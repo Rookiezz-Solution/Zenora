@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Edit or create a template</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#1D1822;background:#F5F3F7}
+a{color:#6B3585}a:hover{color:#4F2563}
+.side a{display:flex;align-items:center;height:32px;padding:0 12px;border-radius:8px;font-size:13px;font-weight:500;color:#D6CEDE;text-decoration:none}
+.side a:hover{color:#FFFFFF;background:#2E2735}
+.side a.on{color:#FFFFFF;background:#8B4FA8;font-weight:600}
+.card{background:#FFFFFF;border:1px solid #E4DFE9;border-radius:14px;padding:18px;box-sizing:border-box}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.ig{color:#8E2C5A;background:#F9E6EF}.wa{color:#17654A;background:#E4F3EC}.ad{color:#8F4312;background:#FBEEE3}.crm{color:#244B8A;background:#E6EDF8}.ai{color:#4F2563;background:#F1E8F6}.mut{color:#5E5566;background:#F1EEF4}.ok{color:#17654A;background:#E4F3EC}.warn{color:#8F4312;background:#FBEEE3}.bad{color:#9B1C1C;background:#FBE7E7}
+.btn{height:38px;padding:0 14px;border-radius:8px;border:1px solid #D3CADB;background:#FFFFFF;font:inherit;font-size:13px;font-weight:600;color:#1D1822;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.btnp{height:38px;padding:0 16px;border-radius:8px;border:none;background:#8B4FA8;font:inherit;font-size:13px;font-weight:600;color:#FFFFFF;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5E5566}
+.muted{color:#5E5566}
+.h1{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:28px}
+.h2{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:17px}
+.inp{height:38px;border:1px solid #D3CADB;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;box-sizing:border-box;width:100%;background:#FFFFFF;color:#1D1822}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5E5566;padding:9px 10px;border-bottom:1px solid #E4DFE9}
+.tbl td{padding:10px;border-bottom:1px solid #F0ECF3;vertical-align:middle}
+.av{width:30px;height:30px;border-radius:50%;background:#F1E8F6;color:#6B3585;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.tog{width:36px;height:20px;border-radius:999px;background:#B8ADC2;position:relative;display:inline-block;flex-shrink:0;border:none;padding:0;cursor:pointer}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.tog.on{background:#1D7A55}.tog.on::after{left:18px}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+.stat{font-family:'Bricolage Grotesque',sans-serif;font-size:28px;font-weight:700}
+.bar{height:8px;border-radius:999px;background:#EFEAF3;overflow:hidden}
+.bar span{display:block;height:100%;background:#8B4FA8;border-radius:999px}
+.small{font-size:12px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0ECF3;font-size:13px}
+.dd{position:relative;display:inline-block}
+.dd>summary{list-style:none;cursor:pointer}
+.dd>summary::-webkit-details-marker{display:none}
+.dd .menu{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:210px;max-height:320px;overflow:auto;background:#FFFFFF;border:1px solid #E4DFE9;border-radius:10px;box-shadow:0 10px 30px rgba(29,24,34,.16);padding:6px;display:flex;flex-direction:column;gap:1px}
+.dd.r .menu{left:auto;right:0}
+.dd .menu>*{display:block;width:100%;text-align:left;border:none;background:none;font:inherit;font-size:13px;font-weight:500;color:#1D1822;padding:8px 10px;border-radius:6px;text-decoration:none;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.dd .menu>*:hover{background:#F5F3F7;color:#1D1822}
+.dd .menu .sel{font-weight:700;color:#6B3585}
+.dd .menu .sep{height:1px;padding:0;margin:4px 0;background:#E4DFE9}
+.side .dd{display:block}
+.side .dd .menu a{color:#1D1822;height:auto}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #F5F3F7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #1D1822; overflow: hidden; position: relative">
+<aside class="side" style="width: 220px; flex-shrink: 0; background: #1D1822; padding: 18px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 12px"><div style="width: 30px; height: 30px; border-radius: 8px; background: #8B4FA8; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700">Z</div><span style="color: #FFFFFF; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 15px">Zenora</span></div>
+<details class="dd" style="margin-bottom: 10px"><summary style="padding: 8px 10px; border: 1px solid #3A3242; border-radius: 8px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #B8ADC2">Workspace</span><span style="font-size: 13px; font-weight: 600; color: #FFFFFF">[Business name] ▾</span></summary><div class="menu" role="menu"><a href="Dashboard.dc.html" class="sel" role="menuitem">✓ [Business name]</a><a href="Dashboard.dc.html" role="menuitem">[Client 2] Academy</a><a href="Dashboard.dc.html" role="menuitem">[Client 3] Fitness</a><span class="sep"></span><a href="Agency.dc.html" role="menuitem">All workspaces (agency view)</a><a href="Onboarding.dc.html" role="menuitem">+ New workspace</a></div></details>
+<a href="GlobalSearch.dc.html" style="margin: -4px 0 8px; border: 1px solid #3A3242; color: #B8ADC2">Search leads, chats, automations <span style="margin-left: auto; font-size: 11px">Ctrl K</span></a>
+<a href="Usage.dc.html" style="height: auto; padding: 8px 10px; margin: -4px 0 10px; flex-direction: column; align-items: stretch; gap: 5px; background: #2B2531"><span style="display: flex; justify-content: space-between; font-size: 11px"><span>AI credits</span><b style="color: #FFFFFF">2,140 / 3,000</b></span><span style="height: 6px; border-radius: 999px; background: #3A3242; overflow: hidden; display: block"><span style="display: block; width: 71%; height: 100%; background: #E7A93B"></span></span></a>
+<nav aria-label="Main" style="display: flex; flex-direction: column; gap: 2px">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="14"><a href="{{n.href}}" class="{{n.cls}}">{{n.label}}</a></sc-for>
+</nav>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #3A3242; padding-top: 8px">
+<a href="Notifications.dc.html">Notifications <span style="margin-left: auto; background: #C2410C; color: #FFFFFF; border-radius: 999px; font-size: 11px; padding: 1px 7px">3</span></a>
+<a href="Help.dc.html">Help and support</a>
+<a href="Profile.dc.html" style="height: 44px; gap: 8px"><span class="av" style="width: 26px; height: 26px; background: #8B4FA8; color: #FFFFFF">RM</span><span style="display: flex; flex-direction: column; line-height: 1.2"><span style="color: #FFFFFF; font-weight: 600">[Your name]</span><span style="font-size: 11px">Growth plan · Owner</span></span></a>
+</div>
+</aside>
+<main style="flex-grow: 1; min-width: 0; padding: 26px 30px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; overflow: hidden">
+<div style="display: flex; align-items: flex-end; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px"><h1 class="h1">Edit template</h1><p style="margin: 0; font-size: 14px" class="muted">Appointment booking · your copy. Changes here don’t affect automations already live.</p></div>
+<div style="margin-left: auto; display: flex; gap: 8px"><a href="Templates.dc.html" class="btn">Cancel</a><a href="AutoPublish.dc.html" class="btn">Preview</a><a href="Templates.dc.html" class="btnp">Save template</a></div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 340px; gap: 14px; flex-grow: 1; min-height: 0">
+<div class="col" style="gap: 14px">
+<div class="card col" style="gap: 10px"><span class="h2">About this template</span>
+<label for="te-n" class="lbl">Name</label><input id="te-n" class="inp" value="Appointment booking">
+<label for="te-d" class="lbl">Description</label><input id="te-d" class="inp" value="Qualify, book a slot, remind, collect feedback">
+<span class="lbl">Industries</span><div class="row" style="gap: 6px; flex-wrap: wrap"><span class="chip ai">Any industry ✓</span><span class="chip mut">Clinics</span><span class="chip mut">Salons</span><span class="chip mut">Coaching</span><span class="chip mut">+ Add</span></div></div>
+<div class="card col" style="gap: 8px"><span class="h2">Fill-in words</span><span class="small muted" style="line-height: 1.5">Anyone using this template fills these in once. They appear everywhere in the messages.</span>
+<sc-for list="{{vars}}" as="v" hint-placeholder-count="5"><div class="row small"><span class="chip ai" style="width: 150px">{{v.k}}</span><input class="inp" aria-label="{{v.k}}" value="{{v.v}}" style="height: 32px"></div></sc-for>
+<button type="button" class="btn" style="align-self: flex-start">+ Fill-in word</button></div></div>
+<div class="card col" style="gap: 6px"><div class="row"><span class="h2">Steps</span><a href="Main.dc.html" class="btn" style="margin-left: auto; height: 32px">Open in builder</a></div>
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="8"><div style="display: flex; gap: 10px; align-items: center; padding: 9px 10px; border: 1px solid #E4DFE9; border-radius: 10px; font-size: 13px"><span class="muted" aria-hidden="true">⋮⋮</span><span class="chip {{s.c}}" style="width: 88px; text-align: center">{{s.k}}</span><span style="flex-grow: 1; line-height: 1.35">{{s.t}}</span><button type="button" class="btn" style="height: 28px; padding: 0 8px">Edit</button></div></sc-for>
+<button type="button" class="btn" style="align-self: flex-start">+ Add step</button></div>
+<div class="col" style="gap: 14px">
+<div class="card col" style="gap: 8px"><span class="h2">Comes with</span>
+<div class="li"><span style="flex-grow: 1">Default trigger</span><b>Keyword "{keyword}"</b></div>
+<div class="li"><span style="flex-grow: 1">Pipeline stages</span><b>5</b></div>
+<div class="li"><span style="flex-grow: 1">Custom fields</span><b>4</b></div>
+<div class="li" style="border: none"><span style="flex-grow: 1">WhatsApp templates</span><b>2</b></div></div>
+<div class="card col" style="gap: 8px"><span class="h2">Who can use it</span>
+<sc-for list="{{share}}" as="s" hint-placeholder-count="4"><div class="row" style="font-size: 13px; justify-content: space-between"><span>{{s.t}}</span><button type="button" class="{{s.g}}" aria-label="{{s.t}}" aria-pressed="{{s.p}}"></button></div></sc-for></div></div></div>
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview": {"width": 1440, "height": 900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const NAV=[["Home", "Dashboard"], ["Inbox", "Inbox"], ["Leads", "LeadsList"], ["Leads board", "Pipeline"], ["Automations", "AutomationsList"], ["Calendar", "Calendar"], ["Calls", "Calls"], ["Meetings", "Meetings"], ["Tasks and follow-ups", "Tasks"], ["Broadcasts and templates", "Broadcasts"], ["AI knowledge", "Knowledge"], ["Ads and sources", "Sources"], ["Link in bio", "LinkInBio"], ["Reports", "Reports"], ["Settings", "Settings"]]; const nav=NAV.map(function(p){return {label:p[0],href:p[1]+'.dc.html',cls:p[1]==='Templates'?'on':''};});
+    const D = {"vars": [{"k": "{business_name}", "v": "[Your business]"}, {"k": "{appointment_word}", "v": "appointment"}, {"k": "{options}", "v": "Service A, Service B, Service C"}, {"k": "{budget_ranges}", "v": "Under ₹10K, ₹10K–50K, ₹50K+"}, {"k": "{keyword}", "v": "BOOK"}], "steps": [{"k": "Trigger", "c": "warn", "t": "Comment, DM or WhatsApp message with {keyword}"}, {"k": "List menu", "c": "ok", "t": "What are you looking for? → {options}"}, {"k": "Buttons", "c": "ok", "t": "Budget? → {budget_ranges}"}, {"k": "Form", "c": "ok", "t": "Name, date and slot for your {appointment_word}"}, {"k": "If", "c": "crm", "t": "Qualified? → assign and alert"}, {"k": "Template", "c": "ok", "t": "{appointment_word} reminder a day before"}, {"k": "Wait", "c": "crm", "t": "After the {appointment_word}: ask for feedback"}, {"k": "Hand over", "c": "crm", "t": "\"Talk to someone\" goes to a person"}], "share": [{"t": "Only me", "g": "tog", "p": "false"}, {"t": "Everyone in my workspace", "g": "tog on", "p": "true"}, {"t": "My agency clients", "g": "tog on", "p": "true"}, {"t": "Public template gallery", "g": "tog", "p": "false"}]};
+    D.nav = nav;
+    return D;
+  }
+}
+</script>
+</body>
+</html>

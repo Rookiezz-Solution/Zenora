@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Checkout</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#1D1822;background:#F5F3F7}
+a{color:#6B3585}a:hover{color:#4F2563}
+.side a{display:flex;align-items:center;height:32px;padding:0 12px;border-radius:8px;font-size:13px;font-weight:500;color:#D6CEDE;text-decoration:none}
+.side a:hover{color:#FFFFFF;background:#2E2735}
+.side a.on{color:#FFFFFF;background:#8B4FA8;font-weight:600}
+.card{background:#FFFFFF;border:1px solid #E4DFE9;border-radius:14px;padding:18px;box-sizing:border-box}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.ig{color:#8E2C5A;background:#F9E6EF}.wa{color:#17654A;background:#E4F3EC}.ad{color:#8F4312;background:#FBEEE3}.crm{color:#244B8A;background:#E6EDF8}.ai{color:#4F2563;background:#F1E8F6}.mut{color:#5E5566;background:#F1EEF4}.ok{color:#17654A;background:#E4F3EC}.warn{color:#8F4312;background:#FBEEE3}.bad{color:#9B1C1C;background:#FBE7E7}
+.btn{height:38px;padding:0 14px;border-radius:8px;border:1px solid #D3CADB;background:#FFFFFF;font:inherit;font-size:13px;font-weight:600;color:#1D1822;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.btnp{height:38px;padding:0 16px;border-radius:8px;border:none;background:#8B4FA8;font:inherit;font-size:13px;font-weight:600;color:#FFFFFF;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5E5566}
+.muted{color:#5E5566}
+.h1{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:28px}
+.h2{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:17px}
+.inp{height:38px;border:1px solid #D3CADB;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;box-sizing:border-box;width:100%;background:#FFFFFF;color:#1D1822}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5E5566;padding:9px 10px;border-bottom:1px solid #E4DFE9}
+.tbl td{padding:10px;border-bottom:1px solid #F0ECF3;vertical-align:middle}
+.av{width:30px;height:30px;border-radius:50%;background:#F1E8F6;color:#6B3585;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.tog{width:36px;height:20px;border-radius:999px;background:#B8ADC2;position:relative;display:inline-block;flex-shrink:0;border:none;padding:0;cursor:pointer}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.tog.on{background:#1D7A55}.tog.on::after{left:18px}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+.stat{font-family:'Bricolage Grotesque',sans-serif;font-size:28px;font-weight:700}
+.bar{height:8px;border-radius:999px;background:#EFEAF3;overflow:hidden}
+.bar span{display:block;height:100%;background:#8B4FA8;border-radius:999px}
+.small{font-size:12px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0ECF3;font-size:13px}
+.dd{position:relative;display:inline-block}
+.dd>summary{list-style:none;cursor:pointer}
+.dd>summary::-webkit-details-marker{display:none}
+.dd .menu{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:210px;max-height:320px;overflow:auto;background:#FFFFFF;border:1px solid #E4DFE9;border-radius:10px;box-shadow:0 10px 30px rgba(29,24,34,.16);padding:6px;display:flex;flex-direction:column;gap:1px}
+.dd.r .menu{left:auto;right:0}
+.dd .menu>*{display:block;width:100%;text-align:left;border:none;background:none;font:inherit;font-size:13px;font-weight:500;color:#1D1822;padding:8px 10px;border-radius:6px;text-decoration:none;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.dd .menu>*:hover{background:#F5F3F7;color:#1D1822}
+.dd .menu .sel{font-weight:700;color:#6B3585}
+.dd .menu .sep{height:1px;padding:0;margin:4px 0;background:#E4DFE9}
+.side .dd{display:block}
+.side .dd .menu a{color:#1D1822;height:auto}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #F5F3F7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #1D1822; overflow: hidden; box-sizing: border-box; display: flex; flex-direction: column">
+<header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 0 40px; background: #FFFFFF; border-bottom: 1px solid #E4DFE9"><div style="width: 32px; height: 32px; border-radius: 8px; background: #8B4FA8; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700">Z</div><b style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px">Zenora</b><a href="Billing.dc.html" class="btn" style="margin-left: auto">Cancel</a></header>
+<div style="flex-grow: 1; padding: 40px 64px; display: grid; grid-template-columns: 1fr 420px; gap: 30px; box-sizing: border-box">
+<div class="col" style="gap: 16px"><h1 class="h1">Upgrade to Pro</h1>
+<div class="card col" style="gap: 10px"><span class="h2">Billing cycle</span><div class="row" style="gap: 10px"><button type="button" class="btn" style="flex-grow: 1; height: 56px">Monthly · ₹8,999</button><button type="button" class="btn" style="flex-grow: 1; height: 56px; border: 2px solid #8B4FA8">Yearly · ₹89,990 (2 months free)</button></div></div>
+<div class="card col" style="gap: 10px"><span class="h2">GST details</span><div class="row"><div class="col" style="gap: 6px; flex-grow: 1"><label for="co-legal" class="lbl">Legal business name</label><input id="co-legal" class="inp" value="[Business legal name]"></div><div class="col" style="gap: 6px; flex-grow: 1"><label for="co-gst" class="lbl">GSTIN (optional)</label><input id="co-gst" class="inp" placeholder="33XXXXX0000X1Z5"></div></div>
+<label for="co-addr" class="lbl">Billing address</label><input id="co-addr" class="inp" value="[Address], Chennai, Tamil Nadu"></div>
+<div class="card col" style="gap: 10px"><span class="h2">Pay with</span><div class="row" style="gap: 8px"><span class="chip ai">UPI</span><span class="chip mut">Card</span><span class="chip mut">Net banking</span><span class="chip mut">UPI AutoPay (recurring)</span></div><span class="small muted">Secure payment through your payment gateway. We never see your card details.</span></div></div>
+<div class="card col" style="gap: 10px; align-self: flex-start"><span class="h2">Summary</span>
+<div class="row small" style="justify-content: space-between"><span>Pro plan · monthly</span><span>₹8,999</span></div>
+<div class="row small" style="justify-content: space-between"><span>Credit for unused Growth days</span><span>−₹[amount]</span></div>
+<div class="row small" style="justify-content: space-between"><span>GST 18%</span><span>₹[amount]</span></div>
+<div class="row" style="justify-content: space-between; border-top: 1px solid #E4DFE9; padding-top: 10px"><b>Total today</b><b>₹[total]</b></div>
+<div class="row"><input class="inp" aria-label="Coupon code" placeholder="Coupon code" style="height: 36px"><button type="button" class="btn" style="height: 36px">Apply</button></div>
+<a href="PaymentSuccess.dc.html" class="btnp" style="height: 48px">Pay securely</a><span class="small muted">Cancel anytime. WhatsApp message charges are billed by Meta separately.</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview": {"width": 1440, "height": 900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const nav=[];
+    const D = {};
+    D.nav = nav;
+    return D;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Unified inbox</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#1D1822;background:#F5F3F7}
+a{color:#6B3585}a:hover{color:#4F2563}
+.side a{display:flex;align-items:center;height:32px;padding:0 12px;border-radius:8px;font-size:13px;font-weight:500;color:#D6CEDE;text-decoration:none}
+.side a:hover{color:#FFFFFF;background:#2E2735}
+.side a.on{color:#FFFFFF;background:#8B4FA8;font-weight:600}
+.card{background:#FFFFFF;border:1px solid #E4DFE9;border-radius:14px;padding:18px;box-sizing:border-box}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.ig{color:#8E2C5A;background:#F9E6EF}.wa{color:#17654A;background:#E4F3EC}.ad{color:#8F4312;background:#FBEEE3}.crm{color:#244B8A;background:#E6EDF8}.ai{color:#4F2563;background:#F1E8F6}.mut{color:#5E5566;background:#F1EEF4}.ok{color:#17654A;background:#E4F3EC}.warn{color:#8F4312;background:#FBEEE3}.bad{color:#9B1C1C;background:#FBE7E7}
+.btn{height:38px;padding:0 14px;border-radius:8px;border:1px solid #D3CADB;background:#FFFFFF;font:inherit;font-size:13px;font-weight:600;color:#1D1822;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.btnp{height:38px;padding:0 16px;border-radius:8px;border:none;background:#8B4FA8;font:inherit;font-size:13px;font-weight:600;color:#FFFFFF;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5E5566}
+.muted{color:#5E5566}
+.h1{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:28px}
+.h2{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:17px}
+.inp{height:38px;border:1px solid #D3CADB;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;box-sizing:border-box;width:100%;background:#FFFFFF;color:#1D1822}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5E5566;padding:9px 10px;border-bottom:1px solid #E4DFE9}
+.tbl td{padding:10px;border-bottom:1px solid #F0ECF3;vertical-align:middle}
+.av{width:30px;height:30px;border-radius:50%;background:#F1E8F6;color:#6B3585;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.tog{width:36px;height:20px;border-radius:999px;background:#B8ADC2;position:relative;display:inline-block;flex-shrink:0;border:none;padding:0;cursor:pointer}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.tog.on{background:#1D7A55}.tog.on::after{left:18px}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+.stat{font-family:'Bricolage Grotesque',sans-serif;font-size:28px;font-weight:700}
+.bar{height:8px;border-radius:999px;background:#EFEAF3;overflow:hidden}
+.bar span{display:block;height:100%;background:#8B4FA8;border-radius:999px}
+.small{font-size:12px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0ECF3;font-size:13px}
+.dd{position:relative;display:inline-block}
+.dd>summary{list-style:none;cursor:pointer}
+.dd>summary::-webkit-details-marker{display:none}
+.dd .menu{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:210px;max-height:320px;overflow:auto;background:#FFFFFF;border:1px solid #E4DFE9;border-radius:10px;box-shadow:0 10px 30px rgba(29,24,34,.16);padding:6px;display:flex;flex-direction:column;gap:1px}
+.dd.r .menu{left:auto;right:0}
+.dd .menu>*{display:block;width:100%;text-align:left;border:none;background:none;font:inherit;font-size:13px;font-weight:500;color:#1D1822;padding:8px 10px;border-radius:6px;text-decoration:none;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.dd .menu>*:hover{background:#F5F3F7;color:#1D1822}
+.dd .menu .sel{font-weight:700;color:#6B3585}
+.dd .menu .sep{height:1px;padding:0;margin:4px 0;background:#E4DFE9}
+.side .dd{display:block}
+.side .dd .menu a{color:#1D1822;height:auto}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #F5F3F7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #1D1822; overflow: hidden; position: relative">
+<aside class="side" style="width: 220px; flex-shrink: 0; background: #1D1822; padding: 18px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 12px"><div style="width: 30px; height: 30px; border-radius: 8px; background: #8B4FA8; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700">Z</div><span style="color: #FFFFFF; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 15px">Zenora</span></div>
+<details class="dd" style="margin-bottom: 10px"><summary style="padding: 8px 10px; border: 1px solid #3A3242; border-radius: 8px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #B8ADC2">Workspace</span><span style="font-size: 13px; font-weight: 600; color: #FFFFFF">[Business name] ▾</span></summary><div class="menu" role="menu"><a href="Dashboard.dc.html" class="sel" role="menuitem">✓ [Business name]</a><a href="Dashboard.dc.html" role="menuitem">[Client 2] Academy</a><a href="Dashboard.dc.html" role="menuitem">[Client 3] Fitness</a><span class="sep"></span><a href="Agency.dc.html" role="menuitem">All workspaces (agency view)</a><a href="Onboarding.dc.html" role="menuitem">+ New workspace</a></div></details>
+<a href="GlobalSearch.dc.html" style="margin: -4px 0 8px; border: 1px solid #3A3242; color: #B8ADC2">Search leads, chats, automations <span style="margin-left: auto; font-size: 11px">Ctrl K</span></a>
+<a href="Usage.dc.html" style="height: auto; padding: 8px 10px; margin: -4px 0 10px; flex-direction: column; align-items: stretch; gap: 5px; background: #2B2531"><span style="display: flex; justify-content: space-between; font-size: 11px"><span>AI credits</span><b style="color: #FFFFFF">2,140 / 3,000</b></span><span style="height: 6px; border-radius: 999px; background: #3A3242; overflow: hidden; display: block"><span style="display: block; width: 71%; height: 100%; background: #E7A93B"></span></span></a>
+<nav aria-label="Main" style="display: flex; flex-direction: column; gap: 2px">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="14"><a href="{{n.href}}" class="{{n.cls}}">{{n.label}}</a></sc-for>
+</nav>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #3A3242; padding-top: 8px">
+<a href="Notifications.dc.html">Notifications <span style="margin-left: auto; background: #C2410C; color: #FFFFFF; border-radius: 999px; font-size: 11px; padding: 1px 7px">3</span></a>
+<a href="Help.dc.html">Help and support</a>
+<a href="Profile.dc.html" style="height: 44px; gap: 8px"><span class="av" style="width: 26px; height: 26px; background: #8B4FA8; color: #FFFFFF">RM</span><span style="display: flex; flex-direction: column; line-height: 1.2"><span style="color: #FFFFFF; font-weight: 600">[Your name]</span><span style="font-size: 11px">Growth plan · Owner</span></span></a>
+</div>
+</aside>
+<main style="flex-grow: 1; min-width: 0; padding: 26px 30px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; overflow: hidden">
+<div style="display: flex; gap: 0; flex-grow: 1; min-height: 0; margin: -26px -30px; background: #FFFFFF">
+<section aria-label="Conversations" style="width: 330px; flex-shrink: 0; border-right: 1px solid #E4DFE9; display: flex; flex-direction: column">
+<div style="padding: 18px 16px 10px; display: flex; flex-direction: column; gap: 10px"><h1 class="h1" style="font-size: 22px">Inbox</h1><input class="inp" type="search" aria-label="Search conversations" placeholder="Search name, phone, @handle">
+<div class="row" style="gap: 6px; flex-wrap: wrap"><sc-for list="{{tabs}}" as="t" hint-placeholder-count="5"><button type="button" style="height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid {{t.b}}; background: {{t.bg}}; color: {{t.fg}}; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer">{{t.t}}</button></sc-for></div>
+<div class="row small" style="gap: 6px"><span class="chip mut">Mine</span><span class="chip mut">Unassigned · 3</span><span class="chip mut">Bot active</span><span class="chip mut">Waiting on us</span></div></div>
+<sc-for list="{{convos}}" as="c" hint-placeholder-count="7"><button type="button" style="display: flex; gap: 10px; padding: 12px 16px; border: none; border-top: 1px solid #F0ECF3; background: {{c.bg}}; text-align: left; font: inherit; cursor: pointer; width: 100%"><span class="av">{{c.i}}</span><span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><span class="row" style="gap: 6px"><b style="font-size: 13px">{{c.n}}</b><span class="chip {{c.cls}}">{{c.ch}}</span><span class="small muted" style="margin-left: auto">{{c.tm}}</span></span><span class="small muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.m}}</span></span></button></sc-for>
+</section>
+<section aria-label="Conversation" style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; background: #FBFAFC">
+<div style="height: 64px; flex-shrink: 0; border-bottom: 1px solid #E4DFE9; background: #FFFFFF; display: flex; align-items: center; gap: 10px; padding: 0 20px"><span class="av">PN</span><div class="col" style="gap: 2px"><b style="font-size: 14px">Priya N</b><span class="small muted">@priya.n · +91 98xxx xx210 · merged profile</span></div>
+<span class="chip ok" style="margin-left: auto">WhatsApp window: 18h 20m left</span><a href="Dialer.dc.html" class="btn">Call (recorded)</a><details class="dd r"><summary class="btn">Assign: Arun K ▾</summary><div class="menu" role="menu"><button type="button" role="menuitem" class="sel">✓ Arun K</button><button type="button" role="menuitem">Meena V</button><button type="button" role="menuitem">Sathish R</button><button type="button" role="menuitem">Nisha P (on leave)</button><span class="sep"></span><button type="button" role="menuitem">Auto (routing rules)</button><button type="button" role="menuitem">Unassign</button></div></details><details class="dd r"><summary class="btn">Resume bot</summary><div class="menu" role="menu"><button type="button" role="menuitem">Resume bot now</button><button type="button" role="menuitem">Resume after I stop replying (30 min)</button><button type="button" role="menuitem">Keep bot paused for this lead</button></div></details></div>
+<div style="flex-grow: 1; padding: 18px 24px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.45; overflow: hidden">
+<span class="chip ig" style="align-self: center">Commented "PRICE" on reel · Product walkthrough · 10:02</span>
+<div style="align-self: flex-end; max-width: 60%; background: #F1E8F6; border-radius: 12px; padding: 9px 12px"><span class="lbl" style="font-size: 10px">Bot · Instagram</span><br>Thanks for your interest! Get the brochure, prices and a free appointment on WhatsApp.</div>
+<span class="chip wa" style="align-self: center">Moved to WhatsApp · 10:03</span>
+<div style="align-self: flex-end; max-width: 60%; background: #F1E8F6; border-radius: 12px; padding: 9px 12px"><span class="lbl" style="font-size: 10px">Bot · WhatsApp</span><br>What are you looking for? → <b>Premium package</b> · Budget? → <b>₹10K – 50K</b> · Date → <b>Sat 10:30 AM</b></div>
+<span class="chip crm" style="align-self: center">Qualified · assigned to Arun K · 10:06</span>
+<div style="align-self: flex-start; max-width: 60%; background: #FFFFFF; border: 1px solid #E4DFE9; border-radius: 12px; padding: 9px 12px">Can I bring my family? Do you have weekend slots?</div>
+<div style="align-self: flex-end; max-width: 60%; background: #D9FDD3; border-radius: 12px; padding: 9px 12px"><span class="lbl" style="font-size: 10px">Arun K</span><br>Of course! Saturday 10:30 works. I'll share the location pin now.</div>
+<span class="chip mut" style="align-self: center">Bot paused while a person is replying</span>
+</div>
+<div style="border-top: 1px solid #E4DFE9; background: #FFFFFF; padding: 12px 20px; display: flex; flex-direction: column; gap: 10px">
+<div class="row small" style="gap: 6px"><span class="lbl" style="margin-right: 4px">Quick replies</span><span class="chip mut">/location</span><span class="chip mut">/brochure</span><span class="chip mut">/packages</span><span class="chip ai">AI suggested reply</span></div>
+<div class="row"><label for="composer" class="lbl" style="position: absolute; left: -9999px">Message</label><input id="composer" class="inp" placeholder="Type a reply, or / for quick replies"><details class="dd r"><summary class="btn">Attach</summary><div class="menu" role="menu"><button type="button" role="menuitem">Photo or video</button><button type="button" role="menuitem">Document or brochure</button><button type="button" role="menuitem">Location pin</button><button type="button" role="menuitem">Contact card</button><button type="button" role="menuitem">Product from catalog</button><button type="button" role="menuitem">Saved media</button></div></details><details class="dd r"><summary class="btn">Payment link</summary><div class="menu" role="menu"><button type="button" role="menuitem">Advance · ₹5,000</button><button type="button" role="menuitem">Full payment</button><button type="button" role="menuitem">Custom amount…</button><span class="sep"></span><button type="button" role="menuitem">Payment link history</button></div></details><details class="dd r"><summary class="btn">Template</summary><div class="menu" role="menu"><button type="button" role="menuitem">appointment_reminder (Utility)</button><button type="button" role="menuitem">visit_feedback (Utility)</button><button type="button" role="menuitem">no_reply_nudge (Marketing)</button><button type="button" role="menuitem">payment_link (Utility)</button><span class="sep"></span><a href="TemplateCreate.dc.html" role="menuitem">+ New template</a></div></details><button type="button" class="btnp">Send</button></div>
+</div>
+</section>
+<aside aria-label="Lead details" style="width: 300px; flex-shrink: 0; border-left: 1px solid #E4DFE9; padding: 18px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; overflow: hidden">
+<div class="col" style="gap: 6px"><span class="lbl">Stage</span><details class="dd"><summary class="btn" style="justify-content: space-between">Appointment Booked ▾</summary><div class="menu" role="menu"><button type="button" role="menuitem">New Enquiry</button><button type="button" role="menuitem">Contacted</button><button type="button" role="menuitem" class="sel">✓ Appointment Booked</button><button type="button" role="menuitem">Appointment Done</button><button type="button" role="menuitem">Negotiation</button><button type="button" role="menuitem">Won</button><button type="button" role="menuitem">Lost</button></div></details></div>
+<div class="col" style="gap: 8px; font-size: 13px"><span class="lbl">Fields (from bot)</span>
+<sc-for list="{{fields}}" as="f" hint-placeholder-count="6"><div class="row" style="justify-content: space-between"><span class="muted">{{f.k}}</span><b>{{f.v}}</b></div></sc-for></div>
+<div class="row" style="flex-wrap: wrap; gap: 6px"><span class="chip ai">Score 82 · hot</span><span class="chip mut">Tamil</span><span class="chip mut">Weekend slot</span></div>
+<div class="card" style="padding: 12px; background: #FAF6FC; border-color: #E3D2EC; font-size: 12px; line-height: 1.5"><span class="lbl" style="color: #4F2563">AI summary</span><br>Buying for the family, prefers the premium package, wants a weekend slot, ready to come Saturday.</div>
+<a href="LeadProfile.dc.html" class="btn">Open full lead profile</a>
+</aside>
+</div>
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview": {"width": 1440, "height": 900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const NAV=[["Home", "Dashboard"], ["Inbox", "Inbox"], ["Leads", "LeadsList"], ["Leads board", "Pipeline"], ["Automations", "AutomationsList"], ["Calendar", "Calendar"], ["Calls", "Calls"], ["Meetings", "Meetings"], ["Tasks and follow-ups", "Tasks"], ["Broadcasts and templates", "Broadcasts"], ["AI knowledge", "Knowledge"], ["Ads and sources", "Sources"], ["Link in bio", "LinkInBio"], ["Reports", "Reports"], ["Settings", "Settings"]]; const nav=NAV.map(function(p){return {label:p[0],href:p[1]+'.dc.html',cls:p[1]==='Inbox'?'on':''};});
+    const D = {"tabs": [{"t": "All", "b": "#1D1822", "bg": "#1D1822", "fg": "#FFFFFF"}, {"t": "IG DMs", "b": "#D3CADB", "bg": "#FFFFFF", "fg": "#1D1822"}, {"t": "Comments", "b": "#D3CADB", "bg": "#FFFFFF", "fg": "#1D1822"}, {"t": "Story replies", "b": "#D3CADB", "bg": "#FFFFFF", "fg": "#1D1822"}, {"t": "WhatsApp", "b": "#D3CADB", "bg": "#FFFFFF", "fg": "#1D1822"}], "convos": [{"i": "PN", "n": "Priya N", "ch": "WhatsApp", "cls": "wa", "tm": "now", "m": "Can I bring my family? Do you have…", "bg": "#F7F2FA"}, {"i": "KR", "n": "Karthik R", "ch": "Comment", "cls": "ig", "tm": "2m", "m": "Bot: What are you looking for?…", "bg": "#FFFFFF"}, {"i": "DS", "n": "Divya S", "ch": "WhatsApp", "cls": "wa", "tm": "5m", "m": "From ad \"Launch campaign\" · filling form", "bg": "#FFFFFF"}, {"i": "@m", "n": "@mohan.builds", "ch": "Story reply", "cls": "ig", "tm": "9m", "m": "Replied to your story: \"price?\"", "bg": "#FFFFFF"}, {"i": "SK", "n": "Suresh K", "ch": "WhatsApp", "cls": "wa", "tm": "22m", "m": "Meena: Sharing the custom package quote", "bg": "#FFFFFF"}, {"i": "LV", "n": "Lakshmi V", "ch": "IG DM", "cls": "ig", "tm": "1h", "m": "Is the Saturday slot confirmed?", "bg": "#FFFFFF"}, {"i": "AM", "n": "Anitha M", "ch": "WhatsApp", "cls": "wa", "tm": "3h", "m": "Bot: How was your appointment? ★★★★", "bg": "#FFFFFF"}], "fields": [{"k": "Interest", "v": "Premium package"}, {"k": "Budget", "v": "₹10K – 50K"}, {"k": "Requirement", "v": "Premium"}, {"k": "Appointment", "v": "Sat, 10:30 AM"}, {"k": "Source", "v": "IG reel comment"}, {"k": "Owner", "v": "Arun K"}]};
+    D.nav = nav;
+    return D;
+  }
+}
+</script>
+</body>
+</html>

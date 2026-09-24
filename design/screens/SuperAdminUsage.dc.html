@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Owner console: usage and costs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#1D1822;background:#F5F3F7}
+a{color:#6B3585}a:hover{color:#4F2563}
+.side a{display:flex;align-items:center;height:32px;padding:0 12px;border-radius:8px;font-size:13px;font-weight:500;color:#D6CEDE;text-decoration:none}
+.side a:hover{color:#FFFFFF;background:#2E2735}
+.side a.on{color:#FFFFFF;background:#8B4FA8;font-weight:600}
+.card{background:#FFFFFF;border:1px solid #E4DFE9;border-radius:14px;padding:18px;box-sizing:border-box}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.ig{color:#8E2C5A;background:#F9E6EF}.wa{color:#17654A;background:#E4F3EC}.ad{color:#8F4312;background:#FBEEE3}.crm{color:#244B8A;background:#E6EDF8}.ai{color:#4F2563;background:#F1E8F6}.mut{color:#5E5566;background:#F1EEF4}.ok{color:#17654A;background:#E4F3EC}.warn{color:#8F4312;background:#FBEEE3}.bad{color:#9B1C1C;background:#FBE7E7}
+.btn{height:38px;padding:0 14px;border-radius:8px;border:1px solid #D3CADB;background:#FFFFFF;font:inherit;font-size:13px;font-weight:600;color:#1D1822;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.btnp{height:38px;padding:0 16px;border-radius:8px;border:none;background:#8B4FA8;font:inherit;font-size:13px;font-weight:600;color:#FFFFFF;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5E5566}
+.muted{color:#5E5566}
+.h1{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:28px}
+.h2{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:17px}
+.inp{height:38px;border:1px solid #D3CADB;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;box-sizing:border-box;width:100%;background:#FFFFFF;color:#1D1822}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5E5566;padding:9px 10px;border-bottom:1px solid #E4DFE9}
+.tbl td{padding:10px;border-bottom:1px solid #F0ECF3;vertical-align:middle}
+.av{width:30px;height:30px;border-radius:50%;background:#F1E8F6;color:#6B3585;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.tog{width:36px;height:20px;border-radius:999px;background:#B8ADC2;position:relative;display:inline-block;flex-shrink:0;border:none;padding:0;cursor:pointer}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.tog.on{background:#1D7A55}.tog.on::after{left:18px}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+.stat{font-family:'Bricolage Grotesque',sans-serif;font-size:28px;font-weight:700}
+.bar{height:8px;border-radius:999px;background:#EFEAF3;overflow:hidden}
+.bar span{display:block;height:100%;background:#8B4FA8;border-radius:999px}
+.small{font-size:12px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0ECF3;font-size:13px}
+.dd{position:relative;display:inline-block}
+.dd>summary{list-style:none;cursor:pointer}
+.dd>summary::-webkit-details-marker{display:none}
+.dd .menu{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:210px;max-height:320px;overflow:auto;background:#FFFFFF;border:1px solid #E4DFE9;border-radius:10px;box-shadow:0 10px 30px rgba(29,24,34,.16);padding:6px;display:flex;flex-direction:column;gap:1px}
+.dd.r .menu{left:auto;right:0}
+.dd .menu>*{display:block;width:100%;text-align:left;border:none;background:none;font:inherit;font-size:13px;font-weight:500;color:#1D1822;padding:8px 10px;border-radius:6px;text-decoration:none;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.dd .menu>*:hover{background:#F5F3F7;color:#1D1822}
+.dd .menu .sel{font-weight:700;color:#6B3585}
+.dd .menu .sep{height:1px;padding:0;margin:4px 0;background:#E4DFE9}
+.side .dd{display:block}
+.side .dd .menu a{color:#1D1822;height:auto}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #F5F3F7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #1D1822; overflow: hidden; box-sizing: border-box; display: flex; flex-direction: column">
+<div style="height: 60px; flex-shrink: 0; background: #1D1822; color: #FFFFFF; display: flex; align-items: center; gap: 12px; padding: 0 30px"><div style="width: 28px; height: 28px; border-radius: 8px; background: #C2410C; display: flex; align-items: center; justify-content: center; font-weight: 700">A</div><b>Zenora · Owner console</b><span class="chip warn" style="margin-left: 8px">Internal</span>
+<nav aria-label="Admin" style="margin-left: auto; display: flex; gap: 18px; font-size: 13px; font-weight: 600"><a href="SuperAdmin.dc.html" style="color: #D6CEDE; text-decoration: none">Overview</a><a href="SuperAdminUsage.dc.html" style="color: #FFFFFF; text-decoration: none">Usage and costs</a><a href="SuperAdminUsage.dc.html" style="color: #D6CEDE; text-decoration: none">Plans and limits</a><a href="SuperAdmin.dc.html" style="color: #D6CEDE; text-decoration: none">Support</a></nav></div>
+<div style="flex-grow: 1; padding: 22px 30px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box">
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px">
+<sc-for list="{{spend}}" as="s" hint-placeholder-count="5"><div class="card col" style="gap: 4px; padding: 14px"><span class="small muted" style="font-weight: 600">{{s.l}}</span><span class="stat" style="font-size: 22px">{{s.v}}</span><span class="small muted">{{s.d}}</span></div></sc-for></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px">
+<div class="card col" style="gap: 6px"><span class="h2">Margin by plan (this month)</span>
+<table class="tbl"><thead><tr><th>Plan</th><th>Workspaces</th><th>Revenue</th><th>AI cost</th><th>Infra + fees</th><th>Margin</th></tr></thead><tbody>
+<sc-for list="{{plans}}" as="p" hint-placeholder-count="5"><tr><td><b>{{p.n}}</b></td><td>{{p.w}}</td><td>{{p.r}}</td><td>{{p.a}}</td><td>{{p.i}}</td><td><span class="chip {{p.c}}">{{p.m}}</span></td></tr></sc-for></tbody></table></div>
+<div class="card col" style="gap: 8px"><div class="row"><span class="h2">Plan limits and credit weights</span><button type="button" class="btnp" style="margin-left: auto; height: 32px">Save changes</button></div>
+<table class="tbl"><thead><tr><th>Setting</th><th>Starter</th><th>Growth</th><th>Pro</th></tr></thead><tbody>
+<sc-for list="{{limits}}" as="l" hint-placeholder-count="5"><tr><td>{{l.t}}</td><td><input class="inp" aria-label="{{l.t}} Starter" value="{{l.a}}" style="height: 30px; width: 90px"></td><td><input class="inp" aria-label="{{l.t}} Growth" value="{{l.b}}" style="height: 30px; width: 90px"></td><td><input class="inp" aria-label="{{l.t}} Pro" value="{{l.c}}" style="height: 30px; width: 90px"></td></tr></sc-for></tbody></table>
+<span class="small muted">Credit weights: reply 1 · call minute 3 · meeting minute 6 · changes apply from next billing month</span></div></div>
+<div class="card col" style="gap: 6px; flex-grow: 1"><div class="row"><span class="h2">Workspaces to watch</span><div class="row" style="margin-left: auto; gap: 6px"><span class="chip bad">Cost over 30% · 2</span><span class="chip warn">Unusual usage · 1</span><span class="chip ai">Upgrade candidates · 4</span></div></div>
+<table class="tbl"><thead><tr><th>Workspace</th><th>Plan</th><th>Credits used</th><th>AI cost</th><th>Cost / revenue</th><th>Flag</th><th>Action</th></tr></thead><tbody>
+<sc-for list="{{ws}}" as="w" hint-placeholder-count="5"><tr><td><b>{{w.n}}</b></td><td>{{w.p}}</td><td>{{w.u}}</td><td>{{w.a}}</td><td><span class="chip {{w.c}}">{{w.r}}</span></td><td class="small">{{w.f}}</td><td><button type="button" class="btn" style="height: 30px">{{w.act}}</button></td></tr></sc-for></tbody></table></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview": {"width": 1440, "height": 900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const nav=[];
+    const D = {"spend": [{"l": "AI provider bills (MTD)", "v": "₹[amount]", "d": "Claude, Sarvam, meeting bot"}, {"l": "Credits used (all)", "v": "[n]", "d": "of [n] included"}, {"l": "Top-up revenue", "v": "₹[amount]", "d": "[n] packs sold"}, {"l": "Cache hits", "v": "[n]%", "d": "FAQ answers served free"}, {"l": "Guardrail stops", "v": "[n]", "d": "bot loops, long calls skipped"}], "plans": [{"n": "Free", "w": "[n]", "r": "₹0", "a": "₹[n]", "i": "₹[n]", "m": "Marketing", "c": "mut"}, {"n": "Starter", "w": "[n]", "r": "₹[n]", "a": "₹[n]", "i": "₹[n]", "m": "74%", "c": "ok"}, {"n": "Growth", "w": "[n]", "r": "₹[n]", "a": "₹[n]", "i": "₹[n]", "m": "76%", "c": "ok"}, {"n": "Pro", "w": "[n]", "r": "₹[n]", "a": "₹[n]", "i": "₹[n]", "m": "68%", "c": "warn"}, {"n": "Top-ups", "w": "—", "r": "₹[n]", "a": "₹[n]", "i": "—", "m": "69%", "c": "ok"}], "limits": [{"t": "AI credits / month", "a": "1000", "b": "3000", "c": "7000"}, {"t": "Contacts", "a": "5000", "b": "25000", "c": "100000"}, {"t": "Recording days", "a": "30", "b": "90", "c": "365"}, {"t": "Max call min transcribed", "a": "30", "b": "60", "c": "120"}, {"t": "AI replies per chat", "a": "20", "b": "20", "c": "30"}], "ws": [{"n": "[Client 1] Properties", "p": "Pro", "u": "7,000 + 10,000 top-up", "a": "₹4,250", "r": "26%", "c": "ok", "f": "Heavy caller, buying top-ups", "act": "Offer Enterprise"}, {"n": "[Client 2] Academy", "p": "Growth", "u": "3,000 / 3,000", "a": "₹750", "r": "19%", "c": "ok", "f": "Hits limit monthly", "act": "Suggest Pro"}, {"n": "[Client 7] Clinic", "p": "Starter", "u": "1,000 + 3,000 top-up", "a": "₹1,000", "r": "35%", "c": "bad", "f": "Long calls on Starter", "act": "Review"}, {"n": "[Client 8] Store", "p": "Growth", "u": "2,950 in 2 days", "a": "₹740", "r": "33%", "c": "bad", "f": "Possible bot loop", "act": "Pause AI"}, {"n": "[Client 9] Coach", "p": "Free", "u": "50 / 50", "a": "₹13", "r": "—", "c": "mut", "f": "3 free workspaces, same phone", "act": "Block"}]};
+    D.nav = nav;
+    return D;
+  }
+}
+</script>
+</body>
+</html>

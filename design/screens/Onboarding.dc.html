@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Onboarding</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#1D1822;background:#F5F3F7}
+a{color:#6B3585}a:hover{color:#4F2563}
+.side a{display:flex;align-items:center;height:32px;padding:0 12px;border-radius:8px;font-size:13px;font-weight:500;color:#D6CEDE;text-decoration:none}
+.side a:hover{color:#FFFFFF;background:#2E2735}
+.side a.on{color:#FFFFFF;background:#8B4FA8;font-weight:600}
+.card{background:#FFFFFF;border:1px solid #E4DFE9;border-radius:14px;padding:18px;box-sizing:border-box}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.ig{color:#8E2C5A;background:#F9E6EF}.wa{color:#17654A;background:#E4F3EC}.ad{color:#8F4312;background:#FBEEE3}.crm{color:#244B8A;background:#E6EDF8}.ai{color:#4F2563;background:#F1E8F6}.mut{color:#5E5566;background:#F1EEF4}.ok{color:#17654A;background:#E4F3EC}.warn{color:#8F4312;background:#FBEEE3}.bad{color:#9B1C1C;background:#FBE7E7}
+.btn{height:38px;padding:0 14px;border-radius:8px;border:1px solid #D3CADB;background:#FFFFFF;font:inherit;font-size:13px;font-weight:600;color:#1D1822;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.btnp{height:38px;padding:0 16px;border-radius:8px;border:none;background:#8B4FA8;font:inherit;font-size:13px;font-weight:600;color:#FFFFFF;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5E5566}
+.muted{color:#5E5566}
+.h1{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:28px}
+.h2{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:17px}
+.inp{height:38px;border:1px solid #D3CADB;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;box-sizing:border-box;width:100%;background:#FFFFFF;color:#1D1822}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5E5566;padding:9px 10px;border-bottom:1px solid #E4DFE9}
+.tbl td{padding:10px;border-bottom:1px solid #F0ECF3;vertical-align:middle}
+.av{width:30px;height:30px;border-radius:50%;background:#F1E8F6;color:#6B3585;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.tog{width:36px;height:20px;border-radius:999px;background:#B8ADC2;position:relative;display:inline-block;flex-shrink:0;border:none;padding:0;cursor:pointer}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.tog.on{background:#1D7A55}.tog.on::after{left:18px}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+.stat{font-family:'Bricolage Grotesque',sans-serif;font-size:28px;font-weight:700}
+.bar{height:8px;border-radius:999px;background:#EFEAF3;overflow:hidden}
+.bar span{display:block;height:100%;background:#8B4FA8;border-radius:999px}
+.small{font-size:12px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0ECF3;font-size:13px}
+.dd{position:relative;display:inline-block}
+.dd>summary{list-style:none;cursor:pointer}
+.dd>summary::-webkit-details-marker{display:none}
+.dd .menu{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:210px;max-height:320px;overflow:auto;background:#FFFFFF;border:1px solid #E4DFE9;border-radius:10px;box-shadow:0 10px 30px rgba(29,24,34,.16);padding:6px;display:flex;flex-direction:column;gap:1px}
+.dd.r .menu{left:auto;right:0}
+.dd .menu>*{display:block;width:100%;text-align:left;border:none;background:none;font:inherit;font-size:13px;font-weight:500;color:#1D1822;padding:8px 10px;border-radius:6px;text-decoration:none;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.dd .menu>*:hover{background:#F5F3F7;color:#1D1822}
+.dd .menu .sel{font-weight:700;color:#6B3585}
+.dd .menu .sep{height:1px;padding:0;margin:4px 0;background:#E4DFE9}
+.side .dd{display:block}
+.side .dd .menu a{color:#1D1822;height:auto}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #F5F3F7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #1D1822; overflow: hidden; box-sizing: border-box; display: flex; flex-direction: column">
+<header style="height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 40px; background: #FFFFFF; border-bottom: 1px solid #E4DFE9">
+<div style="width: 30px; height: 30px; border-radius: 8px; background: #8B4FA8; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700">Z</div>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 16px">Zenora</span>
+<ol style="margin: 0 0 0 auto; padding: 0; list-style: none; display: flex; gap: 8px; font-size: 13px; font-weight: 600">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="5"><li style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: {{s.bg}}; color: {{s.fg}}"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; color: #1D1822; display: inline-flex; align-items: center; justify-content: center; font-size: 11px">{{s.n}}</span>{{s.t}}</li></sc-for>
+</ol>
+</header>
+<div style="flex-grow: 1; display: flex; gap: 40px; padding: 44px 64px; box-sizing: border-box">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 26px">
+<div class="col" style="gap: 6px"><span class="lbl">Step 1 of 5</span><h1 class="h1" style="font-size: 34px">How will you use Zenora?</h1><p class="muted" style="margin: 0; font-size: 15px">This sets your default screens. You can switch later in Settings.</p></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<button type="button" class="card" style="text-align: left; font: inherit; border: 2px solid #8B4FA8; cursor: pointer; display: flex; flex-direction: column; gap: 8px"><span class="chip ai" style="align-self: flex-start">Team mode</span><span class="h2">I run a business with a sales team</span><span class="muted" style="font-size: 13px; line-height: 1.5">Leads board, lead routing, recorded calls, meeting summaries, speed-to-lead alerts. For coaching, clinics, salons, real estate, agencies and more.</span></button>
+<button type="button" class="card" style="text-align: left; font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 8px"><span class="chip ig" style="align-self: flex-start">Creator mode</span><span class="h2">I'm a creator or solo seller</span><span class="muted" style="font-size: 13px; line-height: 1.5">Comment-to-DM, link in bio, collab enquiries and course sales in one simple view. No pipeline setup needed.</span></button>
+</div>
+<div class="col" style="gap: 12px"><span class="lbl">Your industry: loads starter flows, stages and fields. Rename or change anything later.</span>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{inds}}" as="i" hint-placeholder-count="5"><button type="button" style="height: 64px; border-radius: 12px; border: {{i.border}}; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px">{{i.t}}<span style="font-size: 11px; font-weight: 500; color: #5E5566">{{i.s}}</span></button></sc-for>
+</div></div>
+<div class="row" style="gap: 12px"><label for="bizname" class="lbl" style="width: 140px">Business name</label><input id="bizname" class="inp" style="max-width: 360px" placeholder="[Business name]"><label for="lang" class="lbl" style="width: 150px; margin-left: 20px">Customer languages</label><input id="lang" class="inp" style="max-width: 260px" value="English, Tamil, Tanglish"></div>
+<div class="row" style="margin-top: auto"><button type="button" class="btn">Back</button><a href="Connect.dc.html" class="btnp" style="margin-left: auto; height: 44px; padding: 0 24px">Continue: connect channels</a></div>
+</div>
+<aside class="card" style="width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; align-self: flex-start">
+<span class="h2">What you'll have in 15 minutes</span>
+<sc-for list="{{gets}}" as="g" hint-placeholder-count="5"><div class="row" style="align-items: flex-start; font-size: 13px; line-height: 1.45"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1D7A55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px"><path d="M3 8.5l3 3 7-7"></path></svg><span>{{g}}</span></div></sc-for>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview": {"width": 1440, "height": 900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const nav=[];
+    const D = {"steps": [{"n": "1", "t": "Your business", "bg": "#8B4FA8", "fg": "#FFFFFF"}, {"n": "2", "t": "Connect channels", "bg": "#F1EEF4", "fg": "#5E5566"}, {"n": "3", "t": "Invite team", "bg": "#F1EEF4", "fg": "#5E5566"}, {"n": "4", "t": "Pick a bot", "bg": "#F1EEF4", "fg": "#5E5566"}, {"n": "5", "t": "Go live", "bg": "#F1EEF4", "fg": "#5E5566"}], "inds": [{"t": "Real estate", "s": "Site visits", "border": "1px solid #D3CADB"}, {"t": "Coaching", "s": "Demo classes", "border": "2px solid #8B4FA8"}, {"t": "Clinics", "s": "Consultations", "border": "1px solid #D3CADB"}, {"t": "Salons and spas", "s": "Bookings", "border": "1px solid #D3CADB"}, {"t": "D2C and shops", "s": "Orders", "border": "1px solid #D3CADB"}, {"t": "Travel", "s": "Trip enquiries", "border": "1px solid #D3CADB"}, {"t": "Creators", "s": "Courses, collabs", "border": "1px solid #D3CADB"}, {"t": "Local services", "s": "Pickups, bookings", "border": "1px solid #D3CADB"}, {"t": "Agencies", "s": "Client leads", "border": "1px solid #D3CADB"}, {"t": "Other", "s": "Type your own", "border": "1px solid #D3CADB"}], "gets": ["Instagram and WhatsApp connected to one inbox", "Every ad and organic lead flowing into your leads board", "A appointment booking bot switched on", "Your sales team invited with lead routing set", "Recorded calls with AI summaries"]};
+    D.nav = nav;
+    return D;
+  }
+}
+</script>
+</body>
+</html>

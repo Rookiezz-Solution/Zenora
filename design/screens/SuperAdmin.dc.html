@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Owner console (SaaS admin)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#1D1822;background:#F5F3F7}
+a{color:#6B3585}a:hover{color:#4F2563}
+.side a{display:flex;align-items:center;height:32px;padding:0 12px;border-radius:8px;font-size:13px;font-weight:500;color:#D6CEDE;text-decoration:none}
+.side a:hover{color:#FFFFFF;background:#2E2735}
+.side a.on{color:#FFFFFF;background:#8B4FA8;font-weight:600}
+.card{background:#FFFFFF;border:1px solid #E4DFE9;border-radius:14px;padding:18px;box-sizing:border-box}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.ig{color:#8E2C5A;background:#F9E6EF}.wa{color:#17654A;background:#E4F3EC}.ad{color:#8F4312;background:#FBEEE3}.crm{color:#244B8A;background:#E6EDF8}.ai{color:#4F2563;background:#F1E8F6}.mut{color:#5E5566;background:#F1EEF4}.ok{color:#17654A;background:#E4F3EC}.warn{color:#8F4312;background:#FBEEE3}.bad{color:#9B1C1C;background:#FBE7E7}
+.btn{height:38px;padding:0 14px;border-radius:8px;border:1px solid #D3CADB;background:#FFFFFF;font:inherit;font-size:13px;font-weight:600;color:#1D1822;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.btnp{height:38px;padding:0 16px;border-radius:8px;border:none;background:#8B4FA8;font:inherit;font-size:13px;font-weight:600;color:#FFFFFF;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5E5566}
+.muted{color:#5E5566}
+.h1{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:28px}
+.h2{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:17px}
+.inp{height:38px;border:1px solid #D3CADB;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;box-sizing:border-box;width:100%;background:#FFFFFF;color:#1D1822}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5E5566;padding:9px 10px;border-bottom:1px solid #E4DFE9}
+.tbl td{padding:10px;border-bottom:1px solid #F0ECF3;vertical-align:middle}
+.av{width:30px;height:30px;border-radius:50%;background:#F1E8F6;color:#6B3585;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.tog{width:36px;height:20px;border-radius:999px;background:#B8ADC2;position:relative;display:inline-block;flex-shrink:0;border:none;padding:0;cursor:pointer}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.tog.on{background:#1D7A55}.tog.on::after{left:18px}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+.stat{font-family:'Bricolage Grotesque',sans-serif;font-size:28px;font-weight:700}
+.bar{height:8px;border-radius:999px;background:#EFEAF3;overflow:hidden}
+.bar span{display:block;height:100%;background:#8B4FA8;border-radius:999px}
+.small{font-size:12px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0ECF3;font-size:13px}
+.dd{position:relative;display:inline-block}
+.dd>summary{list-style:none;cursor:pointer}
+.dd>summary::-webkit-details-marker{display:none}
+.dd .menu{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:210px;max-height:320px;overflow:auto;background:#FFFFFF;border:1px solid #E4DFE9;border-radius:10px;box-shadow:0 10px 30px rgba(29,24,34,.16);padding:6px;display:flex;flex-direction:column;gap:1px}
+.dd.r .menu{left:auto;right:0}
+.dd .menu>*{display:block;width:100%;text-align:left;border:none;background:none;font:inherit;font-size:13px;font-weight:500;color:#1D1822;padding:8px 10px;border-radius:6px;text-decoration:none;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.dd .menu>*:hover{background:#F5F3F7;color:#1D1822}
+.dd .menu .sel{font-weight:700;color:#6B3585}
+.dd .menu .sep{height:1px;padding:0;margin:4px 0;background:#E4DFE9}
+.side .dd{display:block}
+.side .dd .menu a{color:#1D1822;height:auto}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #F5F3F7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #1D1822; overflow: hidden; box-sizing: border-box; display: flex; flex-direction: column">
+<div style="height: 60px; flex-shrink: 0; background: #1D1822; color: #FFFFFF; display: flex; align-items: center; gap: 12px; padding: 0 30px"><div style="width: 28px; height: 28px; border-radius: 8px; background: #C2410C; display: flex; align-items: center; justify-content: center; font-weight: 700">A</div><b>Zenora · Owner console</b><span class="chip warn" style="margin-left: 8px">Internal · Rookiezz team only</span>
+<nav aria-label="Admin" style="margin-left: auto; display: flex; gap: 18px; font-size: 13px; font-weight: 600"><a href="SuperAdmin.dc.html" style="color: #FFFFFF; text-decoration: none">Overview</a><a href="SuperAdmin.dc.html" style="color: #D6CEDE; text-decoration: none">Workspaces</a><a href="SuperAdminUsage.dc.html" style="color: #D6CEDE; text-decoration: none">Usage and costs</a><a href="SuperAdminUsage.dc.html" style="color: #D6CEDE; text-decoration: none">Plans and limits</a><a href="SuperAdmin.dc.html" style="color: #D6CEDE; text-decoration: none">Meta app health</a><a href="SuperAdmin.dc.html" style="color: #D6CEDE; text-decoration: none">Support</a><a href="SuperAdmin.dc.html" style="color: #D6CEDE; text-decoration: none">Feature flags</a></nav></div>
+<div style="flex-grow: 1; padding: 26px 30px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box">
+<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px">
+<sc-for list="{{stats}}" as="s" hint-placeholder-count="6"><div class="card col" style="gap: 4px"><span class="small muted" style="font-weight: 600">{{s.l}}</span><span class="stat" style="font-size: 24px">{{s.v}}</span></div></sc-for></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; flex-grow: 1; min-height: 0">
+<div class="card col" style="gap: 6px"><div class="row"><span class="h2">Workspaces</span><input class="inp" type="search" aria-label="Search workspaces" placeholder="Search business, owner, phone" style="max-width: 260px; margin-left: auto"></div>
+<table class="tbl"><thead><tr><th>Business</th><th>Plan</th><th>Seats</th><th>IG</th><th>Leads (30d)</th><th>AI min</th><th>Status</th><th></th></tr></thead><tbody>
+<sc-for list="{{ws}}" as="w" hint-placeholder-count="7"><tr><td><b>{{w.n}}</b><br><span class="small muted">{{w.i}}</span></td><td>{{w.p}}</td><td>{{w.s}}</td><td>{{w.ig}}</td><td>{{w.l}}</td><td>{{w.ai}}</td><td><span class="chip {{w.c}}">{{w.st}}</span></td><td><a href="Dashboard.dc.html" class="btn" style="height: 30px">View as</a></td></tr></sc-for></tbody></table></div>
+<div class="col" style="gap: 14px">
+<div class="card col" style="gap: 8px"><span class="h2">Platform health</span>
+<sc-for list="{{health}}" as="h" hint-placeholder-count="5"><div class="li"><span style="flex-grow: 1">{{h.t}}</span><span class="chip {{h.c}}">{{h.s}}</span></div></sc-for></div>
+<div class="card col" style="gap: 8px"><span class="h2">Partner commissions</span><div class="li"><span style="flex-grow: 1">Active partners</span><b>[n]</b></div><div class="li"><span style="flex-grow: 1">Clients referred (paying)</span><b>[n]</b></div><div class="li" style="border: none"><span style="flex-grow: 1">Payouts due on 5 Oct</span><b>₹[amount]</b></div></div>
+<div class="card col" style="gap: 8px"><span class="h2">Support queue</span>
+<sc-for list="{{tix}}" as="t" hint-placeholder-count="3"><div class="li"><span class="chip {{t.c}}">{{t.p}}</span><span style="flex-grow: 1">{{t.t}}</span><span class="small muted">{{t.w}}</span></div></sc-for></div></div></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview": {"width": 1440, "height": 900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const nav=[];
+    const D = {"stats": [{"l": "MRR", "v": "₹[MRR]"}, {"l": "Paying workspaces", "v": "[n]"}, {"l": "Free workspaces", "v": "[n]"}, {"l": "Trials ending this week", "v": "[n]"}, {"l": "Churned this month", "v": "[n]"}, {"l": "AI cost this month", "v": "₹[amount]"}], "ws": [{"n": "[Client 1] Properties", "i": "Real estate · Chennai", "p": "Pro", "s": "12/15", "ig": "3", "l": "910", "ai": "1,840", "st": "Active", "c": "ok"}, {"n": "[Client 2] Academy", "i": "Coaching · Coimbatore", "p": "Growth", "s": "5/5", "ig": "2", "l": "640", "ai": "410", "st": "Active", "c": "ok"}, {"n": "[Client 3] Fitness", "i": "Creator · Bengaluru", "p": "Starter", "s": "1/2", "ig": "1", "l": "420", "ai": "0", "st": "Trial · 3 days", "c": "warn"}, {"n": "[Client 4] Laundry", "i": "Local services · Chennai", "p": "Growth", "s": "3/5", "ig": "1", "l": "230", "ai": "60", "st": "Active", "c": "ok"}, {"n": "[Client 5] Dental", "i": "Clinic · Madurai", "p": "Starter", "s": "2/2", "ig": "1", "l": "120", "ai": "15", "st": "Payment failed", "c": "bad"}, {"n": "[Client 6] Travels", "i": "Travel · Trichy", "p": "Free", "s": "1/1", "ig": "1", "l": "60", "ai": "0", "st": "Free", "c": "mut"}, {"n": "[Agency 1]", "i": "Agency · 6 clients", "p": "Agency", "s": "—", "ig": "9", "l": "2,380", "ai": "2,210", "st": "Active", "c": "ok"}], "health": [{"t": "Instagram webhooks", "s": "Healthy", "c": "ok"}, {"t": "WhatsApp Cloud API", "s": "Healthy", "c": "ok"}, {"t": "Meta app review permissions", "s": "Approved", "c": "ok"}, {"t": "Transcription queue", "s": "2 min delay", "c": "warn"}, {"t": "Payment gateway", "s": "Healthy", "c": "ok"}], "tix": [{"p": "High", "c": "bad", "t": "[Client 5]: WhatsApp messages not delivering", "w": "20m"}, {"p": "Med", "c": "warn", "t": "[Client 2]: lead form not syncing", "w": "2h"}, {"p": "Low", "c": "mut", "t": "[Agency 1]: commission payout query", "w": "1d"}]};
+    D.nav = nav;
+    return D;
+  }
+}
+</script>
+</body>
+</html>
