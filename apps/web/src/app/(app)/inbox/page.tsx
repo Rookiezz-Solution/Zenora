@@ -6,30 +6,18 @@ import { ConversationThread } from "@/components/inbox/conversation-thread";
 import { apiFetch } from "@/lib/api";
 import type { Conversation, ConversationFilter, Message, QuickReply, WaTemplate } from "@/lib/inbox-types";
 import { getSocket } from "@/lib/socket";
-
-interface Workspace {
-  id: string;
-}
-
-interface CurrentUser {
-  id: string;
-}
+import { useCurrentUser } from "@/lib/use-current-user";
+import { useCurrentWorkspace } from "@/lib/use-workspace";
 
 export default function InboxPage() {
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { workspaceId } = useCurrentWorkspace();
+  const { userId: currentUserId } = useCurrentUser();
   const [filter, setFilter] = useState<ConversationFilter>("all");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const [templates, setTemplates] = useState<WaTemplate[]>([]);
-
-  // Bootstrap: current user + first workspace.
-  useEffect(() => {
-    apiFetch<CurrentUser>("/auth/me").then((u) => setCurrentUserId(u.id)).catch(() => setCurrentUserId(null));
-    apiFetch<Workspace[]>("/workspaces").then((ws) => setWorkspaceId(ws[0]?.id ?? null)).catch(() => setWorkspaceId(null));
-  }, []);
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
 

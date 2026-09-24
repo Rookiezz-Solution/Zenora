@@ -1,32 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { useCurrentWorkspace } from "@/lib/use-workspace";
 import { startWhatsappEmbeddedSignup } from "@/lib/whatsapp-embedded-signup";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-interface Workspace {
-  id: string;
-  name: string;
-}
-
 export default function SettingsPage() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const { workspaceId } = useCurrentWorkspace();
   const [status, setStatus] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiFetch<Workspace[]>("/workspaces")
-      .then((workspaces) => setWorkspace(workspaces[0] ?? null))
-      .catch(() => setWorkspace(null));
-  }, []);
-
   async function connectWhatsapp() {
-    if (!workspace) return;
+    if (!workspaceId) return;
     setStatus(null);
     try {
       const result = await startWhatsappEmbeddedSignup();
-      await apiFetch(`/channels/whatsapp/connect/${workspace.id}`, {
+      await apiFetch(`/channels/whatsapp/connect/${workspaceId}`, {
         method: "POST",
         body: JSON.stringify(result)
       });
@@ -43,7 +33,7 @@ export default function SettingsPage() {
         Official Meta APIs only — you connect your own Instagram account and WhatsApp number.
       </p>
 
-      {!workspace ? (
+      {!workspaceId ? (
         <p className="mt-6 text-sm text-gray-500">Log in and create a workspace first.</p>
       ) : (
         <div className="mt-6 space-y-4">
@@ -53,7 +43,7 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500">DMs, comments, story replies, follow gate.</p>
             </div>
             <a
-              href={`${API_URL}/channels/instagram/connect/${workspace.id}`}
+              href={`${API_URL}/channels/instagram/connect/${workspaceId}`}
               className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white"
             >
               Connect

@@ -1,5 +1,27 @@
 # Zenora — build progress
 
+## 2026-09-25 — Phase 1 item 3: Leads (list, profile, timeline, add/import, dedupe/merge, tags, notes)
+
+**Done**
+- `apps/api` `leads` module: list (search by name/phone/email, filter by tag), profile (identities, tags, notes, consents, field values), add with duplicate check (409 + the existing lead if phone/email already exists), update, delete, tag add/remove, notes, a unified timeline (merges notes + messages + tasks chronologically — bot steps/routing/calls/meetings will join once those phases exist), duplicate suggestions (shared phone/email), and merge (moves identities/notes/conversations/tasks onto the primary lead, re-points tags via upsert so it can't violate the (leadId, tagId) key, keeps the primary's own field values and only fills gaps from the duplicate, marks the duplicate `mergedIntoId`).
+- `apps/web`: `/leads` (list, search, inline add-lead form), `/leads/[id]` (profile — fields, tag chips, notes panel, timeline), `/leads/import` (CSV upload via PapaParse, column-mapping UI, preview, skip-or-update dedupe strategy).
+- Extracted `useCurrentWorkspace`/`useCurrentUser` hooks and refactored `/settings` and `/inbox` to use them — this was the third page needing the same workspace-bootstrap fetch.
+- Tests: 5 for the merge transaction (identity/note/conversation/task moves, tag re-pointing without a unique-constraint clash, field-value gap-filling, self-merge rejection) + 3 for a DTO validation bug found while testing live (below) — 32 tests total, all passing.
+
+**Real bug found and fixed while testing live against Neon**: `z.string().email().optional()` only skips validation for `undefined`, not `""` — but a blank "Add lead" form field, or any blank cell in an imported CSV column, arrives as an empty string. Every such row was getting rejected with a raw "Bad Request" instead of either succeeding or showing the actual duplicate-check message. This would have broken CSV import for any row with a blank phone/email/name cell — a core part of this item's scope. Fixed with a `blankToUndefined` preprocessor shared by `createLeadSchema`, `updateLeadSchema`, and `importLeadsSchema`'s row shape, with regression tests.
+
+**Also fixed**: the lead profile page's 3-column grid overflowed instead of stacking on narrower viewports (`grid-cols-3` with no responsive breakpoint) — now `grid-cols-1 md:grid-cols-3`.
+
+**Verified live**: added a lead manually, hit the duplicate-check path (confirmed the fix), tagged and noted a lead (both showed up correctly, note appeared in the unified timeline too), searched the list, and imported 2 leads via the real API with one correctly skipped as a duplicate of an existing WhatsApp-sourced lead.
+
+**Simplifications / follow-ups**
+- No custom-field management UI yet — that's Phase 1 item 4's scope (Pipelines: custom fields, stage rules, `PipelineSettings`/`FieldEdit`/`StageEdit`). `LeadFieldValue` exists in the schema and the profile reads it, but nothing writes to it yet.
+- Timeline has no stage-change or automation/routing/call/meeting events yet since those features don't exist until later phases.
+- Bulk actions (assign, move stage, tag, add to sequence, send template, merge, delete) on the leads list from `docs/PRD.md` are single-lead only for now; bulk selection UI is a follow-up.
+
+**Next**
+- Phase 1 item 4: Pipelines (board, stages, custom fields, stage rules, move-stage form, labels/terminology).
+
 ## 2026-09-25 — First real end-to-end run (Neon + Upstash)
 
 Set up a free Neon Postgres and Upstash Redis so the app could run for real instead of just building. This surfaced two real bugs that only show up with actual infra running — both fixed and pushed:
