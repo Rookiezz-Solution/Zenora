@@ -6,7 +6,9 @@ import { loadEnv } from "./config/env";
 
 async function bootstrap() {
   const env = loadEnv();
-  const app = await NestFactory.create(AppModule);
+  // rawBody: true preserves the exact request bytes on req.rawBody, needed
+  // to verify Meta's X-Hub-Signature-256 webhook signature.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.use(cookieParser());
   app.enableCors({ origin: env.APP_URL, credentials: true });
   await app.listen(env.API_PORT);

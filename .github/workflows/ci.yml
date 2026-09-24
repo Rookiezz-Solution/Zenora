@@ -11,6 +11,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://zenora:zenora@localhost:5432/zenora
       AUTH_SECRET: ci-test-secret-not-for-production
+      TOKEN_ENCRYPTION_KEY: "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
     steps:
       - uses: actions/checkout@v4
 

@@ -282,6 +282,22 @@ model AdAccount {
   @@index([workspaceId])
 }
 
+// Raw inbound Meta webhook events. Signature-verified and stored before
+// enqueueing, so ingress is idempotent (by externalId) and replayable if a
+// processor bug needs a re-run. docs/ARCHITECTURE.md: "verify Meta
+// signatures, store raw event, enqueue; idempotent by event id."
+model MetaWebhookEvent {
+  id          String    @id @default(cuid())
+  source      String // "instagram" | "whatsapp"
+  externalId  String    @unique // hash of the payload when Meta gives no stable id
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  error       String?
+
+  @@index([source, processedAt])
+}
+
 // ---------------------------------------------------------------------------
 // Phase 1 — leads / CRM
 // ---------------------------------------------------------------------------

@@ -199,9 +199,15 @@ importers:
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
+      bullmq:
+        specifier: ^5.21.0
+        version: 5.81.5(supports-color@8.1.1)
       cookie-parser:
         specifier: ^1.4.6
         version: 1.4.7
+      ioredis:
+        specifier: ^5.4.1
+        version: 5.11.1(supports-color@8.1.1)
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.3
@@ -337,6 +343,9 @@ importers:
       typescript-eslint:
         specifier: ^8.0.0
         version: 8.70.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@5.9.3)
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)(supports-color@8.1.1)(terser@5.51.2)
 
   packages/config:
     dependencies:
