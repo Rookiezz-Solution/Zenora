@@ -1,5 +1,17 @@
 # Zenora — build progress
 
+## 2026-09-25 — First real end-to-end run (Neon + Upstash)
+
+Set up a free Neon Postgres and Upstash Redis so the app could run for real instead of just building. This surfaced two real bugs that only show up with actual infra running — both fixed and pushed:
+
+- **`turbo.json`**: Turborepo 2's default strict env mode was silently stripping the env vars `dotenv-cli` injects before turbo spawns each app's dev task. `apps/api` crashed on boot ("Invalid environment configuration") and `apps/worker`'s Redis client silently fell back to `localhost:6379` even with a real `.env` present. Fixed with `envMode: "loose"`.
+- **`GoogleStrategy`**: `env.GOOGLE_CLIENT_ID ?? "unconfigured"` doesn't fall back when the var is unset, because an empty `.env` line loads as `""` (defined, not `undefined`) — `??` only catches `null`/`undefined`. Passport's `OAuth2Strategy` throws synchronously in its constructor on a falsy `clientID`, crashing the whole Nest app at startup. Switched to `||`.
+- Also added `dotenv-cli`-wrapped root scripts (`dev`, `db:migrate`, `db:seed`, `db:studio`) since Prisma only auto-loads `.env` from `packages/db`, not the monorepo root.
+
+**Verified live** (not just build/lint/test green): signed up a real user through `/signup`, created a workspace through the real API, and POSTed a simulated inbound WhatsApp webhook straight at `/webhooks/meta` — it flowed through signature verification → raw event storage → BullMQ → the worker's processor → created a real `Lead`/`Conversation`/`Message` in Postgres → published over Socket.IO → showed up live in `/inbox`, where the `/price` quick-reply autocomplete also worked end-to-end. This is the first time the built product has actually run rather than just passed CI.
+
+`.env` now holds real (free-tier) `DATABASE_URL`/`REDIS_URL` — gitignored, not committed.
+
 ## 2026-09-24 — Phase 0 kickoff
 
 **Done**
