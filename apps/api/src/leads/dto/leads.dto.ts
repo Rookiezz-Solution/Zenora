@@ -41,6 +41,12 @@ export const mergeLeadsSchema = z.object({
 });
 export type MergeLeadsDto = z.infer<typeof mergeLeadsSchema>;
 
+export const moveStageSchema = z.object({
+  stageId: z.string().min(1),
+  fieldValues: z.record(z.string(), z.unknown()).optional()
+});
+export type MoveStageDto = z.infer<typeof moveStageSchema>;
+
 export const importLeadsSchema = z.object({
   dedupeStrategy: z.enum(["skip", "update"]).default("skip"),
   rows: z

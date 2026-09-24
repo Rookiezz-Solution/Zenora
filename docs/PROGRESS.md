@@ -1,5 +1,29 @@
 # Zenora — build progress
 
+## 2026-09-25 — Phase 1 item 4: Pipelines (board, stages, custom fields, stage rules, move-stage form, labels/terminology)
+
+**Done**
+- `apps/api` `pipelines` module: pipeline CRUD, stage CRUD (with `requiredFieldIds`/`slaMinutes`), stage reordering, and a board endpoint (pipeline → stages → leads, excluding merged leads).
+- `apps/api` `custom-fields` module: CRUD for `CustomField` (text/number/date/select/multiselect/boolean, `required` flag, unique key per workspace).
+- `LeadsService.moveStage`: validates the target stage's `requiredFieldIds` are all present (blank string counts as missing, matching the DTO fix from item 3) before moving; on success it updates `stageId`/`pipelineId` and upserts the provided `LeadFieldValue`s in one transaction; logs a distinguishable audit action (`lead.marked_won`/`lead.marked_lost`/`lead.stage_changed`) so the automation engine (item 5) has something to hook into for "Won/Lost trigger their automations" once it exists.
+- `WorkspacesService`/`Controller` gained `GET/PATCH /workspaces/:workspaceId` for name/currency/timezone and a partial-merge update to `Workspace.labels` (docs/PRD.md: rename Lead/Appointment/Salesperson/Won/Pipeline/Interest).
+- `apps/web`: `/pipeline` — a real Kanban board (native HTML5 drag-and-drop, no library) with an inline add-stage form; dropping a card on a stage with required fields opens a modal (`MoveStageForm`) instead of failing silently. `/settings/fields` (custom field CRUD) and `/settings/labels` (terminology + currency/timezone), both behind a new shared `SettingsTabs` nav alongside the existing Connect-channels page.
+- Extended `apiFetch`'s thrown error to carry the full response body (`ApiError.body`), not just `message`/`status` — needed so the pipeline board can read `missingFields` off a 409 and open the right modal.
+- Tests: 3 for stage ordering (`addStage` appends after the current max, `reorderStages` sets order by list index, scoped to the pipeline) + 4 for `moveStage` (blocks on missing/blank required fields, names them, moves and saves field values once satisfied, logs the right audit action per stage type) — 39 tests total, all passing.
+
+**Real bug found and fixed while testing live**: the 409 thrown when required fields are missing only returned `{id, label}` per field, not `type`/`options` — so the frontend's move-stage modal could never have rendered a proper `<select>` for an enum field or a date input; everything would have silently fallen back to plain text. Caught this by re-reading what `MoveStageForm` actually needed before wiring it up, not by a runtime failure — fixed by returning the full `CustomField` records from the service instead of a hand-picked subset. Also removed an unused `customFields` fetch in the board page that lint caught (a leftover from before this fix).
+
+**Verified live**: created a pipeline (via the page's auto-create-if-none fallback), added stages via the UI, added a `required` custom field and a `won`-type stage via the API, created a lead and moved it into the required-fields stage — first confirming the 409 correctly names the field with its full type, then confirming a move with the field value provided succeeds and the card lands in the right column on reload. Also renamed "Lead" → "Student" via Settings → Industry and labels and confirmed it persisted in `Workspace.labels`.
+
+**Simplifications / follow-ups**
+- Drag-and-drop itself couldn't be exercised by browser automation (HTML5 DnD needs native drag events, not simulated mouse movement) — verified the underlying `onDrop`/`moveLead` wiring by code review and by driving the same API calls it makes directly instead.
+- No pipeline switcher yet if a workspace has more than one pipeline (the board always shows the first) — fine while every workspace has exactly one pipeline; a switcher is a follow-up once multi-pipeline businesses need it.
+- Stage deletion has no explicit "what happens to its leads" UI, but it's safe by default: `Lead.stageId` is optional with no `onDelete` override, so Prisma's default `SetNull` referential action means deleting a stage just clears `stageId` on its leads rather than deleting or orphaning them.
+- Won/Lost automations are a logged no-op until the automation engine (item 5) exists, as called out above.
+
+**Next**
+- Phase 1 item 5: Automation engine + flow builder (core blocks), trigger setup, test and publish, stats, versioning.
+
 ## 2026-09-25 — Phase 1 item 3: Leads (list, profile, timeline, add/import, dedupe/merge, tags, notes)
 
 **Done**

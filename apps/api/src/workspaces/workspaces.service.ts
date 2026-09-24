@@ -1,8 +1,14 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import * as crypto from "node:crypto";
+import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
-import type { CreateWorkspaceDto, InviteMemberDto, UpdateMemberRoleDto } from "./dto/workspaces.dto";
+import type {
+  CreateWorkspaceDto,
+  InviteMemberDto,
+  UpdateMemberRoleDto,
+  UpdateWorkspaceSettingsDto
+} from "./dto/workspaces.dto";
 
 const INVITE_TTL_DAYS = 7;
 
@@ -37,6 +43,29 @@ export class WorkspacesService {
       where: { memberships: { some: { userId } } },
       orderBy: { createdAt: "asc" }
     });
+  }
+
+  async getById(workspaceId: string) {
+    const workspace = await this.prisma.client.workspace.findUnique({ where: { id: workspaceId } });
+    if (!workspace) throw new NotFoundException("Workspace not found");
+    return workspace;
+  }
+
+  async updateSettings(workspaceId: string, userId: string, dto: UpdateWorkspaceSettingsDto) {
+    const current = await this.getById(workspaceId);
+    const labels = dto.labels ? { ...(current.labels as object), ...dto.labels } : undefined;
+
+    const workspace = await this.prisma.client.workspace.update({
+      where: { id: workspaceId },
+      data: {
+        name: dto.name,
+        currency: dto.currency,
+        timezone: dto.timezone,
+        ...(labels ? { labels: labels as Prisma.InputJsonValue } : {})
+      }
+    });
+    await this.audit.log({ workspaceId, userId, action: "workspace.settings_updated", entityType: "workspace", entityId: workspaceId });
+    return workspace;
   }
 
   async ensureMember(workspaceId: string, userId: string) {

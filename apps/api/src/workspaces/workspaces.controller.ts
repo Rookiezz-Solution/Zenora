@@ -7,7 +7,8 @@ import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import {
   createWorkspaceSchema,
   inviteMemberSchema,
-  updateMemberRoleSchema
+  updateMemberRoleSchema,
+  updateWorkspaceSettingsSchema
 } from "./dto/workspaces.dto";
 import { WorkspacesService } from "./workspaces.service";
 
@@ -24,6 +25,22 @@ export class WorkspacesController {
   @Get()
   listMine(@CurrentUser() userId: string) {
     return this.workspaces.listMine(userId);
+  }
+
+  @Get(":workspaceId")
+  async getById(@Param("workspaceId") workspaceId: string, @CurrentUser() userId: string) {
+    await this.workspaces.ensureMember(workspaceId, userId);
+    return this.workspaces.getById(workspaceId);
+  }
+
+  @Patch(":workspaceId")
+  @RequirePermission("settings.manage")
+  updateSettings(
+    @Param("workspaceId") workspaceId: string,
+    @CurrentUser() userId: string,
+    @Body(new ZodValidationPipe(updateWorkspaceSettingsSchema)) body: unknown
+  ) {
+    return this.workspaces.updateSettings(workspaceId, userId, body as never);
   }
 
   @Get(":workspaceId/members")

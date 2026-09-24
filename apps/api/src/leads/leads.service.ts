@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
@@ -8,6 +9,7 @@ import type {
   ImportLeadsDto,
   ListLeadsQuery,
   MergeLeadsDto,
+  MoveStageDto,
   UpdateLeadDto
 } from "./dto/leads.dto";
 
@@ -199,6 +201,60 @@ export class LeadsService {
       metadata: { duplicateLeadId: duplicate.id }
     });
     return this.getById(workspaceId, primary.id);
+  }
+
+  // docs/PRD.md: "Moving to a stage with required fields opens a form; Won/
+  // Lost trigger their automations." The automation trigger itself is a
+  // no-op until the automation engine (Phase 1 item 5) exists — this just
+  // logs the transition so it's there to hook into.
+  async moveStage(workspaceId: string, leadId: string, userId: string, dto: MoveStageDto) {
+    const lead = await this.ensureLead(workspaceId, leadId);
+    const stage = await this.prisma.client.stage.findFirst({
+      where: { id: dto.stageId, pipeline: { workspaceId } },
+      include: { pipeline: true }
+    });
+    if (!stage) throw new NotFoundException("Stage not found");
+
+    const missing = stage.requiredFieldIds.filter((fieldId) => {
+      const value = dto.fieldValues?.[fieldId];
+      return value === undefined || value === null || value === "";
+    });
+    if (missing.length > 0) {
+      // Full field records (not just id/label) so the frontend's move-stage
+      // form can render the right input — a select for an enum field, a
+      // date picker, etc — instead of falling back to plain text for
+      // everything.
+      const fields = await this.prisma.client.customField.findMany({ where: { id: { in: missing } } });
+      throw new ConflictException({
+        message: "Fill the required fields before moving to this stage",
+        missingFields: fields
+      });
+    }
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.lead.update({
+        where: { id: lead.id },
+        data: { stageId: stage.id, pipelineId: stage.pipelineId }
+      });
+      for (const [fieldId, value] of Object.entries(dto.fieldValues ?? {})) {
+        await tx.leadFieldValue.upsert({
+          where: { leadId_fieldId: { leadId: lead.id, fieldId } },
+          update: { value: value as Prisma.InputJsonValue },
+          create: { leadId: lead.id, fieldId, value: value as Prisma.InputJsonValue }
+        });
+      }
+    });
+
+    await this.audit.log({
+      workspaceId,
+      userId,
+      action: stage.type === "open" ? "lead.stage_changed" : `lead.marked_${stage.type}`,
+      entityType: "lead",
+      entityId: lead.id,
+      metadata: { stageId: stage.id, stageName: stage.name, pipelineId: stage.pipelineId }
+    });
+
+    return this.getById(workspaceId, lead.id);
   }
 
   async import(workspaceId: string, userId: string, dto: ImportLeadsDto) {

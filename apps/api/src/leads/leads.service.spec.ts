@@ -101,3 +101,78 @@ describe("LeadsService.merge", () => {
     );
   });
 });
+
+describe("LeadsService.moveStage", () => {
+  const stage = {
+    id: "stage-won",
+    pipelineId: "pipe-1",
+    type: "won",
+    name: "Won",
+    requiredFieldIds: ["field-budget"]
+  };
+
+  function makeMoveStagePrisma() {
+    const tx = { lead: { update: vi.fn() }, leadFieldValue: { upsert: vi.fn() } };
+    const client = {
+      lead: {
+        findFirst: vi.fn().mockResolvedValue({ id: "lead-1", workspaceId: "ws1" }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "lead-1" })
+      },
+      stage: { findFirst: vi.fn().mockResolvedValue(stage) },
+      customField: { findMany: vi.fn().mockResolvedValue([{ id: "field-budget", label: "Budget" }]) },
+      $transaction: vi.fn().mockImplementation((cb: (tx: unknown) => unknown) => cb(tx))
+    };
+    return { prisma: { client } as unknown as PrismaService, tx };
+  }
+
+  it("blocks the move and names the missing required fields when they aren't provided", async () => {
+    const { prisma } = makeMoveStagePrisma();
+    const service = new LeadsService(prisma, makeAudit());
+
+    const attempt = service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won" });
+
+    await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+    await expect(attempt).rejects.toMatchObject({
+      response: { missingFields: [{ id: "field-budget", label: "Budget" }] }
+    });
+  });
+
+  it("treats an empty string as missing, not provided", async () => {
+    const { prisma } = makeMoveStagePrisma();
+    const service = new LeadsService(prisma, makeAudit());
+
+    await expect(
+      service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "" } })
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("moves the lead and saves the required field values once they're all provided", async () => {
+    const { prisma, tx } = makeMoveStagePrisma();
+    const service = new LeadsService(prisma, makeAudit());
+
+    await service.moveStage("ws1", "lead-1", "user1", {
+      stageId: "stage-won",
+      fieldValues: { "field-budget": "50000" }
+    });
+
+    expect(tx.lead.update).toHaveBeenCalledWith({
+      where: { id: "lead-1" },
+      data: { stageId: "stage-won", pipelineId: "pipe-1" }
+    });
+    expect(tx.leadFieldValue.upsert).toHaveBeenCalledWith({
+      where: { leadId_fieldId: { leadId: "lead-1", fieldId: "field-budget" } },
+      update: { value: "50000" },
+      create: { leadId: "lead-1", fieldId: "field-budget", value: "50000" }
+    });
+  });
+
+  it("logs a distinguishable audit action for a won/lost stage vs. a plain stage change", async () => {
+    const { prisma } = makeMoveStagePrisma();
+    const audit = makeAudit();
+    const service = new LeadsService(prisma, audit);
+
+    await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "1" } });
+
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "lead.marked_won" }));
+  });
+});

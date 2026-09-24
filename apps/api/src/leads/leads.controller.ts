@@ -11,6 +11,7 @@ import {
   importLeadsSchema,
   listLeadsQuerySchema,
   mergeLeadsSchema,
+  moveStageSchema,
   updateLeadSchema
 } from "./dto/leads.dto";
 import { LeadsService } from "./leads.service";
@@ -70,6 +71,17 @@ export class LeadsController {
     @Body(new ZodValidationPipe(updateLeadSchema)) body: unknown
   ) {
     return this.leads.update(workspaceId, leadId, userId, body as never);
+  }
+
+  @Post(":leadId/move-stage")
+  @RequirePermission("leads.write")
+  moveStage(
+    @Param("workspaceId") workspaceId: string,
+    @Param("leadId") leadId: string,
+    @CurrentUser() userId: string,
+    @Body(new ZodValidationPipe(moveStageSchema)) body: unknown
+  ) {
+    return this.leads.moveStage(workspaceId, leadId, userId, body as never);
   }
 
   @Delete(":leadId")
