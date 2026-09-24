@@ -17,7 +17,12 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const required = this.reflector.get<Permission | undefined>(PERMISSION_KEY, context.getHandler());
+    // Method-level @RequirePermission wins over a class-level default, same
+    // as Nest's own guard/interceptor override semantics.
+    const required = this.reflector.getAllAndOverride<Permission | undefined>(PERMISSION_KEY, [
+      context.getHandler(),
+      context.getClass()
+    ]);
     if (!required) return true;
 
     const req = context.switchToHttp().getRequest<AuthedRequest>();

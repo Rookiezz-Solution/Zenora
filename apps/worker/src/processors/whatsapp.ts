@@ -1,4 +1,5 @@
 import { prisma } from "@zenora/db";
+import { publishInboxEvent } from "../realtime";
 import { findOrCreateConversation } from "./conversation";
 import { findOrCreateLeadByIdentity } from "./lead-identity";
 
@@ -47,7 +48,7 @@ export async function processWhatsappPayload(payload: unknown): Promise<void> {
           phone: message.from
         });
         const conversation = await findOrCreateConversation(number.workspaceId, lead.id, "whatsapp");
-        await prisma.message.upsert({
+        const created = await prisma.message.upsert({
           where: { externalId: message.id },
           update: {},
           create: {
@@ -59,6 +60,7 @@ export async function processWhatsappPayload(payload: unknown): Promise<void> {
             createdAt: new Date(Number(message.timestamp) * 1000)
           }
         });
+        await publishInboxEvent({ workspaceId: number.workspaceId, type: "message.created", payload: created });
       }
     }
   }

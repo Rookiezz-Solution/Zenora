@@ -42,3 +42,27 @@
 
 **Next**
 - Phase 1 item 2: unified inbox (realtime updates, 24h window UI, handover, quick replies, templates) — the `Conversation`/`Message` tables and window logic built here are what it reads from.
+
+## 2026-09-24 — Phase 1 item 2: unified inbox
+
+**Done**
+- `apps/api` `inbox` module: `GET /inbox/:workspaceId/conversations` (filters: mine/unassigned/bot_active/waiting_on_us), `GET .../messages` (cursor-paginated), `POST .../messages` (sends for real via `MetaGraphClient` — Instagram DM or WhatsApp text/template), `POST .../handover` (bot pause/resume), `PATCH .../assign`.
+- 24h window enforcement lives in `InboxService.sendWhatsapp`: outside the window a `templateId` is required and must resolve to an `approved` `WaTemplate`, matching CLAUDE.md rule #5. Instagram has no equivalent template mechanism in Meta's API, so it's unrestricted (noted inline).
+- `MetaGraphClient` gained `sendInstagramMessage`, `sendWhatsappText`, `sendWhatsappTemplate`.
+- Realtime: `RealtimeService` (api, publishes to Redis) + a matching publisher in `apps/worker` + `InboxGateway` (Socket.IO, subscribes to the same Redis channel and forwards to a per-workspace room) — one channel/event shape shared via `@zenora/shared`'s `realtime.ts` so api and worker can't drift. The worker now publishes `message.created` right after storing each inbound Instagram/WhatsApp message, so the inbox updates without polling.
+- Quick replies: full CRUD (`workspaces/:id/quick-replies`), workspace-scoped, `settings.manage` for writes.
+- Templates: read-only list of approved `WaTemplate`s for the composer's picker — the actual builder + Meta approval sync is roadmap item 7, not built yet.
+- `apps/web` `/inbox`: conversation list with the 4 filters, thread view, composer with `/`-shortcut quick-reply autocomplete, automatic template-picker mode when a WhatsApp conversation is outside its window, bot handover toggle, "assign to me", all wired to Socket.IO for live updates.
+- Fixed a real bug found while wiring `InboxController`'s class-level `@RequirePermission`: `PermissionsGuard` only ever read handler-level metadata (`reflector.get(..., context.getHandler())`), so a class-level permission decorator was silently ignored. Switched to `reflector.getAllAndOverride(..., [handler, class])` (handler wins), the standard Nest pattern — added a test asserting the guard actually consults both.
+- Tests: 4 new worker tests for the WhatsApp processor (mirroring the existing Instagram ones) plus the guard fix's regression test — 24 tests total across the repo. Lint/typecheck/build all green; `/inbox` verified rendering in-browser (degrades gracefully with no API running, same as `/settings`).
+
+**Not yet live-testable**
+- Same caveat as item 1: sending/receiving through real Instagram/WhatsApp needs a real Meta app. Nothing new here changes that.
+
+**Simplifications / follow-ups**
+- `sendMessage` picks the workspace's *first* connected Instagram account / WhatsApp number when there could eventually be more than one — fine for the single-channel-per-workspace pilot scope, flagged for whenever multi-account support matters.
+- No comments/story-reply channel in the inbox yet (DMs and WhatsApp messages only, matching item 1's ingestion scope).
+- Right panel (stage, owner, fields, score, tags, AI summary) is deferred — Lead profile is Phase 1 item 3, and AI summary is Phase 2.
+
+**Next**
+- Phase 1 item 3: Leads (list, profile, timeline, add/import, dedupe/merge, tags, notes).

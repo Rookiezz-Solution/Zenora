@@ -5,16 +5,19 @@ import type { PrismaService } from "../../prisma/prisma.service";
 import { PermissionsGuard } from "./permissions.guard";
 
 function makeContext(params: Record<string, string>): ExecutionContext {
+  const handler = () => undefined;
+  const klass = class {};
   return {
     switchToHttp: () => ({
       getRequest: () => ({ userId: params.userId, params })
     }),
-    getHandler: () => () => undefined
+    getHandler: () => handler,
+    getClass: () => klass
   } as unknown as ExecutionContext;
 }
 
 function makeReflector(permission: string | undefined): Reflector {
-  return { get: () => permission } as unknown as Reflector;
+  return { getAllAndOverride: () => permission } as unknown as Reflector;
 }
 
 function makePrisma(membership: { role: string } | null) {
@@ -67,5 +70,17 @@ describe("PermissionsGuard", () => {
     const guard = new PermissionsGuard(reflector, prisma);
 
     await expect(guard.canActivate(makeContext({ userId: "u1" }))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("checks both the handler and the class when resolving the required permission", async () => {
+    const getAllAndOverride = vi.fn().mockReturnValue("leads.read");
+    const reflector = { getAllAndOverride } as unknown as Reflector;
+    const { prisma } = makePrisma({ role: "viewer" });
+    const guard = new PermissionsGuard(reflector, prisma);
+    const context = makeContext({ workspaceId: "w1", userId: "u1" });
+
+    await guard.canActivate(context);
+
+    expect(getAllAndOverride).toHaveBeenCalledWith("permission", [context.getHandler(), context.getClass()]);
   });
 });

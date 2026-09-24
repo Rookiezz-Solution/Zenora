@@ -1,4 +1,5 @@
 import { prisma } from "@zenora/db";
+import { publishInboxEvent } from "../realtime";
 import { findOrCreateConversation } from "./conversation";
 import { findOrCreateLeadByIdentity } from "./lead-identity";
 
@@ -31,7 +32,7 @@ export async function processInstagramPayload(payload: unknown): Promise<void> {
 
       const lead = await findOrCreateLeadByIdentity(account.workspaceId, "ig_scoped_id", event.sender.id);
       const conversation = await findOrCreateConversation(account.workspaceId, lead.id, "instagram");
-      await prisma.message.upsert({
+      const message = await prisma.message.upsert({
         where: { externalId: event.message.mid },
         update: {},
         create: {
@@ -43,6 +44,7 @@ export async function processInstagramPayload(payload: unknown): Promise<void> {
           createdAt: new Date(event.timestamp)
         }
       });
+      await publishInboxEvent({ workspaceId: account.workspaceId, type: "message.created", payload: message });
     }
   }
 }

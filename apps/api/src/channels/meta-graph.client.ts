@@ -109,4 +109,55 @@ export class MetaGraphClient {
     });
     return { displayPhoneNumber: body.display_phone_number };
   }
+
+  private async post<T>(path: string, accessToken: string, payload: Record<string, unknown>): Promise<T> {
+    const res = await fetch(`${this.baseUrl()}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      throw new Error(`Meta Graph API error (${path}): ${JSON.stringify(body)}`);
+    }
+    return body as T;
+  }
+
+  // Instagram DMs go out via the connected IG business account, using the
+  // Page access token stored for it.
+  async sendInstagramMessage(igUserId: string, recipientId: string, text: string, accessToken: string): Promise<string> {
+    const body = await this.post<{ message_id: string }>(`/${igUserId}/messages`, accessToken, {
+      recipient: { id: recipientId },
+      message: { text }
+    });
+    return body.message_id;
+  }
+
+  async sendWhatsappText(phoneNumberId: string, to: string, text: string, accessToken: string): Promise<string> {
+    const body = await this.post<{ messages: Array<{ id: string }> }>(`/${phoneNumberId}/messages`, accessToken, {
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body: text }
+    });
+    return body.messages[0]!.id;
+  }
+
+  // Outside the 24h customer-service window, WhatsApp only allows sending a
+  // pre-approved template (CLAUDE.md rule #5).
+  async sendWhatsappTemplate(
+    phoneNumberId: string,
+    to: string,
+    templateName: string,
+    languageCode: string,
+    accessToken: string
+  ): Promise<string> {
+    const body = await this.post<{ messages: Array<{ id: string }> }>(`/${phoneNumberId}/messages`, accessToken, {
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: { name: templateName, language: { code: languageCode } }
+    });
+    return body.messages[0]!.id;
+  }
 }

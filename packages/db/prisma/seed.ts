@@ -77,6 +77,26 @@ async function main() {
     });
   }
 
+  await prisma.waTemplate.upsert({
+    where: { id: "seed-template-welcome" },
+    update: {},
+    create: {
+      id: "seed-template-welcome",
+      workspaceId: workspace.id,
+      name: "welcome_followup",
+      category: "utility",
+      language: "en",
+      bodyText: "Hi! Thanks for your interest — we'll follow up with details shortly.",
+      metaStatus: "approved"
+    }
+  });
+
+  await prisma.quickReply.upsert({
+    where: { workspaceId_shortcut: { workspaceId: workspace.id, shortcut: "/price" } },
+    update: {},
+    create: { workspaceId: workspace.id, shortcut: "/price", body: "Here's our current pricing — happy to walk you through it on a quick call." }
+  });
+
   console.log(`Seeded workspace "${workspace.name}" (${workspace.id}) with owner ${owner.email}`);
 }
 

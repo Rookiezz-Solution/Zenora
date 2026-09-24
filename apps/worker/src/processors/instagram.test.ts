@@ -9,6 +9,7 @@ const prismaMock = vi.hoisted(() => ({
 }));
 
 vi.mock("@zenora/db", () => ({ prisma: prismaMock }));
+vi.mock("../realtime", () => ({ publishInboxEvent: vi.fn() }));
 
 import { processInstagramPayload } from "./instagram";
 
