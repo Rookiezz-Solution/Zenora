@@ -10,6 +10,10 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("@zenora/db", () => ({ prisma: prismaMock }));
 vi.mock("../realtime", () => ({ publishInboxEvent: vi.fn() }));
+const findMatchingAutomations = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+const enqueueStart = vi.hoisted(() => vi.fn());
+vi.mock("../automation-engine/trigger-matcher", () => ({ findMatchingAutomations }));
+vi.mock("../automation-engine/queue", () => ({ enqueueStart }));
 
 import { processWhatsappPayload } from "./whatsapp";
 
@@ -19,7 +23,8 @@ beforeEach(() => {
   prismaMock.leadIdentity.findUnique.mockResolvedValue(null);
   prismaMock.lead.create.mockResolvedValue({ id: "lead_1" });
   prismaMock.conversation.findFirst.mockResolvedValue(null);
-  prismaMock.conversation.create.mockResolvedValue({ id: "conv_1" });
+  prismaMock.conversation.create.mockResolvedValue({ id: "conv_1", botActive: true });
+  findMatchingAutomations.mockResolvedValue([]);
 });
 
 describe("processWhatsappPayload", () => {
@@ -88,5 +93,54 @@ describe("processWhatsappPayload", () => {
 
     expect(prismaMock.whatsappNumber.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.message.upsert).not.toHaveBeenCalled();
+  });
+
+  it("starts a run for a matching automation when the bot is active", async () => {
+    findMatchingAutomations.mockResolvedValue([{ id: "auto_1" }]);
+
+    await processWhatsappPayload({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "waba_1",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                metadata: { phone_number_id: "phone_123" },
+                messages: [{ id: "wamid_1", from: "919999999999", timestamp: "1700000000", type: "text", text: { body: "PRICE" } }]
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(findMatchingAutomations).toHaveBeenCalledWith("ws_1", "whatsapp_message_keyword", "PRICE", "lead_1");
+    expect(enqueueStart).toHaveBeenCalledWith("auto_1", "lead_1", "conv_1");
+  });
+
+  it("doesn't check for automation triggers once a human has taken over the conversation", async () => {
+    prismaMock.conversation.create.mockResolvedValue({ id: "conv_1", botActive: false });
+
+    await processWhatsappPayload({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "waba_1",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                metadata: { phone_number_id: "phone_123" },
+                messages: [{ id: "wamid_1", from: "919999999999", timestamp: "1700000000", type: "text", text: { body: "PRICE" } }]
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(findMatchingAutomations).not.toHaveBeenCalled();
   });
 });

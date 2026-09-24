@@ -1,4 +1,6 @@
 import { prisma } from "@zenora/db";
+import { enqueueStart } from "../automation-engine/queue";
+import { findMatchingAutomations } from "../automation-engine/trigger-matcher";
 import { publishInboxEvent } from "../realtime";
 import { findOrCreateConversation } from "./conversation";
 import { findOrCreateLeadByIdentity } from "./lead-identity";
@@ -45,6 +47,13 @@ export async function processInstagramPayload(payload: unknown): Promise<void> {
         }
       });
       await publishInboxEvent({ workspaceId: account.workspaceId, type: "message.created", payload: message });
+
+      if (conversation.botActive && event.message.text) {
+        const matches = await findMatchingAutomations(account.workspaceId, "instagram_dm_keyword", event.message.text, lead.id);
+        for (const automation of matches) {
+          await enqueueStart(automation.id, lead.id, conversation.id);
+        }
+      }
     }
   }
 }

@@ -1,4 +1,6 @@
 import { prisma } from "@zenora/db";
+import { enqueueStart } from "../automation-engine/queue";
+import { findMatchingAutomations } from "../automation-engine/trigger-matcher";
 import { publishInboxEvent } from "../realtime";
 import { findOrCreateConversation } from "./conversation";
 import { findOrCreateLeadByIdentity } from "./lead-identity";
@@ -61,6 +63,13 @@ export async function processWhatsappPayload(payload: unknown): Promise<void> {
           }
         });
         await publishInboxEvent({ workspaceId: number.workspaceId, type: "message.created", payload: created });
+
+        if (conversation.botActive && message.text?.body) {
+          const matches = await findMatchingAutomations(number.workspaceId, "whatsapp_message_keyword", message.text.body, lead.id);
+          for (const automation of matches) {
+            await enqueueStart(automation.id, lead.id, conversation.id);
+          }
+        }
       }
     }
   }

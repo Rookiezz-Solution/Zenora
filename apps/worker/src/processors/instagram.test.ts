@@ -10,6 +10,10 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("@zenora/db", () => ({ prisma: prismaMock }));
 vi.mock("../realtime", () => ({ publishInboxEvent: vi.fn() }));
+const findMatchingAutomations = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+const enqueueStart = vi.hoisted(() => vi.fn());
+vi.mock("../automation-engine/trigger-matcher", () => ({ findMatchingAutomations }));
+vi.mock("../automation-engine/queue", () => ({ enqueueStart }));
 
 import { processInstagramPayload } from "./instagram";
 
@@ -19,7 +23,8 @@ beforeEach(() => {
   prismaMock.leadIdentity.findUnique.mockResolvedValue(null);
   prismaMock.lead.create.mockResolvedValue({ id: "lead_1" });
   prismaMock.conversation.findFirst.mockResolvedValue(null);
-  prismaMock.conversation.create.mockResolvedValue({ id: "conv_1" });
+  prismaMock.conversation.create.mockResolvedValue({ id: "conv_1", botActive: true });
+  findMatchingAutomations.mockResolvedValue([]);
 });
 
 describe("processInstagramPayload", () => {
@@ -89,5 +94,43 @@ describe("processInstagramPayload", () => {
     });
 
     expect(prismaMock.message.upsert).not.toHaveBeenCalled();
+  });
+
+  it("starts a run for every automation whose keyword trigger matches, when the bot is active", async () => {
+    findMatchingAutomations.mockResolvedValue([{ id: "auto_1" }, { id: "auto_2" }]);
+
+    await processInstagramPayload({
+      object: "instagram",
+      entry: [
+        {
+          id: "ig_business_123",
+          messaging: [
+            { sender: { id: "ig_scoped_456" }, recipient: { id: "ig_business_123" }, timestamp: 1, message: { mid: "mid_1", text: "PRICE" } }
+          ]
+        }
+      ]
+    });
+
+    expect(findMatchingAutomations).toHaveBeenCalledWith("ws_1", "instagram_dm_keyword", "PRICE", "lead_1");
+    expect(enqueueStart).toHaveBeenCalledWith("auto_1", "lead_1", "conv_1");
+    expect(enqueueStart).toHaveBeenCalledWith("auto_2", "lead_1", "conv_1");
+  });
+
+  it("doesn't check for automation triggers once a human has taken over the conversation", async () => {
+    prismaMock.conversation.create.mockResolvedValue({ id: "conv_1", botActive: false });
+
+    await processInstagramPayload({
+      object: "instagram",
+      entry: [
+        {
+          id: "ig_business_123",
+          messaging: [
+            { sender: { id: "ig_scoped_456" }, recipient: { id: "ig_business_123" }, timestamp: 1, message: { mid: "mid_1", text: "PRICE" } }
+          ]
+        }
+      ]
+    });
+
+    expect(findMatchingAutomations).not.toHaveBeenCalled();
   });
 });

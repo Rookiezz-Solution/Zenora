@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
+import { AutomationsModule } from "./automations/automations.module";
 import { ChannelsModule } from "./channels/channels.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { HealthController } from "./health/health.controller";
@@ -27,6 +28,7 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     LeadsModule,
     PipelinesModule,
     CustomFieldsModule,
+    AutomationsModule,
     QuickRepliesModule,
     TemplatesModule
   ],

@@ -1,4 +1,5 @@
 import { Worker, type Job } from "bullmq";
+import { resumeRun, startRun } from "./automation-engine/engine";
 import { createRedisConnection } from "./redis";
 import { processMetaWebhookEvent } from "./processors/webhook-event";
 import { QUEUE_NAMES, type QueueName } from "./queues";
@@ -15,6 +16,15 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
   "webhook-ingress": async (job) => {
     const { eventId } = job.data as { eventId: string };
     await processMetaWebhookEvent(eventId);
+  },
+  "automation-engine": async (job) => {
+    if (job.name === "start") {
+      const { automationId, leadId, conversationId } = job.data as { automationId: string; leadId: string; conversationId: string };
+      await startRun(automationId, leadId, conversationId);
+    } else if (job.name === "resume") {
+      const { runId, blockId } = job.data as { runId: string; blockId: string };
+      await resumeRun(runId, blockId);
+    }
   }
 };
 
