@@ -7,10 +7,13 @@ import { loadEnv } from "../../config/env";
 export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
   constructor() {
     const env = loadEnv();
+    // `||` (not `??`) on purpose: an unset var in .env loads as "" not
+    // undefined, and passport-oauth2 throws synchronously in its
+    // constructor on a falsy clientID — this must never be empty.
     super({
-      clientID: env.GOOGLE_CLIENT_ID ?? "unconfigured",
-      clientSecret: env.GOOGLE_CLIENT_SECRET ?? "unconfigured",
-      callbackURL: env.GOOGLE_REDIRECT_URI ?? "http://localhost:4000/auth/google/callback",
+      clientID: env.GOOGLE_CLIENT_ID || "unconfigured",
+      clientSecret: env.GOOGLE_CLIENT_SECRET || "unconfigured",
+      callbackURL: env.GOOGLE_REDIRECT_URI || "http://localhost:4000/auth/google/callback",
       scope: ["email", "profile"]
     });
   }
