@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from "@zenora/db";
 import { validateFlowGraph, type FlowBlock, type FlowGraph } from "@zenora/shared";
 import { AuditService } from "../audit/audit.service";
+import type { SaveAsTemplateDto } from "../flow-templates/dto/flow-templates.dto";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
   CreateAutomationDto,
@@ -72,6 +73,27 @@ export class AutomationsService {
     });
     await this.audit.log({ workspaceId, userId, action: "automation.duplicated", entityType: "automation", entityId: copy.id });
     return this.getById(workspaceId, copy.id);
+  }
+
+  // docs/PRD.md: "'Save as template' from any flow." Captures the current
+  // draft graph as-is (including this workspace's own copy on the flow
+  // templates gallery) — variable substitution happens the other direction,
+  // when a template is turned back into an automation.
+  async saveAsTemplate(workspaceId: string, id: string, userId: string, dto: SaveAsTemplateDto) {
+    const automation = await this.getById(workspaceId, id);
+    const graph = automation.draft?.graph ?? EMPTY_GRAPH;
+    const template = await this.prisma.client.flowTemplate.create({
+      data: { workspaceId, name: dto.name, industry: dto.industry, scope: "private", graph: graph as Prisma.InputJsonValue }
+    });
+    await this.audit.log({
+      workspaceId,
+      userId,
+      action: "automation.saved_as_template",
+      entityType: "flow_template",
+      entityId: template.id,
+      metadata: { automationId: id }
+    });
+    return template;
   }
 
   // Autosaves the flow builder's in-progress graph. Only mutates the

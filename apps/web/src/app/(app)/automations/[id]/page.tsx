@@ -100,6 +100,14 @@ export default function AutomationEditorPage() {
     router.push("/automations");
   }
 
+  async function saveAsTemplate() {
+    if (!workspaceId) return;
+    const name = prompt("Template name:", `${automation?.name} template`);
+    if (!name) return;
+    await apiFetch(`/automations/${workspaceId}/${id}/save-as-template`, { method: "POST", body: JSON.stringify({ name }) });
+    setMessage("Saved as template — find it under Browse templates.");
+  }
+
   if (!workspaceId || !automation) return <p className="text-sm text-gray-500">Loading…</p>;
 
   return (
@@ -112,6 +120,9 @@ export default function AutomationEditorPage() {
           </button>
           <button type="button" onClick={publish} className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white">
             Publish
+          </button>
+          <button type="button" onClick={saveAsTemplate} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+            Save as template
           </button>
           <button type="button" onClick={remove} className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600">
             Delete

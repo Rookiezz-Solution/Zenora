@@ -1,5 +1,25 @@
 # Zenora — build progress
 
+## 2026-09-25 — Phase 1 item 6: Flow templates (starter kits for 4 industries), template editor, save as template
+
+**Done**
+- `packages/shared`: `substituteTemplateVariables`/`extractTemplateVariables` — pure functions that fill (or find) `{business_name}`-style placeholders in a graph's message text only, leaving block wiring (`next`/`tagName`/`stageId`/...) untouched.
+- `apps/api` `flow-templates` module: gallery listing (`all`/`mine`/`public` scope + industry filter — `FlowTemplate.workspaceId: null` is how a template counts as "public"), CRUD scoped so a workspace can only edit/delete its own templates (a 403 on a public one, not a silent no-op), and a `use` endpoint that creates a brand-new `Automation` + initial version from the template's graph with `{business_name}` filled in from the workspace's actual name.
+- `automations` module gained `POST :id/save-as-template`, capturing the automation's current draft graph as a new private `FlowTemplate` — docs/PRD.md's "Save as template from any flow."
+- `packages/db` seed: 4 public starter-kit templates (coaching, clinic, salon, real_estate), each a realistic 3-block welcome → tag → handover flow using `{business_name}`.
+- `apps/web`: `/automations/templates` (gallery with scope/industry filters, "Use template" prompting for a name and jumping straight to the new automation's editor) and `/automations/templates/[id]` (editor reusing the same `FlowBlockEditor` component the automation editor uses — a public template opens read-only), plus a "Save as template" button on the automation editor and a "Browse templates" link from the automations list.
+- Tests: 6 for variable substitution/extraction, 4 for the flow-templates service (ownership guards on update/delete, the `use` → substitution wiring) — 10 new tests, 90 total across the repo.
+
+**Verified live**: confirmed all 4 seeded starter kits show up in the gallery with their industry/public badges; called `use` on the coaching template and confirmed via the API that `{business_name}` became the workspace's real name ("Demo Business (Live)") in the new automation's first message; confirmed a direct `PATCH` on a public template is rejected with 403 rather than silently succeeding; opened the new automation's editor and confirmed the 3-block flow (with the filled-in text) reconstructed correctly from the stored graph.
+
+**Simplifications / follow-ups**
+- No "shared by agency" gallery scope — agencies don't exist until Phase 3, so the gallery only has `all`/`mine`/`public`, one short of the PRD's four.
+- Templates don't bundle stages/custom fields/WA templates alongside the flow graph (docs/PRD.md mentions this) — only the flow itself. Worth revisiting once template authors actually need to ship a stage/field setup with their flow.
+- `variables` on `FlowTemplate` is informational only (what the seed data declares) — nothing yet auto-populates it from a graph's actual placeholders via `extractTemplateVariables`, though the function exists and is tested for exactly that purpose.
+
+**Next**
+- Phase 1 item 7: WhatsApp template builder + Meta approval sync; basic broadcasts.
+
 ## 2026-09-25 — Phase 1 item 5: Automation engine + flow builder (core blocks), trigger setup, test and publish, stats, versioning
 
 **Scope decision**: docs/PRD.md's full automation spec (12+ trigger types, AI blocks, catalog/payment/WhatsApp-Flows blocks, A/B testing, a visual canvas, a template gallery) is Phase 2+/later-Phase-1 territory — AI blocks specifically need Phase 2's AI service. docs/ROADMAP.md's Phase 1 item 5 only asks for "core blocks," so this pass scopes to: two trigger types (Instagram DM / WhatsApp message, keyword-matched), 8 core flow blocks, versioning, publish validation, dry-run testing, and stats. Logged here rather than silently narrowed, same as prior items' simplifications.

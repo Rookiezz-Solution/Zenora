@@ -6,3 +6,4 @@ export * from "./queues";
 export * from "./realtime";
 export * from "./automation";
 export * from "./automation-validation";
+export * from "./automation-template";

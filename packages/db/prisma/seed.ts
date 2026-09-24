@@ -97,6 +97,63 @@ async function main() {
     create: { workspaceId: workspace.id, shortcut: "/price", body: "Here's our current pricing — happy to walk you through it on a quick call." }
   });
 
+  // Public (workspaceId: null) starter-kit templates for the flow template
+  // gallery — docs/ROADMAP.md Phase 1 item 6: "starter kits for 4
+  // industries." A simple, realistic welcome-and-handover flow per
+  // industry; {business_name} is filled in when a workspace uses one.
+  const starterKits: Array<{ id: string; name: string; industry: string; welcomeBody: string; tagName: string }> = [
+    {
+      id: "seed-template-coaching",
+      name: "New DM auto-responder",
+      industry: "coaching",
+      welcomeBody: "Hi! Thanks for reaching out to {business_name} 🙌 Want to book a free consultation call?",
+      tagName: "new-lead"
+    },
+    {
+      id: "seed-template-clinic",
+      name: "Appointment inquiry responder",
+      industry: "clinic",
+      welcomeBody: "Hi! Thanks for contacting {business_name}. Would you like to book an appointment?",
+      tagName: "appointment-inquiry"
+    },
+    {
+      id: "seed-template-salon",
+      name: "Booking inquiry responder",
+      industry: "salon",
+      welcomeBody: "Hi! Thanks for messaging {business_name} 💇 Which service are you interested in booking?",
+      tagName: "booking-inquiry"
+    },
+    {
+      id: "seed-template-real-estate",
+      name: "Property inquiry responder",
+      industry: "real_estate",
+      welcomeBody: "Hi! Thanks for your interest in {business_name}'s listings. Which property caught your eye?",
+      tagName: "property-inquiry"
+    }
+  ];
+  for (const kit of starterKits) {
+    await prisma.flowTemplate.upsert({
+      where: { id: kit.id },
+      update: {},
+      create: {
+        id: kit.id,
+        workspaceId: null,
+        name: kit.name,
+        industry: kit.industry,
+        scope: "public",
+        graph: {
+          startBlockId: "welcome",
+          blocks: {
+            welcome: { id: "welcome", type: "send_text", body: kit.welcomeBody, next: "tag" },
+            tag: { id: "tag", type: "tag", tagName: kit.tagName, next: "handover" },
+            handover: { id: "handover", type: "handover" }
+          }
+        },
+        variables: { business_name: "Your business name" }
+      }
+    });
+  }
+
   console.log(`Seeded workspace "${workspace.name}" (${workspace.id}) with owner ${owner.email}`);
 }
 

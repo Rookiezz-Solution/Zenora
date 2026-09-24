@@ -4,6 +4,7 @@ import { AuthModule } from "./auth/auth.module";
 import { AutomationsModule } from "./automations/automations.module";
 import { ChannelsModule } from "./channels/channels.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
+import { FlowTemplatesModule } from "./flow-templates/flow-templates.module";
 import { HealthController } from "./health/health.controller";
 import { InboxModule } from "./inbox/inbox.module";
 import { LeadsModule } from "./leads/leads.module";
@@ -29,6 +30,7 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     PipelinesModule,
     CustomFieldsModule,
     AutomationsModule,
+    FlowTemplatesModule,
     QuickRepliesModule,
     TemplatesModule
   ],

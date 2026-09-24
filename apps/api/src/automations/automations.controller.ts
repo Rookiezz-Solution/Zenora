@@ -4,6 +4,7 @@ import { RequirePermission } from "../auth/decorators/require-permission.decorat
 import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../auth/guards/permissions.guard";
+import { saveAsTemplateSchema } from "../flow-templates/dto/flow-templates.dto";
 import { AutomationsService } from "./automations.service";
 import {
   createAutomationSchema,
@@ -50,6 +51,16 @@ export class AutomationsController {
   @Post(":id/duplicate")
   duplicate(@Param("workspaceId") workspaceId: string, @Param("id") id: string, @CurrentUser() userId: string) {
     return this.automations.duplicate(workspaceId, id, userId);
+  }
+
+  @Post(":id/save-as-template")
+  saveAsTemplate(
+    @Param("workspaceId") workspaceId: string,
+    @Param("id") id: string,
+    @CurrentUser() userId: string,
+    @Body(new ZodValidationPipe(saveAsTemplateSchema)) body: unknown
+  ) {
+    return this.automations.saveAsTemplate(workspaceId, id, userId, body as never);
   }
 
   @Patch(":id/draft")

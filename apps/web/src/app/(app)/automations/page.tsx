@@ -40,6 +40,9 @@ export default function AutomationsListPage() {
     <div className="max-w-3xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Automations</h1>
+        <Link href="/automations/templates" className="text-sm text-brand-700">
+          Browse templates →
+        </Link>
       </div>
 
       <form onSubmit={create} className="mt-4 flex gap-2">

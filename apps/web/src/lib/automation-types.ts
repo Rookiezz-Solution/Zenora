@@ -56,6 +56,17 @@ export interface Automation {
   runCount?: number;
 }
 
+export interface FlowTemplate {
+  id: string;
+  workspaceId: string | null;
+  name: string;
+  industry: string | null;
+  scope: "private" | "agency" | "public";
+  graph: FlowGraph;
+  variables: Record<string, string>;
+  createdAt: string;
+}
+
 export interface RunStep {
   id: string;
   blockId: string;
