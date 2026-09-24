@@ -1,0 +1,868 @@
+// Zenora — Prisma schema v1
+// Covers Phase 0 (foundations) and Phase 1 (capture + automate MVP) tables.
+// See docs/ARCHITECTURE.md for the full target data model and docs/ROADMAP.md
+// for phasing. Phase 2/3 tables (calls, meetings, AI knowledge, partners,
+// API keys/webhooks) are added when those phases start.
+//
+// Every business-data table carries workspaceId and MUST be filtered by it
+// on every query (CLAUDE.md non-negotiable rule #7). Postgres RLS is added
+// alongside app-layer checks before pilot launch.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Phase 2 adds `previewFeatures = ["postgresqlExtensions"]` above and a
+// pgvector extension block once kb_chunks (AI knowledge search) lands.
+
+// ---------------------------------------------------------------------------
+// Phase 0 — workspaces, membership, RBAC, audit
+// ---------------------------------------------------------------------------
+
+enum WorkspaceMode {
+  team
+  creator
+}
+
+model Workspace {
+  id        String        @id @default(cuid())
+  name      String
+  mode      WorkspaceMode @default(team)
+  industry  String?
+  timezone  String        @default("Asia/Kolkata")
+  currency  String        @default("INR")
+  locales   String[]      @default(["en"])
+  labels    Json          @default("{}") // terminology overrides, see @zenora/shared DEFAULT_LABELS
+  planId    String        @default("free")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  memberships   Membership[]
+  invites       Invite[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  featureFlags  WorkspaceFeatureFlag[]
+
+  instagramAccounts InstagramAccount[]
+  whatsappNumbers   WhatsappNumber[]
+  adAccounts        AdAccount[]
+
+  leads         Lead[]
+  tags          Tag[]
+  pipelines     Pipeline[]
+  customFields  CustomField[]
+  conversations Conversation[]
+
+  automations   Automation[]
+  savedTriggers SavedTrigger[]
+  flowTemplates FlowTemplate[]
+
+  waTemplates          WaTemplate[]
+  broadcasts           Broadcast[]
+  quickReplies         QuickReply[]
+  media                Media[]
+
+  routingRules  RoutingRule[]
+  scoringRules  ScoringRule[]
+  slaTimers     SlaTimer[]
+
+  tasks     Task[]
+  sequences Sequence[]
+
+  subscription  Subscription?
+  invoices      Invoice[]
+  addons        WorkspaceAddon[]
+  usageEvents   UsageEvent[]
+  usageMonthly  UsageMonthly[]
+
+  @@index([planId])
+}
+
+enum WorkspaceRole {
+  owner
+  admin
+  manager
+  sales
+  viewer
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  emailVerifiedAt   DateTime?
+  phone             String?   @unique
+  phoneVerifiedAt   DateTime?
+  passwordHash      String?
+  googleId          String?   @unique
+  name              String?
+  avatarUrl         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  memberships  Membership[]
+  otpCodes     OtpCode[]
+  auditLogs    AuditLog[]
+  assignments  Assignment[]
+  notes        Note[]        @relation("NoteAuthor")
+}
+
+model Membership {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(sales)
+  teamId      String?
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team?     @relation(fields: [teamId], references: [id])
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  createdAt   DateTime @default(now())
+
+  memberships Membership[]
+
+  @@index([workspaceId])
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
+model Invite {
+  id          String       @id @default(cuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole
+  teamId      String?
+  status      InviteStatus @default(pending)
+  token       String       @unique
+  invitedById String?
+  expiresAt   DateTime
+  createdAt   DateTime     @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String?
+  target    String // phone number or email the code was sent to
+  codeHash  String
+  purpose   String // "login" | "signup" | "phone_verify"
+  expiresAt DateTime
+  consumedAt DateTime?
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([target, purpose])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  action      String // e.g. "member.invited", "lead.deleted", "automation.published"
+  entityType  String
+  entityId    String?
+  metadata    Json     @default("{}")
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model FeatureFlag {
+  key         String   @id
+  description String?
+  enabledByDefault Boolean @default(false)
+
+  workspaceOverrides WorkspaceFeatureFlag[]
+}
+
+model WorkspaceFeatureFlag {
+  id          String  @id @default(cuid())
+  workspaceId String
+  flagKey     String
+  enabled     Boolean
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  flag      FeatureFlag @relation(fields: [flagKey], references: [key], onDelete: Cascade)
+
+  @@unique([workspaceId, flagKey])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String?
+  type        String
+  title       String
+  body        String?
+  channel     String // "app" | "whatsapp" | "email"
+  readAt      DateTime?
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, userId, readAt])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — channels
+// ---------------------------------------------------------------------------
+
+model InstagramAccount {
+  id                String   @id @default(cuid())
+  workspaceId       String
+  igUserId          String   @unique
+  username          String?
+  accessTokenCipher String // encrypted at rest
+  tokenExpiresAt    DateTime?
+  connectedAt       DateTime @default(now())
+  status            String   @default("active")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model WhatsappNumber {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  wabaId             String
+  phoneNumberId      String   @unique
+  displayPhoneNumber String
+  accessTokenCipher  String
+  status             String   @default("active")
+  connectedAt        DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model AdAccount {
+  id                String   @id @default(cuid())
+  workspaceId       String
+  provider          String // "meta" | "google"
+  externalAccountId String
+  accessTokenCipher String?
+  connectedAt       DateTime @default(now())
+  status            String   @default("active")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — leads / CRM
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String?
+  phone       String?
+  email       String?
+  source      String? // "instagram" | "whatsapp" | "manual" | "import" | "ad"
+  score       Int      @default(0)
+  ownerId     String?
+  pipelineId  String?
+  stageId     String?
+  mergedIntoId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pipeline  Pipeline?  @relation(fields: [pipelineId], references: [id])
+  stage     Stage?     @relation(fields: [stageId], references: [id])
+  mergedInto Lead?     @relation("LeadMerge", fields: [mergedIntoId], references: [id])
+  mergedFrom Lead[]    @relation("LeadMerge")
+
+  identities   LeadIdentity[]
+  fieldValues  LeadFieldValue[]
+  tags         LeadTag[]
+  notes        Note[]
+  consents     Consent[]
+  conversations Conversation[]
+  assignments  Assignment[]
+  tasks        Task[]
+  sequenceEnrollments SequenceEnrollment[]
+  automationRuns AutomationRun[]
+
+  @@index([workspaceId, pipelineId, stageId])
+  @@index([workspaceId, ownerId])
+  @@index([workspaceId, phone])
+  @@index([workspaceId, email])
+}
+
+model LeadIdentity {
+  id     String @id @default(cuid())
+  leadId String
+  type   String // "ig_scoped_id" | "wa_phone" | "email"
+  value  String
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([type, value])
+  @@index([leadId])
+}
+
+model CustomField {
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String
+  label       String
+  type        String // "text" | "number" | "date" | "select" | "multiselect" | "boolean"
+  options     Json?    // for select/multiselect
+  required    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  values    LeadFieldValue[]
+
+  @@unique([workspaceId, key])
+}
+
+model LeadFieldValue {
+  id      String @id @default(cuid())
+  leadId  String
+  fieldId String
+  value   Json
+
+  lead  Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  field CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, fieldId])
+}
+
+model Tag {
+  id          String @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leads     LeadTag[]
+
+  @@unique([workspaceId, name])
+}
+
+model LeadTag {
+  leadId String
+  tagId  String
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  leadId    String
+  authorId  String?
+  body      String
+  createdAt DateTime @default(now())
+
+  lead   Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User? @relation("NoteAuthor", fields: [authorId], references: [id])
+
+  @@index([leadId])
+}
+
+model Consent {
+  id        String   @id @default(cuid())
+  leadId    String
+  type      String // "marketing" | "recording" | "data_processing"
+  granted   Boolean
+  source    String? // where consent was captured
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — pipelines
+// ---------------------------------------------------------------------------
+
+model Pipeline {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  stages    Stage[]
+  leads     Lead[]
+
+  @@index([workspaceId])
+}
+
+enum StageType {
+  open
+  won
+  lost
+}
+
+model Stage {
+  id               String    @id @default(cuid())
+  pipelineId       String
+  name             String
+  type             StageType @default(open)
+  order            Int
+  requiredFieldIds String[]  @default([])
+  onEnterAutomationId String?
+  slaMinutes       Int?
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  leads    Lead[]
+
+  @@index([pipelineId, order])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — unified inbox
+// ---------------------------------------------------------------------------
+
+enum ConversationChannel {
+  instagram
+  whatsapp
+}
+
+model Conversation {
+  id              String              @id @default(cuid())
+  workspaceId     String
+  leadId          String?
+  channel         ConversationChannel
+  windowExpiresAt DateTime?
+  botActive       Boolean             @default(true)
+  assignedToId    String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead      Lead?     @relation(fields: [leadId], references: [id])
+  messages  Message[]
+
+  @@index([workspaceId, leadId])
+  @@index([workspaceId, assignedToId])
+}
+
+enum MessageDirection {
+  inbound
+  outbound
+}
+
+model Message {
+  id             String            @id @default(cuid())
+  conversationId String
+  direction      MessageDirection
+  type           String // "text" | "image" | "video" | "document" | "template" | "location" | "product"
+  body           String?
+  mediaUrl       String?
+  templateId     String?
+  status         String            @default("sent") // sent | delivered | read | failed
+  externalId     String?           @unique
+  createdAt      DateTime          @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — automations
+// ---------------------------------------------------------------------------
+
+enum AutomationStatus {
+  draft
+  live
+  scheduled
+  paused
+}
+
+model Automation {
+  id          String           @id @default(cuid())
+  workspaceId String
+  name        String
+  folder      String?
+  status      AutomationStatus @default(draft)
+  triggerId   String?
+  scheduleAt  DateTime?
+  endAt       DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  trigger   Trigger?            @relation(fields: [triggerId], references: [id])
+  versions  AutomationVersion[]
+  runs      AutomationRun[]
+
+  @@index([workspaceId, status])
+}
+
+model AutomationVersion {
+  id           String   @id @default(cuid())
+  automationId String
+  version      Int
+  graph        Json // flow builder blocks + edges
+  publishedAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@unique([automationId, version])
+}
+
+model Trigger {
+  id     String @id @default(cuid())
+  type   String // "comment_keyword" | "dm" | "story_reply" | "custom" | ...
+  config Json
+
+  automations Automation[]
+}
+
+model SavedTrigger {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  config      Json
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model AutomationRun {
+  id           String   @id @default(cuid())
+  automationId String
+  leadId       String?
+  status       String   @default("running") // running | completed | failed | handed_over
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  lead       Lead?      @relation(fields: [leadId], references: [id])
+  steps      RunStep[]
+
+  @@index([automationId, status])
+}
+
+model RunStep {
+  id        String   @id @default(cuid())
+  runId     String
+  blockId   String // node id within the automation graph
+  type      String
+  input     Json?
+  output    Json?
+  status    String   @default("ok") // ok | error | skipped
+  startedAt DateTime @default(now())
+
+  run AutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+model FlowTemplate {
+  id          String   @id @default(cuid())
+  workspaceId String? // null = public/system template
+  name        String
+  industry    String?
+  scope       String   @default("private") // private | agency | public
+  graph       Json
+  variables   Json     @default("{}") // {business_name} etc.
+  createdAt   DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — messaging
+// ---------------------------------------------------------------------------
+
+model WaTemplate {
+  id         String   @id @default(cuid())
+  workspaceId String
+  name       String
+  category   String // marketing | utility | authentication
+  language   String
+  bodyText   String
+  buttons    Json     @default("[]")
+  metaStatus String   @default("pending") // pending | approved | rejected
+  createdAt  DateTime @default(now())
+
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  broadcasts Broadcast[]
+
+  @@index([workspaceId])
+}
+
+model Broadcast {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  templateId    String
+  audienceFilter Json    @default("{}")
+  scheduledAt   DateTime?
+  status        String   @default("draft") // draft | scheduled | sending | sent | failed
+  costEstimate  Int? // in paise
+  createdAt     DateTime @default(now())
+
+  workspace  Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  template   WaTemplate          @relation(fields: [templateId], references: [id])
+  recipients BroadcastRecipient[]
+
+  @@index([workspaceId])
+}
+
+model BroadcastRecipient {
+  id          String   @id @default(cuid())
+  broadcastId String
+  leadId      String
+  status      String   @default("pending") // pending | sent | delivered | failed | skipped
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@index([broadcastId, status])
+}
+
+model QuickReply {
+  id          String   @id @default(cuid())
+  workspaceId String
+  shortcut    String
+  body        String
+  mediaUrl    String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, shortcut])
+}
+
+model Media {
+  id          String   @id @default(cuid())
+  workspaceId String
+  url         String
+  type        String // image | video | document
+  filename    String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — routing, scoring, tasks
+// ---------------------------------------------------------------------------
+
+model RoutingRule {
+  id          String   @id @default(cuid())
+  workspaceId String
+  order       Int
+  conditions  Json
+  assignTo    Json // { type: "user" | "team" | "least_busy" | "round_robin", targetId? }
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, order])
+}
+
+model ScoringRule {
+  id          String   @id @default(cuid())
+  workspaceId String
+  condition   Json
+  points      Int
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model Assignment {
+  id        String   @id @default(cuid())
+  leadId    String
+  userId    String
+  assignedAt DateTime @default(now())
+  reassignedFromId String?
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@index([userId])
+}
+
+model SlaTimer {
+  id          String   @id @default(cuid())
+  workspaceId String
+  leadId      String
+  dueAt       DateTime
+  escalatedAt DateTime?
+  resolvedAt  DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, dueAt])
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  workspaceId String
+  leadId      String?
+  assignedToId String?
+  title       String
+  dueAt       DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead      Lead?     @relation(fields: [leadId], references: [id])
+
+  @@index([workspaceId, assignedToId, completedAt])
+}
+
+model Sequence {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  steps       Json // ordered list of {waitHours, action}
+  createdAt   DateTime @default(now())
+
+  workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  enrollments SequenceEnrollment[]
+
+  @@index([workspaceId])
+}
+
+model SequenceEnrollment {
+  id         String    @id @default(cuid())
+  sequenceId String
+  leadId     String
+  currentStep Int      @default(0)
+  status     String    @default("active") // active | completed | stopped
+  enrolledAt DateTime  @default(now())
+
+  sequence Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([sequenceId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — plans, billing, usage (metering without AI cost yet)
+// ---------------------------------------------------------------------------
+
+model Subscription {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  planId      String
+  status      String   @default("active") // active | trialing | past_due | canceled | paused
+  billingCycle String  @default("monthly") // monthly | yearly
+  trialEndsAt DateTime?
+  currentPeriodEnd DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  workspaceId String
+  amountInr   Int
+  gstInr      Int      @default(0)
+  status      String   @default("pending") // pending | paid | failed | refunded
+  periodStart DateTime
+  periodEnd   DateTime
+  issuedAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model WorkspaceAddon {
+  id          String   @id @default(cuid())
+  workspaceId String
+  addonKey    String // extra_user | extra_instagram_account | extra_25k_contacts
+  quantity    Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model CreditLedger {
+  id          String   @id @default(cuid())
+  workspaceId String
+  delta       Int // positive = credit added, negative = debited
+  reason      String // "monthly_reset" | "topup" | "ai_reply" | "call_transcription" | ...
+  balanceAfter Int
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+}
+
+model UsageEvent {
+  id          String   @id @default(cuid())
+  workspaceId String
+  type        String // "ai_reply" | "call_minute" | "meeting_minute" | "broadcast_send" | ...
+  quantity    Int      @default(1)
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, type, createdAt])
+}
+
+model UsageMonthly {
+  id          String   @id @default(cuid())
+  workspaceId String
+  yearMonth   String // "2026-09"
+  aiCreditsUsed Int    @default(0)
+  contactsCount Int    @default(0)
+  usersCount    Int    @default(0)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, yearMonth])
+}
