@@ -6,6 +6,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import type {
   CreateWorkspaceDto,
   InviteMemberDto,
+  UpdateMemberAvailabilityDto,
   UpdateMemberRoleDto,
   UpdateWorkspaceSettingsDto
 } from "./dto/workspaces.dto";
@@ -61,6 +62,7 @@ export class WorkspacesService {
         name: dto.name,
         currency: dto.currency,
         timezone: dto.timezone,
+        slaMinutes: dto.slaMinutes,
         ...(labels ? { labels: labels as Prisma.InputJsonValue } : {})
       }
     });
@@ -145,5 +147,14 @@ export class WorkspacesService {
       metadata: { role: dto.role }
     });
     return membership;
+  }
+
+  async updateMemberAvailability(workspaceId: string, membershipId: string, dto: UpdateMemberAvailabilityDto) {
+    const result = await this.prisma.client.membership.updateMany({
+      where: { id: membershipId, workspaceId },
+      data: { available: dto.available }
+    });
+    if (result.count === 0) throw new NotFoundException("Member not found");
+    return this.prisma.client.membership.findUniqueOrThrow({ where: { id: membershipId } });
   }
 }

@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from "@nestjs/common
 import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { RoutingEngineService } from "../routing/routing-engine.service";
 import type {
   AddNoteDto,
   AddTagDto,
@@ -17,7 +18,8 @@ import type {
 export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly routingEngine: RoutingEngineService
   ) {}
 
   async list(workspaceId: string, query: ListLeadsQuery) {
@@ -75,6 +77,7 @@ export class LeadsService {
     }
     const lead = await this.prisma.client.lead.create({ data: { workspaceId, ...dto } });
     await this.audit.log({ workspaceId, userId, action: "lead.created", entityType: "lead", entityId: lead.id });
+    await this.routingEngine.applyToNewLead(workspaceId, lead.id);
     return lead;
   }
 

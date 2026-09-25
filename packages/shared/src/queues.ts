@@ -7,6 +7,8 @@ export const QUEUE_NAMES = [
   "ai",
   "transcription",
   "broadcasts",
-  "billing"
+  "billing",
+  "routing",
+  "sequences"
 ] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];

@@ -20,10 +20,18 @@ export const updateMemberRoleSchema = z.object({
 });
 export type UpdateMemberRoleDto = z.infer<typeof updateMemberRoleSchema>;
 
+export const updateMemberAvailabilitySchema = z.object({
+  available: z.boolean()
+});
+export type UpdateMemberAvailabilityDto = z.infer<typeof updateMemberAvailabilitySchema>;
+
 export const updateWorkspaceSettingsSchema = z.object({
   name: z.string().min(1).optional(),
   currency: z.string().length(3).optional(),
   timezone: z.string().min(1).optional(),
+  // Speed rule (docs/PRD.md section 10): respond within N minutes else
+  // reassign — read by the routing engine when it starts an SLA timer.
+  slaMinutes: z.number().int().positive().optional(),
   // Partial merge into Workspace.labels — e.g. { lead: "Student" } renames
   // only the "lead" term (docs/PRD.md: rename Lead/Appointment/Salesperson/
   // Won/Pipeline/Interest).

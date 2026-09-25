@@ -7,6 +7,7 @@ import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import {
   createWorkspaceSchema,
   inviteMemberSchema,
+  updateMemberAvailabilitySchema,
   updateMemberRoleSchema,
   updateWorkspaceSettingsSchema
 } from "./dto/workspaces.dto";
@@ -73,5 +74,18 @@ export class WorkspacesController {
     @Body(new ZodValidationPipe(updateMemberRoleSchema)) body: unknown
   ) {
     return this.workspaces.updateMemberRole(workspaceId, membershipId, userId, body as never);
+  }
+
+  // Team availability toggle feeding routing's least-busy/round-robin
+  // fallback (docs/PRD.md section 10). Gated with routing rather than
+  // members.manage since it's part of the routing settings surface.
+  @Patch(":workspaceId/members/:membershipId/availability")
+  @RequirePermission("routing.manage")
+  updateAvailability(
+    @Param("workspaceId") workspaceId: string,
+    @Param("membershipId") membershipId: string,
+    @Body(new ZodValidationPipe(updateMemberAvailabilitySchema)) body: unknown
+  ) {
+    return this.workspaces.updateMemberAvailability(workspaceId, membershipId, body as never);
   }
 }

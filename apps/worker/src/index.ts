@@ -2,6 +2,8 @@ import { Worker, type Job } from "bullmq";
 import { resumeRun, startRun } from "./automation-engine/engine";
 import { createRedisConnection } from "./redis";
 import { processBroadcast } from "./processors/broadcast";
+import { processSalespersonAlert, processSlaCheck } from "./processors/routing";
+import { processSequenceStep } from "./processors/sequence";
 import { processMetaWebhookEvent } from "./processors/webhook-event";
 import { QUEUE_NAMES, type QueueName } from "./queues";
 
@@ -30,6 +32,19 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
   broadcasts: async (job) => {
     const { broadcastId } = job.data as { broadcastId: string };
     await processBroadcast(broadcastId);
+  },
+  routing: async (job) => {
+    if (job.name === "salesperson_alert") {
+      const { workspaceId, leadId, userId, note } = job.data as { workspaceId: string; leadId: string; userId: string; note?: string };
+      await processSalespersonAlert(workspaceId, leadId, userId, note);
+    } else if (job.name === "sla_check") {
+      const { slaTimerId } = job.data as { slaTimerId: string };
+      await processSlaCheck(slaTimerId);
+    }
+  },
+  sequences: async (job) => {
+    const { enrollmentId } = job.data as { enrollmentId: string };
+    await processSequenceStep(enrollmentId);
   }
 };
 

@@ -14,7 +14,9 @@ export const PERMISSIONS = [
   "broadcasts.send",
   "reports.read",
   "settings.manage",
-  "audit_log.read"
+  "audit_log.read",
+  "routing.manage",
+  "tasks.manage"
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -29,9 +31,11 @@ export const ROLE_PERMISSIONS: Record<WorkspaceRole, readonly Permission[]> = {
     "pipelines.manage",
     "automations.manage",
     "broadcasts.send",
-    "reports.read"
+    "reports.read",
+    "routing.manage",
+    "tasks.manage"
   ],
-  sales: ["leads.read", "leads.write", "reports.read"],
+  sales: ["leads.read", "leads.write", "reports.read", "tasks.manage"],
   viewer: ["leads.read", "reports.read"]
 };
 

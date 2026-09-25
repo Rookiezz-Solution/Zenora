@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Lead, LeadProfile, TimelineEvent } from "@/lib/lead-types";
+import type { Sequence } from "@/lib/sequence-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
 
 export default function LeadProfilePage() {
@@ -15,15 +16,29 @@ export default function LeadProfilePage() {
   const [duplicates, setDuplicates] = useState<Lead[]>([]);
   const [noteBody, setNoteBody] = useState("");
   const [tagInput, setTagInput] = useState("");
+  const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [selectedSequenceId, setSelectedSequenceId] = useState("");
+  const [enrollMessage, setEnrollMessage] = useState<string | null>(null);
 
   function load() {
     if (!workspaceId) return;
     apiFetch<LeadProfile>(`/leads/${workspaceId}/${id}`).then(setLead).catch(() => setLead(null));
     apiFetch<TimelineEvent[]>(`/leads/${workspaceId}/${id}/timeline`).then(setTimeline).catch(() => setTimeline([]));
     apiFetch<Lead[]>(`/leads/${workspaceId}/${id}/duplicates`).then(setDuplicates).catch(() => setDuplicates([]));
+    apiFetch<Sequence[]>(`/sequences/${workspaceId}`).then(setSequences).catch(() => setSequences([]));
   }
 
   useEffect(load, [workspaceId, id]);
+
+  async function enrollInSequence() {
+    if (!workspaceId || !selectedSequenceId) return;
+    const result = await apiFetch<{ enrolled: number; skipped: number }>(`/sequences/${workspaceId}/${selectedSequenceId}/enroll`, {
+      method: "POST",
+      body: JSON.stringify({ leadIds: [id] })
+    });
+    setEnrollMessage(result.enrolled > 0 ? "Enrolled." : "Already enrolled in this sequence.");
+    setTimeout(() => setEnrollMessage(null), 3000);
+  }
 
   async function addNote(e: React.FormEvent) {
     e.preventDefault();
@@ -138,7 +153,32 @@ export default function LeadProfilePage() {
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold text-gray-900">Notes</h2>
+        <h2 className="text-sm font-semibold text-gray-900">Follow-up sequence</h2>
+        <div className="mt-2 flex items-center gap-2">
+          <select
+            value={selectedSequenceId}
+            onChange={(e) => setSelectedSequenceId(e.target.value)}
+            className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+          >
+            <option value="">Choose a sequence…</option>
+            {sequences.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={enrollInSequence}
+            disabled={!selectedSequenceId}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            Enroll
+          </button>
+        </div>
+        {enrollMessage && <p className="mt-1 text-xs text-gray-500">{enrollMessage}</p>}
+
+        <h2 className="mt-6 text-sm font-semibold text-gray-900">Notes</h2>
         <form onSubmit={addNote} className="mt-2 flex flex-col gap-2">
           <textarea
             value={noteBody}

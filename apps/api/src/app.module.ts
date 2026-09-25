@@ -14,6 +14,9 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { QueueModule } from "./queue/queue.module";
 import { QuickRepliesModule } from "./quick-replies/quick-replies.module";
 import { RealtimeModule } from "./realtime/realtime.module";
+import { RoutingModule } from "./routing/routing.module";
+import { SequencesModule } from "./sequences/sequences.module";
+import { TasksModule } from "./tasks/tasks.module";
 import { TemplatesModule } from "./templates/templates.module";
 import { WorkspacesModule } from "./workspaces/workspaces.module";
 
@@ -34,7 +37,10 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     FlowTemplatesModule,
     QuickRepliesModule,
     TemplatesModule,
-    BroadcastsModule
+    BroadcastsModule,
+    RoutingModule,
+    TasksModule,
+    SequencesModule
   ],
   controllers: [HealthController]
 })

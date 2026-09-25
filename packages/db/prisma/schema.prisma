@@ -39,6 +39,7 @@ model Workspace {
   locales   String[]      @default(["en"])
   labels    Json          @default("{}") // terminology overrides, see @zenora/shared DEFAULT_LABELS
   planId    String        @default("free")
+  slaMinutes Int          @default(30) // speed rule: respond within N minutes else reassign (docs/PRD.md section 10)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
@@ -117,6 +118,7 @@ model Membership {
   userId      String
   role        WorkspaceRole @default(sales)
   teamId      String?
+  available   Boolean       @default(true) // team availability toggle for routing's least-busy/round-robin fallback
   createdAt   DateTime      @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

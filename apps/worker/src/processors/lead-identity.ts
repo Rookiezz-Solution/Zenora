@@ -1,4 +1,5 @@
 import { prisma } from "@zenora/db";
+import { applyToNewLead } from "./routing";
 
 // Finds the Lead already linked to this channel identity (ig-scoped id / wa
 // phone), or creates a new Lead + LeadIdentity. This is the merge point that
@@ -17,7 +18,7 @@ export async function findOrCreateLeadByIdentity(
   });
   if (existing) return existing.lead;
 
-  return prisma.lead.create({
+  const lead = await prisma.lead.create({
     data: {
       workspaceId,
       name: attrs.name,
@@ -26,4 +27,8 @@ export async function findOrCreateLeadByIdentity(
       identities: { create: { type, value } }
     }
   });
+  // Scoring + routing only apply to a genuinely new lead, not a returning
+  // one whose identity we already knew (docs/ROADMAP.md Phase 1 item 8).
+  await applyToNewLead(workspaceId, lead.id);
+  return lead;
 }

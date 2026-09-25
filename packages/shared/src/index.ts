@@ -7,3 +7,5 @@ export * from "./realtime";
 export * from "./automation";
 export * from "./automation-validation";
 export * from "./automation-template";
+export * from "./routing";
+export * from "./sequences";

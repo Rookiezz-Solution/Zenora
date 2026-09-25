@@ -6,6 +6,8 @@ const prismaMock = vi.hoisted(() => ({
 }));
 
 vi.mock("@zenora/db", () => ({ prisma: prismaMock }));
+const applyToNewLead = vi.hoisted(() => vi.fn());
+vi.mock("./routing", () => ({ applyToNewLead }));
 
 import { findOrCreateLeadByIdentity } from "./lead-identity";
 
@@ -26,6 +28,7 @@ describe("findOrCreateLeadByIdentity", () => {
       where: { type_value: { type: "ig_scoped_id", value: "ig_abc" } },
       include: { lead: true }
     });
+    expect(applyToNewLead).not.toHaveBeenCalled();
   });
 
   it("creates a new lead with the identity attached when none exists", async () => {
@@ -48,5 +51,6 @@ describe("findOrCreateLeadByIdentity", () => {
         identities: { create: { type: "wa_phone", value: "+919999999999" } }
       }
     });
+    expect(applyToNewLead).toHaveBeenCalledWith("ws_1", "lead_2");
   });
 });

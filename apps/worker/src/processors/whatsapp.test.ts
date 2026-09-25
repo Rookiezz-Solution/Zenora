@@ -15,6 +15,7 @@ const findMatchingAutomations = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 const enqueueStart = vi.hoisted(() => vi.fn());
 vi.mock("../automation-engine/trigger-matcher", () => ({ findMatchingAutomations }));
 vi.mock("../automation-engine/queue", () => ({ enqueueStart }));
+vi.mock("./routing", () => ({ applyToNewLead: vi.fn() }));
 
 import { processWhatsappPayload } from "./whatsapp";
 

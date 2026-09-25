@@ -70,6 +70,12 @@ export class InboxService {
       data: { conversationId, direction: "outbound", type, body, externalId, status: "sent" }
     });
     await this.prisma.client.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
+    // A human reply is what the SLA is actually measuring (docs/PRD.md's
+    // "call within N minutes else reassign") — bot sends don't count.
+    await this.prisma.client.slaTimer.updateMany({
+      where: { workspaceId, leadId: conversation.lead.id, resolvedAt: null },
+      data: { resolvedAt: new Date() }
+    });
 
     await this.realtime.publish({ workspaceId, type: "message.created", payload: message });
     return message;
