@@ -36,3 +36,21 @@ export async function sendWhatsappText(phoneNumberId: string, to: string, text: 
   })) as { messages: Array<{ id: string }> };
   return body.messages[0]!.id;
 }
+
+// Outside the 24h customer-service window, WhatsApp only allows sending a
+// pre-approved template (CLAUDE.md rule #5) — what broadcasts use.
+export async function sendWhatsappTemplate(
+  phoneNumberId: string,
+  to: string,
+  templateName: string,
+  languageCode: string,
+  accessToken: string
+): Promise<string> {
+  const body = (await post(`/${phoneNumberId}/messages`, accessToken, {
+    messaging_product: "whatsapp",
+    to,
+    type: "template",
+    template: { name: templateName, language: { code: languageCode } }
+  })) as { messages: Array<{ id: string }> };
+  return body.messages[0]!.id;
+}

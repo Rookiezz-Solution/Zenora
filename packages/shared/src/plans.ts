@@ -68,6 +68,15 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   }
 };
 
+// WhatsApp per-message rates Meta bills the customer directly (docs/
+// INTEGRATIONS.md, India, checked Sept 2026 — confirm before launch). In
+// paise so broadcast cost estimates stay integer math.
+export const WHATSAPP_MESSAGE_COST_PAISE = {
+  marketing: 86,
+  utility: 12,
+  authentication: 12
+} as const;
+
 // 1 credit ≈ ₹0.25 of provider cost.
 export const CREDIT_WEIGHTS = {
   aiReply: 1,

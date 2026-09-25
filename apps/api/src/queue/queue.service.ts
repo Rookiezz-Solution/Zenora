@@ -11,10 +11,10 @@ export class QueueService implements OnModuleDestroy {
     QUEUE_NAMES.map((name) => [name, new Queue(name, { connection: this.connection })])
   );
 
-  async add(queueName: QueueName, jobName: string, data: unknown) {
+  async add(queueName: QueueName, jobName: string, data: unknown, delayMs = 0) {
     const queue = this.queues.get(queueName);
     if (!queue) throw new Error(`Unknown queue: ${queueName}`);
-    return queue.add(jobName, data);
+    return queue.add(jobName, data, delayMs > 0 ? { delay: delayMs } : undefined);
   }
 
   async onModuleDestroy() {

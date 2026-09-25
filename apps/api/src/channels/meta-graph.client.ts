@@ -160,4 +160,59 @@ export class MetaGraphClient {
     });
     return body.messages[0]!.id;
   }
+
+  // docs/PRD.md: WhatsApp template builder's "submit to Meta." Meta reviews
+  // async — the result comes back later via the message_template_status_update
+  // webhook field (or a manual sync poll), not this call's response.
+  async submitWhatsappTemplate(
+    wabaId: string,
+    accessToken: string,
+    template: {
+      name: string;
+      category: "marketing" | "utility" | "authentication";
+      language: string;
+      headerType: "none" | "text" | "image" | "video" | "document";
+      headerText?: string;
+      bodyText: string;
+      footerText?: string;
+      buttons: Array<{ type: "quick_reply" | "url" | "phone_number"; text: string; url?: string; phoneNumber?: string }>;
+    }
+  ): Promise<{ metaTemplateId: string; status: string }> {
+    const components: Record<string, unknown>[] = [];
+    if (template.headerType !== "none") {
+      components.push({ type: "HEADER", format: template.headerType.toUpperCase(), ...(template.headerText ? { text: template.headerText } : {}) });
+    }
+    components.push({ type: "BODY", text: template.bodyText });
+    if (template.footerText) components.push({ type: "FOOTER", text: template.footerText });
+    if (template.buttons.length > 0) {
+      components.push({
+        type: "BUTTONS",
+        buttons: template.buttons.map((b) => ({
+          type: b.type.toUpperCase(),
+          text: b.text,
+          ...(b.url ? { url: b.url } : {}),
+          ...(b.phoneNumber ? { phone_number: b.phoneNumber } : {})
+        }))
+      });
+    }
+
+    const body = await this.post<{ id: string; status: string }>(`/${wabaId}/message_templates`, accessToken, {
+      name: template.name,
+      category: template.category.toUpperCase(),
+      language: template.language,
+      components
+    });
+    return { metaTemplateId: body.id, status: body.status };
+  }
+
+  // Manual "refresh status" poll, complementing the webhook-driven sync —
+  // useful when the workspace hasn't configured webhooks yet, or just wants
+  // to check now instead of waiting.
+  async getWhatsappTemplateStatus(metaTemplateId: string, accessToken: string): Promise<{ status: string; rejectionReason?: string }> {
+    const body = await this.request<{ status: string; rejected_reason?: string }>(`/${metaTemplateId}`, {
+      fields: "status,rejected_reason",
+      access_token: accessToken
+    });
+    return { status: body.status, rejectionReason: body.rejected_reason };
+  }
 }

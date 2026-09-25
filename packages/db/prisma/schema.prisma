@@ -333,6 +333,7 @@ model Lead {
   tasks        Task[]
   sequenceEnrollments SequenceEnrollment[]
   automationRuns AutomationRun[]
+  broadcastRecipients BroadcastRecipient[]
 
   @@index([workspaceId, pipelineId, stageId])
   @@index([workspaceId, ownerId])
@@ -632,15 +633,21 @@ model FlowTemplate {
 // ---------------------------------------------------------------------------
 
 model WaTemplate {
-  id         String   @id @default(cuid())
-  workspaceId String
-  name       String
-  category   String // marketing | utility | authentication
-  language   String
-  bodyText   String
-  buttons    Json     @default("[]")
-  metaStatus String   @default("pending") // pending | approved | rejected
-  createdAt  DateTime @default(now())
+  id              String    @id @default(cuid())
+  workspaceId     String
+  name            String
+  category        String // marketing | utility | authentication
+  language        String
+  headerType      String    @default("none") // none | text | image | video | document
+  headerText      String?
+  bodyText        String
+  footerText      String?
+  buttons         Json      @default("[]")
+  metaStatus      String    @default("pending") // pending | approved | rejected
+  metaTemplateId  String? // Meta's id for this template, once submitted
+  rejectionReason String?
+  submittedAt     DateTime?
+  createdAt       DateTime  @default(now())
 
   workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   broadcasts Broadcast[]
@@ -649,14 +656,15 @@ model WaTemplate {
 }
 
 model Broadcast {
-  id            String   @id @default(cuid())
-  workspaceId   String
-  templateId    String
-  audienceFilter Json    @default("{}")
-  scheduledAt   DateTime?
-  status        String   @default("draft") // draft | scheduled | sending | sent | failed
-  costEstimate  Int? // in paise
-  createdAt     DateTime @default(now())
+  id             String    @id @default(cuid())
+  workspaceId    String
+  templateId     String
+  audienceFilter Json      @default("{}")
+  scheduledAt    DateTime?
+  status         String    @default("draft") // draft | scheduled | sending | sent | failed
+  costEstimate   Int? // in paise
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
 
   workspace  Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   template   WaTemplate          @relation(fields: [templateId], references: [id])
@@ -672,8 +680,10 @@ model BroadcastRecipient {
   status      String   @default("pending") // pending | sent | delivered | failed | skipped
 
   broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([broadcastId, status])
+  @@index([leadId])
 }
 
 model QuickReply {

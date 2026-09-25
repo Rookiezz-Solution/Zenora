@@ -1,6 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { resumeRun, startRun } from "./automation-engine/engine";
 import { createRedisConnection } from "./redis";
+import { processBroadcast } from "./processors/broadcast";
 import { processMetaWebhookEvent } from "./processors/webhook-event";
 import { QUEUE_NAMES, type QueueName } from "./queues";
 
@@ -25,6 +26,10 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
       const { runId, blockId } = job.data as { runId: string; blockId: string };
       await resumeRun(runId, blockId);
     }
+  },
+  broadcasts: async (job) => {
+    const { broadcastId } = job.data as { broadcastId: string };
+    await processBroadcast(broadcastId);
   }
 };
 

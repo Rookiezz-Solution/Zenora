@@ -5,7 +5,8 @@ const prismaMock = vi.hoisted(() => ({
   leadIdentity: { findUnique: vi.fn() },
   lead: { create: vi.fn() },
   conversation: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
-  message: { upsert: vi.fn() }
+  message: { upsert: vi.fn() },
+  waTemplate: { findFirst: vi.fn(), update: vi.fn() }
 }));
 
 vi.mock("@zenora/db", () => ({ prisma: prismaMock }));
@@ -85,14 +86,80 @@ describe("processWhatsappPayload", () => {
     expect(prismaMock.message.upsert).not.toHaveBeenCalled();
   });
 
-  it("ignores changes that aren't the messages field", async () => {
+  it("ignores an unrecognized field", async () => {
     await processWhatsappPayload({
       object: "whatsapp_business_account",
-      entry: [{ id: "waba_1", changes: [{ field: "message_template_status_update", value: { metadata: { phone_number_id: "phone_123" } } }] }]
+      entry: [{ id: "waba_1", changes: [{ field: "some_other_field", value: {} }] }]
     });
 
     expect(prismaMock.whatsappNumber.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.message.upsert).not.toHaveBeenCalled();
+  });
+
+  it("skips a template status update with no event or template id", async () => {
+    await processWhatsappPayload({
+      object: "whatsapp_business_account",
+      entry: [{ id: "waba_1", changes: [{ field: "message_template_status_update", value: {} }] }]
+    });
+
+    expect(prismaMock.waTemplate.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("syncs an approved template's status from the webhook", async () => {
+    prismaMock.waTemplate.findFirst.mockResolvedValue({ id: "tpl_1", metaTemplateId: "999" });
+
+    await processWhatsappPayload({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "waba_1",
+          changes: [
+            { field: "message_template_status_update", value: { event: "APPROVED", message_template_id: 999, message_template_name: "welcome" } }
+          ]
+        }
+      ]
+    });
+
+    expect(prismaMock.waTemplate.findFirst).toHaveBeenCalledWith({ where: { metaTemplateId: "999" } });
+    expect(prismaMock.waTemplate.update).toHaveBeenCalledWith({
+      where: { id: "tpl_1" },
+      data: { metaStatus: "approved", rejectionReason: null }
+    });
+  });
+
+  it("records the rejection reason on a rejected template", async () => {
+    prismaMock.waTemplate.findFirst.mockResolvedValue({ id: "tpl_1", metaTemplateId: "999" });
+
+    await processWhatsappPayload({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "waba_1",
+          changes: [
+            {
+              field: "message_template_status_update",
+              value: { event: "REJECTED", message_template_id: 999, reason: "INCORRECT_CATEGORY" }
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(prismaMock.waTemplate.update).toHaveBeenCalledWith({
+      where: { id: "tpl_1" },
+      data: { metaStatus: "rejected", rejectionReason: "INCORRECT_CATEGORY" }
+    });
+  });
+
+  it("no-ops when the status update doesn't match any known template", async () => {
+    prismaMock.waTemplate.findFirst.mockResolvedValue(null);
+
+    await processWhatsappPayload({
+      object: "whatsapp_business_account",
+      entry: [{ id: "waba_1", changes: [{ field: "message_template_status_update", value: { event: "APPROVED", message_template_id: 999 } }] }]
+    });
+
+    expect(prismaMock.waTemplate.update).not.toHaveBeenCalled();
   });
 
   it("starts a run for a matching automation when the bot is active", async () => {

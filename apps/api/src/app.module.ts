@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { AutomationsModule } from "./automations/automations.module";
+import { BroadcastsModule } from "./broadcasts/broadcasts.module";
 import { ChannelsModule } from "./channels/channels.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { FlowTemplatesModule } from "./flow-templates/flow-templates.module";
@@ -32,7 +33,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     AutomationsModule,
     FlowTemplatesModule,
     QuickRepliesModule,
-    TemplatesModule
+    TemplatesModule,
+    BroadcastsModule
   ],
   controllers: [HealthController]
 })
