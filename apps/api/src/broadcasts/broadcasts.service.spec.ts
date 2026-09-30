@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { AuditService } from "../audit/audit.service";
+import type { UsageService } from "../billing/usage.service";
 import type { MetaGraphClient } from "../channels/meta-graph.client";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { QueueService } from "../queue/queue.service";
@@ -8,6 +9,10 @@ import { BroadcastsService } from "./broadcasts.service";
 
 function makeAudit() {
   return { log: vi.fn() } as unknown as AuditService;
+}
+
+function makeUsage() {
+  return { checkContactLimit: vi.fn().mockResolvedValue({ allowed: true, limit: 1000, current: 0 }) } as unknown as UsageService;
 }
 
 function makeClient(overrides: Record<string, unknown> = {}) {
@@ -30,7 +35,7 @@ describe("BroadcastsService.estimateAudience", () => {
     client.leadTag.findMany.mockResolvedValue([{ leadId: "l1" }, { leadId: "l2" }]);
     client.consent.findMany.mockResolvedValue([{ leadId: "l1" }]);
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
 
     const result = await service.estimateAudience("ws1", { tag: "vip", optedInOnly: true });
 
@@ -46,7 +51,7 @@ describe("BroadcastsService.estimateAudience", () => {
   it("skips the opt-in filter when optedInOnly is false", async () => {
     const client = makeClient();
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
 
     const result = await service.estimateAudience("ws1", { optedInOnly: false });
 
@@ -58,7 +63,7 @@ describe("BroadcastsService.estimateAudience", () => {
     const client = makeClient();
     client.leadIdentity.findMany.mockResolvedValue([]);
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
 
     const result = await service.estimateAudience("ws1", { optedInOnly: true });
 
@@ -72,7 +77,7 @@ describe("BroadcastsService.create", () => {
     const client = makeClient();
     client.waTemplate.findFirst.mockResolvedValue({ id: "t1", category: "marketing", metaStatus: "pending" });
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
 
     await expect(
       service.create("ws1", "user1", { templateId: "t1", audienceFilter: { optedInOnly: true } })
@@ -85,7 +90,7 @@ describe("BroadcastsService.create", () => {
     client.consent.findMany.mockResolvedValue([{ leadId: "l1" }, { leadId: "l2" }, { leadId: "l3" }]);
     client.broadcast.create.mockImplementation(({ data }: { data: unknown }) => data);
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
 
     const broadcast = await service.create("ws1", "user1", { templateId: "t1", audienceFilter: { optedInOnly: true } });
 
@@ -107,7 +112,7 @@ describe("BroadcastsService.send", () => {
     });
     const queue = { add: vi.fn() } as unknown as QueueService;
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, queue);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, queue, makeUsage());
 
     await service.send("ws1", "b1", "user1");
 
@@ -132,7 +137,7 @@ describe("BroadcastsService.send", () => {
     });
     const queue = { add: vi.fn() } as unknown as QueueService;
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, queue);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, queue, makeUsage());
 
     await service.send("ws1", "b1", "user1");
 
@@ -146,7 +151,7 @@ describe("BroadcastsService.send", () => {
     const client = makeClient();
     client.broadcast.findFirst.mockResolvedValue({ id: "b1", status: "sent", template: {}, recipients: [] });
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
 
     await expect(service.send("ws1", "b1", "user1")).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -163,7 +168,7 @@ describe("BroadcastsService.send", () => {
       recipients: []
     });
     const prisma = { client } as unknown as PrismaService;
-    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService);
+    const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
 
     await expect(service.send("ws1", "b1", "user1")).rejects.toBeInstanceOf(BadRequestException);
   });

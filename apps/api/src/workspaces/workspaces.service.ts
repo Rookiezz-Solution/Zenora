@@ -1,7 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import * as crypto from "node:crypto";
 import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
+import { UsageService } from "../billing/usage.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
   CreateWorkspaceDto,
@@ -17,7 +18,8 @@ const INVITE_TTL_DAYS = 7;
 export class WorkspacesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly usage: UsageService
   ) {}
 
   async create(userId: string, dto: CreateWorkspaceDto) {
@@ -88,6 +90,13 @@ export class WorkspacesService {
   }
 
   async invite(workspaceId: string, invitedById: string, dto: InviteMemberDto) {
+    const userLimit = await this.usage.checkUserLimit(workspaceId);
+    if (!userLimit.allowed) {
+      throw new BadRequestException(
+        `User limit reached (${userLimit.current}/${userLimit.limit}) — upgrade your plan or add a user seat to invite more people`
+      );
+    }
+
     const invite = await this.prisma.client.invite.create({
       data: {
         workspaceId,

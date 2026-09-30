@@ -1,6 +1,7 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
+import { UsageService } from "../billing/usage.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoutingEngineService } from "../routing/routing-engine.service";
 import type {
@@ -19,7 +20,8 @@ export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly routingEngine: RoutingEngineService
+    private readonly routingEngine: RoutingEngineService,
+    private readonly usage: UsageService
   ) {}
 
   async list(workspaceId: string, query: ListLeadsQuery) {
@@ -261,6 +263,13 @@ export class LeadsService {
   }
 
   async import(workspaceId: string, userId: string, dto: ImportLeadsDto) {
+    const contactLimit = await this.usage.checkContactLimit(workspaceId);
+    if (!contactLimit.allowed) {
+      throw new BadRequestException(
+        `Contact limit reached (${contactLimit.current}/${contactLimit.limit}) — upgrade your plan or add contacts capacity to import more leads`
+      );
+    }
+
     let created = 0;
     let updated = 0;
     let skipped = 0;

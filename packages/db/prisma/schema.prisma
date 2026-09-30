@@ -40,6 +40,9 @@ model Workspace {
   labels    Json          @default("{}") // terminology overrides, see @zenora/shared DEFAULT_LABELS
   planId    String        @default("free")
   slaMinutes Int          @default(30) // speed rule: respond within N minutes else reassign (docs/PRD.md section 10)
+  billingName    String? // legal/trade name on the GST invoice
+  gstin          String?
+  billingAddress String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
@@ -80,6 +83,7 @@ model Workspace {
   addons        WorkspaceAddon[]
   usageEvents   UsageEvent[]
   usageMonthly  UsageMonthly[]
+  creditLedger  CreditLedger[]
 
   @@index([planId])
 }
@@ -834,9 +838,12 @@ model Subscription {
 model Invoice {
   id          String   @id @default(cuid())
   workspaceId String
+  description String   @default("") // e.g. "Growth plan — monthly", "Extra user x2", "1,000 AI credits"
   amountInr   Int
   gstInr      Int      @default(0)
   status      String   @default("pending") // pending | paid | failed | refunded
+  razorpayOrderId   String? @unique
+  razorpayPaymentId String? @unique
   periodStart DateTime
   periodEnd   DateTime
   issuedAt    DateTime @default(now())
@@ -865,6 +872,8 @@ model CreditLedger {
   reason      String // "monthly_reset" | "topup" | "ai_reply" | "call_transcription" | ...
   balanceAfter Int
   createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
 }

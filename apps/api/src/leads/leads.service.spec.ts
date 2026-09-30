@@ -1,12 +1,17 @@
 import { ConflictException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { AuditService } from "../audit/audit.service";
+import type { UsageService } from "../billing/usage.service";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { RoutingEngineService } from "../routing/routing-engine.service";
 import { LeadsService } from "./leads.service";
 
 function makeRoutingEngine() {
   return { applyToNewLead: vi.fn() } as unknown as RoutingEngineService;
+}
+
+function makeUsage() {
+  return { checkContactLimit: vi.fn().mockResolvedValue({ allowed: true, limit: 1000, current: 0 }) } as unknown as UsageService;
 }
 
 function makeTx() {
@@ -45,7 +50,7 @@ describe("LeadsService.merge", () => {
   it("moves identities, notes, conversations and tasks onto the primary lead", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage());
 
     await service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "dup" });
 
@@ -58,7 +63,7 @@ describe("LeadsService.merge", () => {
   it("re-points every tag from the duplicate onto the primary without violating the (leadId, tagId) primary key", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage());
 
     await service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "dup" });
 
@@ -76,7 +81,7 @@ describe("LeadsService.merge", () => {
   it("keeps the primary's own field values and only fills gaps from the duplicate", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage());
 
     await service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "dup" });
 
@@ -89,7 +94,7 @@ describe("LeadsService.merge", () => {
   it("marks the duplicate as merged into the primary", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage());
 
     await service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "dup" });
 
@@ -99,7 +104,7 @@ describe("LeadsService.merge", () => {
   it("refuses to merge a lead into itself", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage());
 
     await expect(service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "primary" })).rejects.toBeInstanceOf(
       ConflictException
@@ -132,7 +137,7 @@ describe("LeadsService.moveStage", () => {
 
   it("blocks the move and names the missing required fields when they aren't provided", async () => {
     const { prisma } = makeMoveStagePrisma();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage());
 
     const attempt = service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won" });
 
@@ -144,7 +149,7 @@ describe("LeadsService.moveStage", () => {
 
   it("treats an empty string as missing, not provided", async () => {
     const { prisma } = makeMoveStagePrisma();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage());
 
     await expect(
       service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "" } })
@@ -153,7 +158,7 @@ describe("LeadsService.moveStage", () => {
 
   it("moves the lead and saves the required field values once they're all provided", async () => {
     const { prisma, tx } = makeMoveStagePrisma();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage());
 
     await service.moveStage("ws1", "lead-1", "user1", {
       stageId: "stage-won",
@@ -174,7 +179,7 @@ describe("LeadsService.moveStage", () => {
   it("logs a distinguishable audit action for a won/lost stage vs. a plain stage change", async () => {
     const { prisma } = makeMoveStagePrisma();
     const audit = makeAudit();
-    const service = new LeadsService(prisma, audit, makeRoutingEngine());
+    const service = new LeadsService(prisma, audit, makeRoutingEngine(), makeUsage());
 
     await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "1" } });
 

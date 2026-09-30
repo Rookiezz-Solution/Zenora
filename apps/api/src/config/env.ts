@@ -21,7 +21,10 @@ const envSchema = z.object({
   META_APP_SECRET: z.string().optional(),
   META_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
   META_GRAPH_API_VERSION: z.string().default("v21.0"),
-  REDIS_URL: z.string().default("redis://localhost:6379")
+  REDIS_URL: z.string().default("redis://localhost:6379"),
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional()
 });
 
 export type Env = z.infer<typeof envSchema>;

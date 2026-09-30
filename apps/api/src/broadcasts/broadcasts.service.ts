@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { WHATSAPP_MESSAGE_COST_PAISE } from "@zenora/shared";
 import { AuditService } from "../audit/audit.service";
+import { UsageService } from "../billing/usage.service";
 import { MetaGraphClient } from "../channels/meta-graph.client";
 import { decryptToken } from "../common/encryption";
 import { PrismaService } from "../prisma/prisma.service";
@@ -13,7 +14,8 @@ export class BroadcastsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly meta: MetaGraphClient,
-    private readonly queue: QueueService
+    private readonly queue: QueueService,
+    private readonly usage: UsageService
   ) {}
 
   list(workspaceId: string) {
@@ -86,6 +88,13 @@ export class BroadcastsService {
   }
 
   async send(workspaceId: string, id: string, userId: string) {
+    const contactLimit = await this.usage.checkContactLimit(workspaceId);
+    if (!contactLimit.allowed) {
+      throw new BadRequestException(
+        `Contact limit reached (${contactLimit.current}/${contactLimit.limit}) — upgrade your plan or add contacts capacity to send broadcasts`
+      );
+    }
+
     const broadcast = await this.getById(workspaceId, id);
     if (broadcast.status !== "draft") throw new BadRequestException(`Broadcast is already ${broadcast.status}`);
 

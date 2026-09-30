@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { BillingModule } from "../billing/billing.module";
 import { InstagramController } from "./instagram.controller";
 import { InstagramService } from "./instagram.service";
 import { MetaGraphClient } from "./meta-graph.client";
@@ -9,7 +10,7 @@ import { WhatsappController } from "./whatsapp.controller";
 import { WhatsappService } from "./whatsapp.service";
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, BillingModule],
   controllers: [WebhooksController, InstagramController, WhatsappController],
   providers: [MetaGraphClient, WebhooksService, InstagramService, WhatsappService]
 })

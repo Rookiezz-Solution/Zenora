@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { AutomationsModule } from "./automations/automations.module";
+import { BillingModule } from "./billing/billing.module";
 import { BroadcastsModule } from "./broadcasts/broadcasts.module";
 import { ChannelsModule } from "./channels/channels.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
@@ -40,7 +41,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     BroadcastsModule,
     RoutingModule,
     TasksModule,
-    SequencesModule
+    SequencesModule,
+    BillingModule
   ],
   controllers: [HealthController]
 })

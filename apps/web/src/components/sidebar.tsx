@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
+import type { UsageOverview } from "@/lib/billing-types";
+import { useCurrentWorkspace } from "@/lib/use-workspace";
 
 // Nav order matches design/screens (Dashboard.dc.html / workspace shell) and
 // docs/PRD.md section 3. Icons come later with the shadcn/ui pass — labels
@@ -88,11 +92,21 @@ function SearchTrigger() {
 }
 
 function AiCreditsMeter() {
-  // Phase 0 placeholder — wired to real usage once the credit ledger (Phase 2)
-  // ships. Layout matches design/screens so the header doesn't reflow later.
+  const { workspaceId } = useCurrentWorkspace();
+  const [usage, setUsage] = useState<UsageOverview | null>(null);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    apiFetch<UsageOverview>(`/billing/${workspaceId}/usage`).then(setUsage).catch(() => setUsage(null));
+  }, [workspaceId]);
+
+  // AI credit debiting itself is Phase 2 (no AI feature exists yet to spend
+  // them) — this shows the plan's real monthly allotment, usage stays 0
+  // until Phase 2 wires actual debiting.
   return (
     <div className="mx-3 mt-3 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
-      AI credits <span className="font-semibold text-gray-900">— / —</span>
+      AI credits{" "}
+      <span className="font-semibold text-gray-900">{usage ? `0 / ${usage.limits.aiCreditsPerMonth}` : "— / —"}</span>
     </div>
   );
 }

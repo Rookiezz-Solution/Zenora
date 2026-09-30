@@ -19,7 +19,7 @@ export default function SignUpPage() {
     setLoading(true);
     try {
       await apiFetch("/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password }) });
-      router.push("/dashboard");
+      router.push("/onboarding");
     } catch (err) {
       setError((err as { message?: string }).message ?? "Could not sign up");
     } finally {

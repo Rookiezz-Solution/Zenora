@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { encryptToken } from "../common/encryption";
 import { loadEnv } from "../config/env";
 import { AuditService } from "../audit/audit.service";
+import { UsageService } from "../billing/usage.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MetaGraphClient } from "./meta-graph.client";
 
@@ -20,7 +21,8 @@ export class InstagramService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly meta: MetaGraphClient
+    private readonly meta: MetaGraphClient,
+    private readonly usage: UsageService
   ) {}
 
   buildAuthorizeUrl(state: string): string {
@@ -56,6 +58,16 @@ export class InstagramService {
       this.logger.warn(`Workspace ${workspaceId} has ${pages.length} linked IG accounts; connecting the first`);
     }
     const chosen = pages[0]!;
+
+    const alreadyConnected = await this.prisma.client.instagramAccount.findUnique({ where: { igUserId: chosen.igUserId } });
+    if (!alreadyConnected) {
+      const limit = await this.usage.checkInstagramLimit(workspaceId);
+      if (!limit.allowed) {
+        throw new BadRequestException(
+          `Instagram account limit reached (${limit.current}/${limit.limit}) — upgrade your plan or add an Instagram account slot to connect another`
+        );
+      }
+    }
 
     const account = await this.prisma.client.instagramAccount.upsert({
       where: { igUserId: chosen.igUserId },

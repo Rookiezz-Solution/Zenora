@@ -96,6 +96,25 @@ export const TOPUP_PRICES_INR = {
   credits10000: 6499
 } as const;
 
+export const TOPUP_CREDITS: Record<keyof typeof TOPUP_PRICES_INR, number> = {
+  credits1000: 1000,
+  credits3000: 3000,
+  credits10000: 10000
+};
+
+export const GST_RATE = 0.18;
+
+export const PLAN_LABELS: Record<PlanId, string> = {
+  free: "Free",
+  starter: "Starter",
+  growth: "Growth",
+  pro: "Pro",
+  partner: "Partner"
+};
+
+// Yearly = 2 months free (docs/PLANS_AND_LIMITS.md).
+export const YEARLY_MONTHS_CHARGED = 10;
+
 export const USAGE_ALERT_THRESHOLDS = [0.5, 0.8, 1.0] as const;
 
 // Owner console flags workspaces whose variable cost exceeds this share of
