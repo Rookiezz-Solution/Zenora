@@ -15,6 +15,9 @@ export interface Lead {
   email: string | null;
   source: string | null;
   score: number;
+  ruleScore: number;
+  aiIntentScore: number;
+  aiScoreReasoning: string | null;
   createdAt: string;
   tags: LeadTag[];
 }

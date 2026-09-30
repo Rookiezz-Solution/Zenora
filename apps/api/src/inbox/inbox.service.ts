@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { AiClient } from "../ai/ai.client";
+import { UsageService } from "../billing/usage.service";
 import { decryptToken } from "../common/encryption";
 import { MetaGraphClient } from "../channels/meta-graph.client";
 import { PrismaService } from "../prisma/prisma.service";
@@ -6,13 +8,16 @@ import { RealtimeService } from "../realtime/realtime.service";
 import type { AssignConversationDto, HandoverDto, ListConversationsQuery, SendMessageDto } from "./dto/inbox.dto";
 
 const MESSAGE_PAGE_SIZE = 50;
+const SUGGEST_REPLY_CONTEXT_SIZE = 10;
 
 @Injectable()
 export class InboxService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly meta: MetaGraphClient,
-    private readonly realtime: RealtimeService
+    private readonly realtime: RealtimeService,
+    private readonly ai: AiClient,
+    private readonly usage: UsageService
   ) {}
 
   async listConversations(workspaceId: string, userId: string, query: ListConversationsQuery) {
@@ -140,6 +145,34 @@ export class InboxService {
     if (!dto.body) throw new BadRequestException("Message body is required");
     const externalId = await this.meta.sendWhatsappText(number.phoneNumberId, recipient.value, dto.body, accessToken);
     return { externalId, body: dto.body, type: "text" };
+  }
+
+  // Drafts a reply for a rep to review and send — never sent automatically
+  // (docs/PRD.md section 9 "suggested replies"). Manual, credit-gated the
+  // same way "Generate FAQs" is in the knowledge base.
+  async suggestReply(workspaceId: string, conversationId: string) {
+    const conversation = await this.prisma.client.conversation.findFirst({ where: { id: conversationId, workspaceId } });
+    if (!conversation) throw new NotFoundException("Conversation not found");
+
+    const recent = await this.prisma.client.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: "desc" },
+      take: SUGGEST_REPLY_CONTEXT_SIZE
+    });
+    if (recent.length === 0) throw new BadRequestException("No messages yet to suggest a reply from");
+
+    const credits = await this.usage.checkAiCredits(workspaceId);
+    if (!credits.allowed) throw new BadRequestException("AI credits are used up for this month");
+
+    const messages = recent
+      .reverse()
+      .filter((m) => m.body)
+      .map((m) => ({ direction: m.direction, body: m.body! }));
+
+    const suggestion = await this.ai.suggestReply(messages);
+    const debit = await this.usage.debitAiReplyCredit(workspaceId);
+
+    return { suggestion, creditsRemaining: debit.remaining };
   }
 
   async setHandover(workspaceId: string, conversationId: string, dto: HandoverDto) {

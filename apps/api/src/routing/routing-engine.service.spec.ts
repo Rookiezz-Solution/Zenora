@@ -44,7 +44,7 @@ describe("RoutingEngineService.applyToNewLead", () => {
 
     await service.applyToNewLead("ws1", "lead1");
 
-    expect(client.lead.update).toHaveBeenCalledWith({ where: { id: "lead1" }, data: { score: 25 } });
+    expect(client.lead.update).toHaveBeenCalledWith({ where: { id: "lead1" }, data: { ruleScore: 25, score: 25 } });
   });
 
   it("does not write a score update when no rule matches", async () => {

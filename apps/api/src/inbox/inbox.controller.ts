@@ -47,6 +47,12 @@ export class InboxController {
     return this.inbox.sendMessage(workspaceId, conversationId, userId, body as never);
   }
 
+  @Post("conversations/:conversationId/suggest-reply")
+  @RequirePermission("leads.write")
+  suggestReply(@Param("workspaceId") workspaceId: string, @Param("conversationId") conversationId: string) {
+    return this.inbox.suggestReply(workspaceId, conversationId);
+  }
+
   @Post("conversations/:conversationId/handover")
   @RequirePermission("leads.write")
   setHandover(

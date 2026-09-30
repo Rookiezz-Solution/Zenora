@@ -88,6 +88,14 @@ export default function InboxPage() {
     loadConversations(workspaceId, filter);
   }
 
+  async function handleSuggestReply(): Promise<string> {
+    if (!workspaceId || !selectedId) return "";
+    const result = await apiFetch<{ suggestion: string }>(`/inbox/${workspaceId}/conversations/${selectedId}/suggest-reply`, {
+      method: "POST"
+    });
+    return result.suggestion;
+  }
+
   async function handleAssignToMe() {
     if (!workspaceId || !selectedId || !currentUserId) return;
     await apiFetch(`/inbox/${workspaceId}/conversations/${selectedId}/assign`, {
@@ -120,6 +128,7 @@ export default function InboxPage() {
           onSend={handleSend}
           onToggleBot={handleToggleBot}
           onAssignToMe={handleAssignToMe}
+          onSuggestReply={handleSuggestReply}
         />
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm text-gray-400">

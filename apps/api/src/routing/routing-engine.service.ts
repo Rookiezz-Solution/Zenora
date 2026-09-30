@@ -54,7 +54,8 @@ export class RoutingEngineService {
 
     const score = computeScore(scoringRules as unknown as ScoringRuleInput[], context);
     if (score !== 0) {
-      await this.prisma.client.lead.update({ where: { id: leadId }, data: { score } });
+      // A brand-new lead has no aiIntentScore yet, so score == ruleScore here.
+      await this.prisma.client.lead.update({ where: { id: leadId }, data: { ruleScore: score, score } });
     }
 
     const assignTo = matchRoutingRule(routingRules as unknown as RoutingRuleInput[], context);

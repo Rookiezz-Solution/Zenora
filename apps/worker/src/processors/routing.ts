@@ -48,7 +48,8 @@ async function run(workspaceId: string, leadId: string): Promise<void> {
 
   const score = computeScore(scoringRules as unknown as ScoringRuleInput[], context);
   if (score !== 0) {
-    await prisma.lead.update({ where: { id: leadId }, data: { score } });
+    // A brand-new lead has no aiIntentScore yet, so score == ruleScore here.
+    await prisma.lead.update({ where: { id: leadId }, data: { ruleScore: score, score } });
   }
 
   const assignTo = matchRoutingRule(routingRules as unknown as RoutingRuleInput[], context);

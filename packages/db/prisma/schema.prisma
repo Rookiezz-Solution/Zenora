@@ -320,7 +320,10 @@ model Lead {
   phone       String?
   email       String?
   source      String? // "instagram" | "whatsapp" | "manual" | "import" | "ad"
-  score       Int      @default(0)
+  score       Int      @default(0) // ruleScore + aiIntentScore, kept in sync at every write site
+  ruleScore   Int      @default(0)
+  aiIntentScore Int    @default(0)
+  aiScoreReasoning String?
   ownerId     String?
   pipelineId  String?
   stageId     String?

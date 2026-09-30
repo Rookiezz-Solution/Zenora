@@ -12,6 +12,20 @@ export interface GeneratedFaq {
   answer: string;
 }
 
+export interface ConversationMessage {
+  direction: "inbound" | "outbound";
+  body: string;
+}
+
+export interface IntentScore {
+  bonus: number; // 0-30, added on top of the rule-based score
+  reasoning: string;
+}
+
+function formatTranscript(messages: ConversationMessage[]): string {
+  return messages.map((m) => `${m.direction === "inbound" ? "Customer" : "Business"}: ${m.body}`).join("\n");
+}
+
 // Thin wrapper around Anthropic's Messages API. Structurally complete + unit
 // tested with mocked responses, like every third-party integration in this
 // repo before live keys exist (Razorpay, Meta). Live-verified only as far as
@@ -108,6 +122,35 @@ export class AiClient {
     const text = await this.complete(system, content.slice(0, 12000));
     return parseGeneratedFaqs(text);
   }
+
+  // AI intent bonus on top of the rule-based score (docs/PRD.md section 10).
+  // Reads recent conversation messages and estimates buying intent/urgency —
+  // a small bonus on top of whatever the workspace's condition-based scoring
+  // rules already computed.
+  async scoreLeadIntent(messages: ConversationMessage[]): Promise<IntentScore> {
+    const system = [
+      "You score a sales lead's buying intent from their conversation with a business, on top of an existing rule-based score.",
+      "Look for signals like urgency, budget mentioned, specific product interest, ready-to-buy language, vs. vague or early-stage browsing.",
+      "Respond with strict JSON only, no markdown fences: " +
+        '{"bonus": number, "reasoning": string}. bonus is an integer from 0 (no signal) to 30 (strong buying intent). ' +
+        "reasoning is one short sentence."
+    ].join("\n");
+
+    const text = await this.complete(system, formatTranscript(messages) || "(no messages yet)");
+    return parseIntentScore(text);
+  }
+
+  // A single suggested reply for a human rep to review and send — never sent
+  // automatically (docs/PRD.md section 9's "suggested replies").
+  async suggestReply(messages: ConversationMessage[], tone = "friendly"): Promise<string> {
+    const system = [
+      `You draft a single ${tone}, concise reply for a sales rep to review and send to a customer, based on the conversation so far.`,
+      "Reply with the suggested message text only — no preamble, no quotes, no markdown."
+    ].join("\n");
+
+    const text = await this.complete(system, formatTranscript(messages) || "(no messages yet)");
+    return text.trim();
+  }
 }
 
 function stripJsonFences(text: string): string {
@@ -126,6 +169,16 @@ function parseAiAnswer(text: string): AiAnswer {
     // Model didn't return valid JSON — fall back to the raw text so the
     // customer still gets an answer, just without a citation.
     return { answer: text, citedIndex: null, handover: false };
+  }
+}
+
+function parseIntentScore(text: string): IntentScore {
+  try {
+    const parsed = JSON.parse(stripJsonFences(text));
+    const bonus = typeof parsed.bonus === "number" ? Math.max(0, Math.min(30, Math.round(parsed.bonus))) : 0;
+    return { bonus, reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : "" };
+  } catch {
+    return { bonus: 0, reasoning: "" };
   }
 }
 

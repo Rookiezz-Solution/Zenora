@@ -149,4 +149,33 @@ describe("AiClient", () => {
       })
     ).rejects.toThrow("Anthropic request failed");
   });
+
+  it("scoreLeadIntent parses and clamps the bonus into 0-30", async () => {
+    mockAnthropicResponse(JSON.stringify({ bonus: 45, reasoning: "Asked about pricing and wants to start this week." }));
+    const client = new AiClient();
+
+    const result = await client.scoreLeadIntent([
+      { direction: "inbound", body: "I want to start this week, what's the price?" }
+    ]);
+
+    expect(result).toEqual({ bonus: 30, reasoning: "Asked about pricing and wants to start this week." });
+  });
+
+  it("scoreLeadIntent falls back to a zero bonus when the model doesn't return JSON", async () => {
+    mockAnthropicResponse("Not enough signal to score.");
+    const client = new AiClient();
+
+    const result = await client.scoreLeadIntent([{ direction: "inbound", body: "hi" }]);
+
+    expect(result).toEqual({ bonus: 0, reasoning: "" });
+  });
+
+  it("suggestReply returns the trimmed raw text", async () => {
+    mockAnthropicResponse("  Sure, we can do 3pm tomorrow — does that work for you?  ");
+    const client = new AiClient();
+
+    const result = await client.suggestReply([{ direction: "inbound", body: "Can we meet tomorrow?" }]);
+
+    expect(result).toBe("Sure, we can do 3pm tomorrow — does that work for you?");
+  });
 });

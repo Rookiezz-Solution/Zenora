@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@zenora/db";
+import { AiClient } from "../ai/ai.client";
 import { AuditService } from "../audit/audit.service";
 import { UsageService } from "../billing/usage.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -21,7 +22,8 @@ export class LeadsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly routingEngine: RoutingEngineService,
-    private readonly usage: UsageService
+    private readonly usage: UsageService,
+    private readonly ai: AiClient
   ) {}
 
   async list(workspaceId: string, query: ListLeadsQuery) {
@@ -59,6 +61,48 @@ export class LeadsService {
     });
     if (!lead) throw new NotFoundException("Lead not found");
     return lead;
+  }
+
+  // AI intent bonus on top of the rule-based score (docs/PRD.md section 10:
+  // "Rule-based score (points per condition) + AI intent bonus"). Manually
+  // triggered rather than automatic on every inbound message — keeps AI
+  // spend deliberate and avoids a second AI call path in the worker (see
+  // docs/PROGRESS.md Phase 2 item 2 simplification).
+  async scoreIntent(workspaceId: string, leadId: string) {
+    const lead = await this.prisma.client.lead.findFirst({ where: { id: leadId, workspaceId } });
+    if (!lead) throw new NotFoundException("Lead not found");
+
+    const recent = await this.prisma.client.message.findMany({
+      where: { conversation: { workspaceId, leadId } },
+      orderBy: { createdAt: "desc" },
+      take: 10
+    });
+    if (recent.length === 0) throw new BadRequestException("No conversation yet to score intent from");
+
+    const credits = await this.usage.checkAiCredits(workspaceId);
+    if (!credits.allowed) throw new BadRequestException("AI credits are used up for this month");
+
+    const messages = recent
+      .reverse()
+      .filter((m) => m.body)
+      .map((m) => ({ direction: m.direction, body: m.body! }));
+
+    const { bonus, reasoning } = await this.ai.scoreLeadIntent(messages);
+    const debit = await this.usage.debitAiReplyCredit(workspaceId);
+
+    const score = lead.ruleScore + bonus;
+    const updated = await this.prisma.client.lead.update({
+      where: { id: leadId },
+      data: { aiIntentScore: bonus, aiScoreReasoning: reasoning, score }
+    });
+
+    return {
+      ruleScore: updated.ruleScore,
+      aiIntentScore: updated.aiIntentScore,
+      aiScoreReasoning: updated.aiScoreReasoning,
+      score: updated.score,
+      creditsRemaining: debit.remaining
+    };
   }
 
   private async findDuplicateBy(workspaceId: string, phone?: string, email?: string) {

@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@zenora/db";
-import { CREDIT_WEIGHTS, PLAN_LIMITS, type PlanId } from "@zenora/shared";
+import { CREDIT_WEIGHTS, PLAN_LIMITS, USAGE_ALERT_THRESHOLDS, type PlanId } from "@zenora/shared";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 // docs/PLANS_AND_LIMITS.md enforcement rules.
@@ -20,7 +21,10 @@ export interface AiCreditCheck {
 
 @Injectable()
 export class UsageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService
+  ) {}
 
   private async currentPlanId(workspaceId: string): Promise<PlanId> {
     const sub = await this.prisma.client.subscription.findUnique({ where: { workspaceId } });
@@ -112,7 +116,36 @@ export class UsageService {
       })
     );
     await this.prisma.client.$transaction(ops);
+    await this.alertOnThresholdCrossing(workspaceId, PLAN_LIMITS[planId].aiCreditsPerMonth, balance, balanceAfter);
     return { remaining: balanceAfter, allowed: true };
+  }
+
+  // Fires an in-app notification the first time a debit pushes usage past
+  // 50/80/100% of the plan's monthly allotment (docs/PLANS_AND_LIMITS.md
+  // "Alerts at 50/80/100%"). WhatsApp/email delivery for these alerts isn't
+  // built yet — app notifications only (docs/PROGRESS.md simplification).
+  // A notification failure never breaks the credit debit that already
+  // succeeded.
+  private async alertOnThresholdCrossing(workspaceId: string, limit: number, before: number, after: number): Promise<void> {
+    if (limit <= 0) return; // partner plan has no monthly allotment to alert on
+    const usedBefore = 1 - before / limit;
+    const usedAfter = 1 - after / limit;
+
+    for (const threshold of USAGE_ALERT_THRESHOLDS) {
+      if (usedBefore < threshold && usedAfter >= threshold) {
+        const pct = Math.round(threshold * 100);
+        try {
+          await this.notifications.create({
+            workspaceId,
+            type: "ai_credits_low",
+            title: pct >= 100 ? "AI credits used up for this month" : `AI credits ${pct}% used`,
+            body: pct >= 100 ? "AI answers and scoring will pause until you top up or the next cycle." : `${Math.max(0, after)} credits remaining this month.`
+          });
+        } catch {
+          // Best-effort — the debit itself already succeeded.
+        }
+      }
+    }
   }
 
   async debitAiReplyCredit(workspaceId: string): Promise<{ remaining: number; allowed: boolean }> {

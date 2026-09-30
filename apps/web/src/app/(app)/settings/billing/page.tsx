@@ -122,6 +122,20 @@ export default function BillingPage() {
         <UsageBar label="Contacts" current={usage.usage.contacts} limit={usage.effectiveLimits.contacts} />
         <UsageBar label="Users" current={usage.usage.users} limit={usage.effectiveLimits.users} />
         <UsageBar label="Instagram accounts" current={usage.usage.instagramAccounts} limit={usage.effectiveLimits.instagramAccounts} />
+        <UsageBar
+          label="AI credits"
+          current={usage.limits.aiCreditsPerMonth - usage.usage.aiCreditsRemaining}
+          limit={usage.limits.aiCreditsPerMonth}
+        />
+        {usage.usage.aiCreditsRemaining <= 0 && (
+          <p className="text-xs text-amber-700">
+            AI credits are used up for this month — AI answers, scoring and suggested replies will pause until you{" "}
+            <a href="#ai-credit-topup" className="underline">
+              top up
+            </a>{" "}
+            or the next cycle.
+          </p>
+        )}
       </section>
 
       <section className="mt-4 rounded-md border border-gray-200 bg-white p-4">
@@ -202,7 +216,7 @@ export default function BillingPage() {
         </div>
       </section>
 
-      <section className="mt-4 rounded-md border border-gray-200 bg-white p-4">
+      <section id="ai-credit-topup" className="mt-4 rounded-md border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">AI credit top-up</h2>
         <div className="mt-2 flex flex-wrap gap-2">
           {(Object.keys(TOPUP_PRICES_INR) as Array<keyof typeof TOPUP_PRICES_INR>).map((key) => (

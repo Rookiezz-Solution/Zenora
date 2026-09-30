@@ -16,7 +16,8 @@ export function ConversationThread({
   currentUserId,
   onSend,
   onToggleBot,
-  onAssignToMe
+  onAssignToMe,
+  onSuggestReply
 }: {
   conversation: Conversation;
   messages: Message[];
@@ -26,10 +27,13 @@ export function ConversationThread({
   onSend: (input: { body?: string; templateId?: string }) => Promise<void>;
   onToggleBot: (active: boolean) => void;
   onAssignToMe: () => void;
+  onSuggestReply: () => Promise<string>;
 }) {
   const [text, setText] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [sending, setSending] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   const outsideWindow = isOutsideWindow(conversation);
 
@@ -51,6 +55,19 @@ export function ConversationThread({
       }
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleSuggest() {
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const suggestion = await onSuggestReply();
+      setText(suggestion);
+    } catch (err) {
+      setSuggestError((err as { message?: string }).message ?? "Could not suggest a reply");
+    } finally {
+      setSuggesting(false);
     }
   }
 
@@ -139,22 +156,33 @@ export function ConversationThread({
             </button>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Type a message, or / for quick replies"
-              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!text.trim() || sending}
-              className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              Send
-            </button>
+          <div>
+            <div className="flex gap-2">
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder="Type a message, or / for quick replies"
+                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleSuggest}
+                disabled={suggesting}
+                className="rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 disabled:opacity-50"
+              >
+                {suggesting ? "Thinking…" : "Suggest reply"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!text.trim() || sending}
+                className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Send
+              </button>
+            </div>
+            {suggestError && <p className="mt-1 text-xs text-red-600">{suggestError}</p>}
           </div>
         )}
       </div>

@@ -100,6 +100,12 @@ export class LeadsController {
     return this.leads.findDuplicates(workspaceId, leadId);
   }
 
+  @Post(":leadId/ai/score-intent")
+  @RequirePermission("leads.write")
+  scoreIntent(@Param("workspaceId") workspaceId: string, @Param("leadId") leadId: string) {
+    return this.leads.scoreIntent(workspaceId, leadId);
+  }
+
   @Post(":leadId/tags")
   @RequirePermission("leads.write")
   addTag(

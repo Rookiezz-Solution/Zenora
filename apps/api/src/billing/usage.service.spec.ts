@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { NotificationsService } from "../notifications/notifications.service";
 import type { PrismaService } from "../prisma/prisma.service";
 import { UsageService } from "./usage.service";
 
@@ -17,14 +18,18 @@ function makeClient(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeService(client: ReturnType<typeof makeClient>) {
-  return new UsageService({ client } as unknown as PrismaService);
+function makeNotifications(overrides: Partial<Record<keyof NotificationsService, unknown>> = {}) {
+  return { create: vi.fn(), list: vi.fn(), markRead: vi.fn(), ...overrides } as unknown as NotificationsService;
+}
+
+function makeService(client: ReturnType<typeof makeClient>, notifications = makeNotifications()) {
+  return { service: new UsageService({ client } as unknown as PrismaService, notifications), notifications };
 }
 
 describe("UsageService.getUsage", () => {
   it("defaults to the free plan when there's no subscription row", async () => {
     const client = makeClient();
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.getUsage("ws1");
 
@@ -34,7 +39,7 @@ describe("UsageService.getUsage", () => {
 
   it("reads the subscription's plan when one exists", async () => {
     const client = makeClient({ subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "growth" }) } });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.getUsage("ws1");
 
@@ -51,7 +56,7 @@ describe("UsageService.getUsage", () => {
         )
       }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.getUsage("ws1");
 
@@ -63,7 +68,7 @@ describe("UsageService.getUsage", () => {
     const client = makeClient({
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "partner" }) }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.getUsage("ws1");
 
@@ -77,7 +82,7 @@ describe("UsageService.checkContactLimit", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) },
       lead: { count: vi.fn().mockResolvedValue(900) }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkContactLimit("ws1");
     expect(result).toEqual({ allowed: true, limit: 1000, current: 900 });
@@ -88,7 +93,7 @@ describe("UsageService.checkContactLimit", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) },
       lead: { count: vi.fn().mockResolvedValue(1050) }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkContactLimit("ws1");
     expect(result.allowed).toBe(true);
@@ -99,7 +104,7 @@ describe("UsageService.checkContactLimit", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) },
       lead: { count: vi.fn().mockResolvedValue(1101) }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkContactLimit("ws1");
     expect(result.allowed).toBe(false);
@@ -112,7 +117,7 @@ describe("UsageService.checkUserLimit", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) },
       membership: { count: vi.fn().mockResolvedValue(1) }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkUserLimit("ws1");
     expect(result).toEqual({ allowed: false, limit: 1, current: 1 });
@@ -123,7 +128,7 @@ describe("UsageService.checkUserLimit", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
       membership: { count: vi.fn().mockResolvedValue(1) }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkUserLimit("ws1");
     expect(result.allowed).toBe(true);
@@ -136,7 +141,7 @@ describe("UsageService.checkInstagramLimit", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) },
       instagramAccount: { count: vi.fn().mockResolvedValue(1) }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkInstagramLimit("ws1");
     expect(result.allowed).toBe(false);
@@ -146,7 +151,7 @@ describe("UsageService.checkInstagramLimit", () => {
 describe("UsageService.checkAiCredits", () => {
   it("reads the plan's monthly allotment when no ledger rows exist yet", async () => {
     const client = makeClient({ subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) } });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkAiCredits("ws1");
     expect(result).toEqual({ allowed: true, remaining: 1000, limit: 1000 });
@@ -157,7 +162,7 @@ describe("UsageService.checkAiCredits", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
       creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 40 }), create: vi.fn() }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkAiCredits("ws1");
     expect(result).toEqual({ allowed: true, remaining: 40, limit: 1000 });
@@ -168,7 +173,7 @@ describe("UsageService.checkAiCredits", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) },
       creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 0 }), create: vi.fn() }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.checkAiCredits("ws1");
     expect(result.allowed).toBe(false);
@@ -178,7 +183,7 @@ describe("UsageService.checkAiCredits", () => {
 describe("UsageService.debitAiCredits", () => {
   it("lazily grants the plan's monthly allotment on first-ever spend, then debits", async () => {
     const client = makeClient({ subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) } });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.debitAiCredits("ws1", 1, "ai_reply");
 
@@ -193,7 +198,7 @@ describe("UsageService.debitAiCredits", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
       creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 10 }), create: vi.fn() }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.debitAiCredits("ws1", 3, "ai_reply");
 
@@ -207,7 +212,7 @@ describe("UsageService.debitAiCredits", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
       creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 0 }), create: vi.fn() }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.debitAiCredits("ws1", 1, "ai_reply");
 
@@ -220,9 +225,79 @@ describe("UsageService.debitAiCredits", () => {
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
       creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 10 }), create: vi.fn() }
     });
-    const service = makeService(client);
+    const { service } = makeService(client);
 
     const result = await service.debitAiReplyCredit("ws1");
     expect(result).toEqual({ remaining: 9, allowed: true });
+  });
+});
+
+describe("UsageService.debitAiCredits alert thresholds", () => {
+  it("fires an 80%-used notification the first time a debit crosses it", async () => {
+    // starter plan: 1000/mo — balance 210 (79% used) minus 20 crosses 80%
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 210 }), create: vi.fn() }
+    });
+    const { service, notifications } = makeService(client);
+
+    await service.debitAiCredits("ws1", 20, "ai_reply");
+
+    expect(notifications.create).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: "ws1", type: "ai_credits_low", title: "AI credits 80% used" })
+    );
+  });
+
+  it("fires a used-up notification when a debit exhausts the balance", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 1 }), create: vi.fn() }
+    });
+    const { service, notifications } = makeService(client);
+
+    await service.debitAiCredits("ws1", 1, "ai_reply");
+
+    expect(notifications.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "ai_credits_low", title: "AI credits used up for this month" })
+    );
+  });
+
+  it("does not re-fire a threshold already crossed by an earlier debit", async () => {
+    // already at 85% used (150 remaining of 1000) before this debit — 80%
+    // threshold was crossed earlier, only 50%/80% below current usage
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 150 }), create: vi.fn() }
+    });
+    const { service, notifications } = makeService(client);
+
+    await service.debitAiCredits("ws1", 10, "ai_reply");
+
+    expect(notifications.create).not.toHaveBeenCalled();
+  });
+
+  it("skips alerting entirely for a plan with no monthly allotment (partner)", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "partner" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue(null) }
+    });
+    const { service, notifications } = makeService(client);
+
+    await service.debitAiCredits("ws1", 1, "ai_reply");
+
+    expect(notifications.create).not.toHaveBeenCalled();
+  });
+
+  it("a notification failure never breaks the credit debit itself", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 1 }), create: vi.fn() }
+    });
+    const notifications = makeNotifications({ create: vi.fn().mockRejectedValue(new Error("db down")) });
+    const { service } = makeService(client, notifications);
+
+    const result = await service.debitAiCredits("ws1", 1, "ai_reply");
+
+    expect(result).toEqual({ remaining: 0, allowed: true });
   });
 });

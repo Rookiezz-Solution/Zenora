@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, type ApiError } from "@/lib/api";
 import type { Lead, LeadProfile, TimelineEvent } from "@/lib/lead-types";
 import type { Sequence } from "@/lib/sequence-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
@@ -19,6 +19,8 @@ export default function LeadProfilePage() {
   const [sequences, setSequences] = useState<Sequence[]>([]);
   const [selectedSequenceId, setSelectedSequenceId] = useState("");
   const [enrollMessage, setEnrollMessage] = useState<string | null>(null);
+  const [scoringIntent, setScoringIntent] = useState(false);
+  const [scoreError, setScoreError] = useState<string | null>(null);
 
   function load() {
     if (!workspaceId) return;
@@ -69,6 +71,20 @@ export default function LeadProfilePage() {
       body: JSON.stringify({ primaryLeadId: lead.id, duplicateLeadId })
     });
     load();
+  }
+
+  async function refreshAiScore() {
+    if (!workspaceId) return;
+    setScoringIntent(true);
+    setScoreError(null);
+    try {
+      await apiFetch(`/leads/${workspaceId}/${id}/ai/score-intent`, { method: "POST" });
+      load();
+    } catch (err) {
+      setScoreError((err as ApiError).message ?? "Could not score this lead");
+    } finally {
+      setScoringIntent(false);
+    }
   }
 
   async function remove() {
@@ -153,7 +169,27 @@ export default function LeadProfilePage() {
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold text-gray-900">Follow-up sequence</h2>
+        <h2 className="text-sm font-semibold text-gray-900">Score</h2>
+        <div className="mt-2 rounded-md border border-gray-200 bg-white p-3 text-sm">
+          <p>
+            Total <span className="font-semibold text-gray-900">{lead.score}</span>{" "}
+            <span className="text-xs text-gray-400">
+              (rule {lead.ruleScore} + AI {lead.aiIntentScore})
+            </span>
+          </p>
+          {lead.aiScoreReasoning && <p className="mt-1 text-xs text-gray-500">{lead.aiScoreReasoning}</p>}
+          <button
+            type="button"
+            onClick={refreshAiScore}
+            disabled={scoringIntent}
+            className="mt-2 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            {scoringIntent ? "Scoring…" : "Refresh AI score"}
+          </button>
+          {scoreError && <p className="mt-1 text-xs text-red-600">{scoreError}</p>}
+        </div>
+
+        <h2 className="mt-6 text-sm font-semibold text-gray-900">Follow-up sequence</h2>
         <div className="mt-2 flex items-center gap-2">
           <select
             value={selectedSequenceId}
