@@ -2,6 +2,7 @@ import { Worker, type Job } from "bullmq";
 import { resumeRun, startRun } from "./automation-engine/engine";
 import { createRedisConnection } from "./redis";
 import { processBroadcast } from "./processors/broadcast";
+import { processKnowledgeSource } from "./processors/knowledge";
 import { processSalespersonAlert, processSlaCheck } from "./processors/routing";
 import { processSequenceStep } from "./processors/sequence";
 import { processMetaWebhookEvent } from "./processors/webhook-event";
@@ -45,6 +46,12 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
   sequences: async (job) => {
     const { enrollmentId } = job.data as { enrollmentId: string };
     await processSequenceStep(enrollmentId);
+  },
+  ai: async (job) => {
+    if (job.name === "process_knowledge_source") {
+      const { sourceId } = job.data as { sourceId: string };
+      await processKnowledgeSource(sourceId);
+    }
   }
 };
 

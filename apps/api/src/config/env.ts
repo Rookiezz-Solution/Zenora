@@ -24,7 +24,10 @@ const envSchema = z.object({
   REDIS_URL: z.string().default("redis://localhost:6379"),
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
-  RAZORPAY_WEBHOOK_SECRET: z.string().optional()
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  AI_MODEL_VOLUME: z.string().default("claude-haiku-4-5-20251001"),
+  AI_MODEL_SUMMARY: z.string().default("claude-sonnet-5-5")
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { href: "/meetings", label: "Meetings" },
   { href: "/tasks", label: "Tasks and follow-ups" },
   { href: "/broadcasts", label: "Broadcasts and templates" },
-  { href: "/knowledge", label: "AI knowledge" },
+  { href: "/settings/knowledge", label: "AI knowledge" },
   { href: "/sources", label: "Ads and sources" },
   { href: "/link-in-bio", label: "Link in bio" },
   { href: "/reports", label: "Reports" },
@@ -100,13 +100,11 @@ function AiCreditsMeter() {
     apiFetch<UsageOverview>(`/billing/${workspaceId}/usage`).then(setUsage).catch(() => setUsage(null));
   }, [workspaceId]);
 
-  // AI credit debiting itself is Phase 2 (no AI feature exists yet to spend
-  // them) — this shows the plan's real monthly allotment, usage stays 0
-  // until Phase 2 wires actual debiting.
+  const used = usage ? usage.limits.aiCreditsPerMonth - usage.usage.aiCreditsRemaining : null;
   return (
     <div className="mx-3 mt-3 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
       AI credits{" "}
-      <span className="font-semibold text-gray-900">{usage ? `0 / ${usage.limits.aiCreditsPerMonth}` : "— / —"}</span>
+      <span className="font-semibold text-gray-900">{usage ? `${used} / ${usage.limits.aiCreditsPerMonth}` : "— / —"}</span>
     </div>
   );
 }

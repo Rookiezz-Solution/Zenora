@@ -10,3 +10,4 @@ export * from "./automation-template";
 export * from "./routing";
 export * from "./sequences";
 export * from "./billing";
+export * from "./knowledge";

@@ -9,6 +9,10 @@ function makeClient(overrides: Record<string, unknown> = {}) {
     membership: { count: vi.fn().mockResolvedValue(1) },
     instagramAccount: { count: vi.fn().mockResolvedValue(0) },
     workspaceAddon: { findMany: vi.fn().mockResolvedValue([]) },
+    creditLedger: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
+    usageEvent: { create: vi.fn() },
+    usageMonthly: { upsert: vi.fn() },
+    $transaction: vi.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
     ...overrides
   };
 }
@@ -136,5 +140,89 @@ describe("UsageService.checkInstagramLimit", () => {
 
     const result = await service.checkInstagramLimit("ws1");
     expect(result.allowed).toBe(false);
+  });
+});
+
+describe("UsageService.checkAiCredits", () => {
+  it("reads the plan's monthly allotment when no ledger rows exist yet", async () => {
+    const client = makeClient({ subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) } });
+    const service = makeService(client);
+
+    const result = await service.checkAiCredits("ws1");
+    expect(result).toEqual({ allowed: true, remaining: 1000, limit: 1000 });
+  });
+
+  it("reads the running ledger balance when one exists", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 40 }), create: vi.fn() }
+    });
+    const service = makeService(client);
+
+    const result = await service.checkAiCredits("ws1");
+    expect(result).toEqual({ allowed: true, remaining: 40, limit: 1000 });
+  });
+
+  it("disallows once the balance is exhausted", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 0 }), create: vi.fn() }
+    });
+    const service = makeService(client);
+
+    const result = await service.checkAiCredits("ws1");
+    expect(result.allowed).toBe(false);
+  });
+});
+
+describe("UsageService.debitAiCredits", () => {
+  it("lazily grants the plan's monthly allotment on first-ever spend, then debits", async () => {
+    const client = makeClient({ subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "free" }) } });
+    const service = makeService(client);
+
+    const result = await service.debitAiCredits("ws1", 1, "ai_reply");
+
+    expect(result).toEqual({ remaining: 49, allowed: true });
+    expect(client.creditLedger.create).toHaveBeenCalledWith({ data: { workspaceId: "ws1", delta: 50, reason: "monthly_reset", balanceAfter: 50 } });
+    expect(client.creditLedger.create).toHaveBeenCalledWith({ data: { workspaceId: "ws1", delta: -1, reason: "ai_reply", balanceAfter: 49 } });
+    expect(client.usageEvent.create).toHaveBeenCalledWith({ data: { workspaceId: "ws1", type: "ai_reply", quantity: 1 } });
+  });
+
+  it("debits from the existing running balance without re-granting", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 10 }), create: vi.fn() }
+    });
+    const service = makeService(client);
+
+    const result = await service.debitAiCredits("ws1", 3, "ai_reply");
+
+    expect(result).toEqual({ remaining: 7, allowed: true });
+    expect(client.creditLedger.create).toHaveBeenCalledTimes(1);
+    expect(client.creditLedger.create).toHaveBeenCalledWith({ data: { workspaceId: "ws1", delta: -3, reason: "ai_reply", balanceAfter: 7 } });
+  });
+
+  it("returns allowed=false without debiting once the balance is exhausted (soft stop)", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 0 }), create: vi.fn() }
+    });
+    const service = makeService(client);
+
+    const result = await service.debitAiCredits("ws1", 1, "ai_reply");
+
+    expect(result).toEqual({ remaining: 0, allowed: false });
+    expect(client.creditLedger.create).not.toHaveBeenCalled();
+  });
+
+  it("debitAiReplyCredit debits exactly CREDIT_WEIGHTS.aiReply (1 credit)", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 10 }), create: vi.fn() }
+    });
+    const service = makeService(client);
+
+    const result = await service.debitAiReplyCredit("ws1");
+    expect(result).toEqual({ remaining: 9, allowed: true });
   });
 });

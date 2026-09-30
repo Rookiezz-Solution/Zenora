@@ -9,6 +9,7 @@ import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { FlowTemplatesModule } from "./flow-templates/flow-templates.module";
 import { HealthController } from "./health/health.controller";
 import { InboxModule } from "./inbox/inbox.module";
+import { KnowledgeModule } from "./knowledge/knowledge.module";
 import { LeadsModule } from "./leads/leads.module";
 import { PipelinesModule } from "./pipelines/pipelines.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -42,7 +43,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     RoutingModule,
     TasksModule,
     SequencesModule,
-    BillingModule
+    BillingModule,
+    KnowledgeModule
   ],
   controllers: [HealthController]
 })

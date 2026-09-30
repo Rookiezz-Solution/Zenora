@@ -48,7 +48,7 @@ export interface UsageOverview {
   planId: PlanId;
   limits: PlanLimits;
   effectiveLimits: { contacts: number | null; users: number | null; instagramAccounts: number | null };
-  usage: { contacts: number; users: number; instagramAccounts: number };
+  usage: { contacts: number; users: number; instagramAccounts: number; aiCreditsRemaining: number };
 }
 
 export interface CheckoutOrderResult {

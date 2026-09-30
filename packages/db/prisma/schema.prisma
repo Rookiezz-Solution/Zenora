@@ -85,6 +85,11 @@ model Workspace {
   usageMonthly  UsageMonthly[]
   creditLedger  CreditLedger[]
 
+  knowledgeSources KnowledgeSource[]
+  knowledgeChunks  KnowledgeChunk[]
+  faqs             Faq[]
+  aiSettings       AiSettings?
+
   @@index([planId])
 }
 
@@ -902,4 +907,77 @@ model UsageMonthly {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, yearMonth])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 item 1 — AI knowledge base (docs/PRD.md section 9)
+// ---------------------------------------------------------------------------
+
+model KnowledgeSource {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  type         String // "text" | "pdf" | "sheet" | "website"
+  name         String
+  // Raw text for text/pdf/sheet (pasted — see docs/PROGRESS.md Phase 2 item 1
+  // simplification: no file upload/parsing yet, paste extracted text).
+  content      String?
+  sourceUrl    String? // fetched + stripped to text server-side for "website"
+  status       String   @default("pending") // pending | ready | failed
+  errorMessage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chunks    KnowledgeChunk[]
+  faqs      Faq[]
+
+  @@index([workspaceId])
+}
+
+model KnowledgeChunk {
+  id          String   @id @default(cuid())
+  workspaceId String
+  sourceId    String
+  content     String
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  source    KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([sourceId])
+}
+
+model Faq {
+  id          String   @id @default(cuid())
+  workspaceId String
+  question    String
+  answer      String
+  sourceId    String?
+  usageCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  source    KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+}
+
+model AiSettings {
+  id                      String   @id @default(cuid())
+  workspaceId             String   @unique
+  tone                    String   @default("friendly")
+  languages               String[] @default(["en"])
+  answerOnlyFromSources   Boolean  @default(true)
+  handoverWhenUnsure      Boolean  @default(true)
+  handoverOnDiscountAsked Boolean  @default(true)
+  alwaysEndWithNextStep   Boolean  @default(true)
+  replyInLeadsLanguage    Boolean  @default(true)
+  sharePricesToggle       Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
