@@ -13,10 +13,18 @@ interface PendingMove {
   missingFields: CustomField[];
 }
 
+interface PendingLostMove {
+  leadId: string;
+  stageId: string;
+  stageName: string;
+}
+
 export default function PipelinePage() {
   const { workspaceId } = useCurrentWorkspace();
   const [pipeline, setPipeline] = useState<Pipeline | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [pendingLostMove, setPendingLostMove] = useState<PendingLostMove | null>(null);
+  const [lostReason, setLostReason] = useState("");
   const [newStageName, setNewStageName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -38,15 +46,17 @@ export default function PipelinePage() {
     load();
   }, [workspaceId]);
 
-  async function moveLead(leadId: string, stageId: string, stageName: string, fieldValues?: Record<string, string>) {
+  async function moveLead(leadId: string, stageId: string, stageName: string, fieldValues?: Record<string, string>, reason?: string) {
     if (!workspaceId) return;
     setError(null);
     try {
       await apiFetch(`/leads/${workspaceId}/${leadId}/move-stage`, {
         method: "POST",
-        body: JSON.stringify({ stageId, fieldValues })
+        body: JSON.stringify({ stageId, fieldValues, lostReason: reason })
       });
       setPendingMove(null);
+      setPendingLostMove(null);
+      setLostReason("");
       load();
     } catch (err) {
       const apiErr = err as ApiError;
@@ -59,10 +69,15 @@ export default function PipelinePage() {
     }
   }
 
-  function onDrop(e: React.DragEvent, stageId: string, stageName: string) {
+  function onDrop(e: React.DragEvent, stageId: string, stageName: string, stageType: "open" | "won" | "lost") {
     e.preventDefault();
     const leadId = e.dataTransfer.getData("text/lead-id");
-    if (leadId) moveLead(leadId, stageId, stageName);
+    if (!leadId) return;
+    if (stageType === "lost") {
+      setPendingLostMove({ leadId, stageId, stageName });
+    } else {
+      moveLead(leadId, stageId, stageName);
+    }
   }
 
   async function addStage(e: React.FormEvent) {
@@ -91,7 +106,7 @@ export default function PipelinePage() {
           <div
             key={stage.id}
             onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => onDrop(e, stage.id, stage.name)}
+            onDrop={(e) => onDrop(e, stage.id, stage.name, stage.type)}
             className="flex w-64 shrink-0 flex-col rounded-md bg-gray-100"
           >
             <div className="flex items-center justify-between px-3 py-2">
@@ -148,6 +163,41 @@ export default function PipelinePage() {
           onCancel={() => setPendingMove(null)}
           onSubmit={(values) => moveLead(pendingMove.leadId, pendingMove.stageId, pendingMove.stageName, values)}
         />
+      )}
+
+      {pendingLostMove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+            <h2 className="text-sm font-semibold text-gray-900">Moving to &quot;{pendingLostMove.stageName}&quot;</h2>
+            <p className="mt-1 text-xs text-gray-500">Why was this lead lost? (Feeds the Reports page.)</p>
+            <textarea
+              value={lostReason}
+              onChange={(e) => setLostReason(e.target.value)}
+              placeholder="e.g. Went with a competitor, budget, unresponsive…"
+              rows={3}
+              className="mt-3 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingLostMove(null);
+                  setLostReason("");
+                }}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => moveLead(pendingLostMove.leadId, pendingLostMove.stageId, pendingLostMove.stageName, undefined, lostReason.trim() || undefined)}
+                className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white"
+              >
+                Move
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

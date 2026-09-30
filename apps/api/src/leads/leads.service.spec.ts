@@ -130,14 +130,14 @@ describe("LeadsService.moveStage", () => {
     requiredFieldIds: ["field-budget"]
   };
 
-  function makeMoveStagePrisma() {
+  function makeMoveStagePrisma(stageOverride: typeof stage = stage) {
     const tx = { lead: { update: vi.fn() }, leadFieldValue: { upsert: vi.fn() } };
     const client = {
       lead: {
         findFirst: vi.fn().mockResolvedValue({ id: "lead-1", workspaceId: "ws1" }),
         findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "lead-1" })
       },
-      stage: { findFirst: vi.fn().mockResolvedValue(stage) },
+      stage: { findFirst: vi.fn().mockResolvedValue(stageOverride) },
       customField: { findMany: vi.fn().mockResolvedValue([{ id: "field-budget", label: "Budget" }]) },
       $transaction: vi.fn().mockImplementation((cb: (tx: unknown) => unknown) => cb(tx))
     };
@@ -193,6 +193,31 @@ describe("LeadsService.moveStage", () => {
     await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "1" } });
 
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "lead.marked_won" }));
+  });
+
+  it("captures the lost reason when moving to a lost-type stage", async () => {
+    const lostStage = { id: "stage-lost", pipelineId: "pipe-1", type: "lost", name: "Lost", requiredFieldIds: [] };
+    const { prisma, tx } = makeMoveStagePrisma(lostStage);
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi());
+
+    await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-lost", lostReason: "Went with a competitor" });
+
+    expect(tx.lead.update).toHaveBeenCalledWith({
+      where: { id: "lead-1" },
+      data: { stageId: "stage-lost", pipelineId: "pipe-1", lostReason: "Went with a competitor" }
+    });
+  });
+
+  it("does not touch lostReason for a non-lost stage move", async () => {
+    const { prisma, tx } = makeMoveStagePrisma();
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi());
+
+    await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "1" } });
+
+    expect(tx.lead.update).toHaveBeenCalledWith({
+      where: { id: "lead-1" },
+      data: { stageId: "stage-won", pipelineId: "pipe-1" }
+    });
   });
 });
 

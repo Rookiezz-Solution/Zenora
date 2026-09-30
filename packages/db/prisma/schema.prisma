@@ -327,6 +327,7 @@ model Lead {
   ownerId     String?
   pipelineId  String?
   stageId     String?
+  lostReason  String? // captured when moved to a lost-type stage (docs/PRD.md Reports section)
   mergedIntoId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -776,6 +777,7 @@ model SlaTimer {
   dueAt       DateTime
   escalatedAt DateTime?
   resolvedAt  DateTime?
+  createdAt   DateTime @default(now()) // response-time start for the team-performance report
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 

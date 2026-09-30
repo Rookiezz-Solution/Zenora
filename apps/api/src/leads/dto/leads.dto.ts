@@ -43,7 +43,8 @@ export type MergeLeadsDto = z.infer<typeof mergeLeadsSchema>;
 
 export const moveStageSchema = z.object({
   stageId: z.string().min(1),
-  fieldValues: z.record(z.string(), z.unknown()).optional()
+  fieldValues: z.record(z.string(), z.unknown()).optional(),
+  lostReason: z.string().optional()
 });
 export type MoveStageDto = z.infer<typeof moveStageSchema>;
 

@@ -283,7 +283,11 @@ export class LeadsService {
     await this.prisma.client.$transaction(async (tx) => {
       await tx.lead.update({
         where: { id: lead.id },
-        data: { stageId: stage.id, pipelineId: stage.pipelineId }
+        data: {
+          stageId: stage.id,
+          pipelineId: stage.pipelineId,
+          ...(stage.type === "lost" ? { lostReason: dto.lostReason ?? null } : {})
+        }
       });
       for (const [fieldId, value] of Object.entries(dto.fieldValues ?? {})) {
         await tx.leadFieldValue.upsert({

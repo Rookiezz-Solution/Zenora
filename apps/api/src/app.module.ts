@@ -17,6 +17,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { QueueModule } from "./queue/queue.module";
 import { QuickRepliesModule } from "./quick-replies/quick-replies.module";
 import { RealtimeModule } from "./realtime/realtime.module";
+import { ReportsModule } from "./reports/reports.module";
 import { RoutingModule } from "./routing/routing.module";
 import { SequencesModule } from "./sequences/sequences.module";
 import { TasksModule } from "./tasks/tasks.module";
@@ -46,7 +47,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     SequencesModule,
     BillingModule,
     KnowledgeModule,
-    NotificationsModule
+    NotificationsModule,
+    ReportsModule
   ],
   controllers: [HealthController]
 })
