@@ -99,7 +99,7 @@ export interface FlowGraph {
   blocks: Record<string, FlowBlock>;
 }
 
-export const TRIGGER_TYPES = ["instagram_dm_keyword", "whatsapp_message_keyword"] as const;
+export const TRIGGER_TYPES = ["instagram_dm_keyword", "whatsapp_message_keyword", "tag_added"] as const;
 export type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 export const KEYWORD_MATCH_TYPES = ["contains", "exact", "any"] as const;
@@ -108,4 +108,42 @@ export type KeywordMatchType = (typeof KEYWORD_MATCH_TYPES)[number];
 export interface KeywordTriggerConfig {
   keywords: string[];
   matchType: KeywordMatchType;
+}
+
+// docs/PRD.md's Growth-section "custom trigger builder" CRM event source —
+// fires when a tag is added to a lead (LeadsService.addTag). tagName: null
+// means "any tag".
+export interface TagAddedTriggerConfig {
+  tagName: string | null;
+}
+
+// docs/PRD.md: "any event ... + AND/OR conditions on any field + limits
+// (once per lead, working hours, delay)". v1 scope: AND-only conditions
+// (reusing routing.ts's RoutingCondition/matchesCondition — same field set,
+// same evaluation, one condition-matching primitive instead of a second),
+// plus two of the three limits — onceForLead and delayMinutes. workingHours
+// is deferred: the workspace has no working-hours schema yet, and OR-groups
+// are deferred as a meaningfully bigger condition-builder UI (see
+// docs/PROGRESS.md).
+export interface TriggerLimits {
+  onceForLead?: boolean;
+  delayMinutes?: number;
+}
+
+export interface TriggerRunRecord {
+  automationId: string;
+  status: string;
+}
+
+// Shared by apps/worker's message-keyword matcher and apps/api's CRM-event
+// (tag_added) matcher — same DI-boundary reason the DB-querying code around
+// this stays duplicated between the two apps.
+export function isTriggerAllowedToFire(automationId: string, limits: TriggerLimits | undefined, runs: TriggerRunRecord[]): boolean {
+  const automationRuns = runs.filter((r) => r.automationId === automationId);
+  if (limits?.onceForLead) return automationRuns.length === 0;
+  return !automationRuns.some((r) => r.status === "running");
+}
+
+export function triggerDelayMs(limits: TriggerLimits | undefined): number {
+  return (limits?.delayMinutes ?? 0) * 60_000;
 }

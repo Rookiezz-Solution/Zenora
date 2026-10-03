@@ -176,3 +176,77 @@ describe("AutomationsService.testRun", () => {
     expect(result.steps[1]?.output).toEqual({ wouldHandOverToHuman: true });
   });
 });
+
+describe("AutomationsService.setTrigger", () => {
+  function makeTriggerPrisma(triggerId: string | null) {
+    const client = {
+      automation: {
+        findFirst: vi.fn().mockResolvedValue({ id: "auto1", workspaceId: "ws1", triggerId, versions: [], runs: [] }),
+        update: vi.fn(),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "auto1" })
+      },
+      trigger: {
+        create: vi.fn().mockResolvedValue({ id: "trig1" }),
+        update: vi.fn().mockResolvedValue({ id: "trig1" })
+      }
+    };
+    return { client, prisma: { client } as unknown as PrismaService };
+  }
+
+  it("stores conditions and limits inside the trigger config blob", async () => {
+    const { client, prisma } = makeTriggerPrisma(null);
+    const service = new AutomationsService(prisma, makeAudit());
+    vi.spyOn(service, "getById").mockResolvedValue({} as never);
+
+    await service.setTrigger("ws1", "auto1", "user1", {
+      type: "tag_added",
+      config: { tagName: "hot" },
+      conditions: [{ field: "source", operator: "equals", value: "instagram" }],
+      limits: { onceForLead: true, delayMinutes: 5 }
+    });
+
+    expect(client.trigger.create).toHaveBeenCalledWith({
+      data: {
+        type: "tag_added",
+        config: {
+          tagName: "hot",
+          conditions: [{ field: "source", operator: "equals", value: "instagram" }],
+          limits: { onceForLead: true, delayMinutes: 5 }
+        }
+      }
+    });
+  });
+});
+
+describe("AutomationsService saved triggers", () => {
+  it("saves a trigger definition under 'My triggers' with its type", async () => {
+    const create = vi.fn();
+    const prisma = { client: { savedTrigger: { create } } } as unknown as PrismaService;
+    const service = new AutomationsService(prisma, makeAudit());
+
+    await service.createSavedTrigger("ws1", {
+      name: "VIP tagged",
+      type: "tag_added",
+      config: { tagName: "vip" },
+      limits: { onceForLead: true }
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        workspaceId: "ws1",
+        name: "VIP tagged",
+        type: "tag_added",
+        config: { tagName: "vip", conditions: undefined, limits: { onceForLead: true } }
+      }
+    });
+  });
+
+  it("only deletes a saved trigger belonging to the workspace", async () => {
+    const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
+    const prisma = { client: { savedTrigger: { deleteMany } } } as unknown as PrismaService;
+    const service = new AutomationsService(prisma, makeAudit());
+
+    await expect(service.removeSavedTrigger("ws1", "missing")).rejects.toThrow("Saved trigger not found");
+    expect(deleteMany).toHaveBeenCalledWith({ where: { id: "missing", workspaceId: "ws1" } });
+  });
+});

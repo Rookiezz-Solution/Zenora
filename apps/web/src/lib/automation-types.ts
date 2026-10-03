@@ -50,7 +50,7 @@ export interface Automation {
   folder: string | null;
   status: "draft" | "live" | "scheduled" | "paused";
   triggerId: string | null;
-  trigger: { id: string; type: string; config: { keywords: string[]; matchType: string } } | null;
+  trigger: { id: string; type: string; config: Record<string, unknown> } | null;
   draft: AutomationVersion | null;
   latestVersion?: AutomationVersion | null;
   runCount?: number;

@@ -76,7 +76,7 @@ async function processMessages(value: MessagesValue) {
     if (conversation.botActive && message.text?.body) {
       const matches = await findMatchingAutomations(number.workspaceId, "whatsapp_message_keyword", message.text.body, lead.id);
       for (const automation of matches) {
-        await enqueueStart(automation.id, lead.id, conversation.id);
+        await enqueueStart(automation.id, lead.id, conversation.id, automation.delayMs);
       }
     }
   }

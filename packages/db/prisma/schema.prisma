@@ -590,6 +590,7 @@ model SavedTrigger {
   id          String   @id @default(cuid())
   workspaceId String
   name        String
+  type        String   @default("")
   config      Json
   createdAt   DateTime @default(now())
 

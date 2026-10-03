@@ -164,7 +164,7 @@ describe("processWhatsappPayload", () => {
   });
 
   it("starts a run for a matching automation when the bot is active", async () => {
-    findMatchingAutomations.mockResolvedValue([{ id: "auto_1" }]);
+    findMatchingAutomations.mockResolvedValue([{ id: "auto_1", delayMs: 600_000 }]);
 
     await processWhatsappPayload({
       object: "whatsapp_business_account",
@@ -185,7 +185,7 @@ describe("processWhatsappPayload", () => {
     });
 
     expect(findMatchingAutomations).toHaveBeenCalledWith("ws_1", "whatsapp_message_keyword", "PRICE", "lead_1");
-    expect(enqueueStart).toHaveBeenCalledWith("auto_1", "lead_1", "conv_1");
+    expect(enqueueStart).toHaveBeenCalledWith("auto_1", "lead_1", "conv_1", 600_000);
   });
 
   it("doesn't check for automation triggers once a human has taken over the conversation", async () => {

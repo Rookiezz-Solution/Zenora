@@ -98,7 +98,7 @@ describe("processInstagramPayload", () => {
   });
 
   it("starts a run for every automation whose keyword trigger matches, when the bot is active", async () => {
-    findMatchingAutomations.mockResolvedValue([{ id: "auto_1" }, { id: "auto_2" }]);
+    findMatchingAutomations.mockResolvedValue([{ id: "auto_1", delayMs: 0 }, { id: "auto_2", delayMs: 300_000 }]);
 
     await processInstagramPayload({
       object: "instagram",
@@ -113,8 +113,8 @@ describe("processInstagramPayload", () => {
     });
 
     expect(findMatchingAutomations).toHaveBeenCalledWith("ws_1", "instagram_dm_keyword", "PRICE", "lead_1");
-    expect(enqueueStart).toHaveBeenCalledWith("auto_1", "lead_1", "conv_1");
-    expect(enqueueStart).toHaveBeenCalledWith("auto_2", "lead_1", "conv_1");
+    expect(enqueueStart).toHaveBeenCalledWith("auto_1", "lead_1", "conv_1", 0);
+    expect(enqueueStart).toHaveBeenCalledWith("auto_2", "lead_1", "conv_1", 300_000);
   });
 
   it("doesn't check for automation triggers once a human has taken over the conversation", async () => {

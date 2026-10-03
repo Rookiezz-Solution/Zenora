@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from "@zenora/db";
 import { AiClient } from "../ai/ai.client";
 import { AuditService } from "../audit/audit.service";
+import { TriggerEventsService } from "../automations/trigger-events.service";
 import { UsageService } from "../billing/usage.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoutingEngineService } from "../routing/routing-engine.service";
@@ -23,7 +24,8 @@ export class LeadsService {
     private readonly audit: AuditService,
     private readonly routingEngine: RoutingEngineService,
     private readonly usage: UsageService,
-    private readonly ai: AiClient
+    private readonly ai: AiClient,
+    private readonly triggerEvents: TriggerEventsService
   ) {}
 
   async list(workspaceId: string, query: ListLeadsQuery) {
@@ -147,12 +149,21 @@ export class LeadsService {
       update: {},
       create: { workspaceId, name: dto.name }
     });
+    const alreadyTagged = await this.prisma.client.leadTag.findUnique({
+      where: { leadId_tagId: { leadId, tagId: tag.id } }
+    });
     await this.prisma.client.leadTag.upsert({
       where: { leadId_tagId: { leadId, tagId: tag.id } },
       update: {},
       create: { leadId, tagId: tag.id }
     });
     await this.audit.log({ workspaceId, userId, action: "lead.tagged", entityType: "lead", entityId: leadId, metadata: { tag: dto.name } });
+
+    // Only a genuinely new tag fires "tag_added" automations; a trigger
+    // failure never fails the tagging itself.
+    if (!alreadyTagged) {
+      await this.triggerEvents.fireTagAdded(workspaceId, leadId, dto.name).catch(() => undefined);
+    }
     return tag;
   }
 

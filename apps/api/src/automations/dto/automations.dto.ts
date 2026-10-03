@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CONDITION_FIELDS, CONDITION_OPERATORS, KEYWORD_MATCH_TYPES, TRIGGER_TYPES } from "@zenora/shared";
+import { CONDITION_FIELDS, CONDITION_OPERATORS, KEYWORD_MATCH_TYPES, ROUTING_CONDITION_FIELDS, ROUTING_CONDITION_OPERATORS } from "@zenora/shared";
 
 export const createAutomationSchema = z.object({
   name: z.string().min(1),
@@ -91,14 +91,54 @@ export const flowGraphSchema = z.object({
 export const saveDraftSchema = z.object({ graph: flowGraphSchema });
 export type SaveDraftDto = z.infer<typeof saveDraftSchema>;
 
-export const setTriggerSchema = z.object({
-  type: z.enum(TRIGGER_TYPES),
-  config: z.object({
-    keywords: z.array(z.string().min(1)).min(1),
-    matchType: z.enum(KEYWORD_MATCH_TYPES)
-  })
+const keywordConfigSchema = z.object({
+  keywords: z.array(z.string().min(1)).min(1),
+  matchType: z.enum(KEYWORD_MATCH_TYPES)
 });
+
+const tagAddedConfigSchema = z.object({
+  tagName: z.string().min(1).nullable()
+});
+
+// Custom trigger builder (docs/PRD.md Growth section): AND-ed extra
+// conditions reusing the exact same field/operator shape routing rules
+// already use, plus once-per-lead / delay limits.
+const triggerConditionSchema = z.object({
+  field: z.enum(ROUTING_CONDITION_FIELDS),
+  operator: z.enum(ROUTING_CONDITION_OPERATORS),
+  value: z.string().min(1),
+  fieldId: z.string().optional()
+});
+
+const triggerLimitsSchema = z.object({
+  onceForLead: z.boolean().optional(),
+  delayMinutes: z.number().int().positive().optional()
+});
+
+const triggerTypeAndConfigSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("whatsapp_message_keyword"), config: keywordConfigSchema }),
+  z.object({ type: z.literal("instagram_dm_keyword"), config: keywordConfigSchema }),
+  z.object({ type: z.literal("tag_added"), config: tagAddedConfigSchema })
+]);
+
+export const setTriggerSchema = z.intersection(
+  triggerTypeAndConfigSchema,
+  z.object({
+    conditions: z.array(triggerConditionSchema).optional(),
+    limits: triggerLimitsSchema.optional()
+  })
+);
 export type SetTriggerDto = z.infer<typeof setTriggerSchema>;
+
+export const createSavedTriggerSchema = z.intersection(
+  triggerTypeAndConfigSchema,
+  z.object({
+    name: z.string().min(1),
+    conditions: z.array(triggerConditionSchema).optional(),
+    limits: triggerLimitsSchema.optional()
+  })
+);
+export type CreateSavedTriggerDto = z.infer<typeof createSavedTriggerSchema>;
 
 export const testRunSchema = z.object({
   channel: z.enum(["instagram", "whatsapp"]),

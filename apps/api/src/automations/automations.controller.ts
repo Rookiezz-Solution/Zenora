@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { RequirePermission } from "../auth/decorators/require-permission.decorator";
 import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
@@ -8,6 +8,7 @@ import { saveAsTemplateSchema } from "../flow-templates/dto/flow-templates.dto";
 import { AutomationsService } from "./automations.service";
 import {
   createAutomationSchema,
+  createSavedTriggerSchema,
   saveDraftSchema,
   setTriggerSchema,
   testRunSchema,
@@ -32,6 +33,25 @@ export class AutomationsController {
     @Body(new ZodValidationPipe(createAutomationSchema)) body: unknown
   ) {
     return this.automations.create(workspaceId, userId, body as never);
+  }
+
+  // Declared before ":id" so "saved-triggers" doesn't get swallowed as an id.
+  @Get("saved-triggers")
+  listSavedTriggers(@Param("workspaceId") workspaceId: string) {
+    return this.automations.listSavedTriggers(workspaceId);
+  }
+
+  @Post("saved-triggers")
+  createSavedTrigger(
+    @Param("workspaceId") workspaceId: string,
+    @Body(new ZodValidationPipe(createSavedTriggerSchema)) body: unknown
+  ) {
+    return this.automations.createSavedTrigger(workspaceId, body as never);
+  }
+
+  @Delete("saved-triggers/:savedTriggerId")
+  removeSavedTrigger(@Param("workspaceId") workspaceId: string, @Param("savedTriggerId") savedTriggerId: string) {
+    return this.automations.removeSavedTrigger(workspaceId, savedTriggerId);
   }
 
   @Get(":id")

@@ -51,7 +51,7 @@ export async function processInstagramPayload(payload: unknown): Promise<void> {
       if (conversation.botActive && event.message.text) {
         const matches = await findMatchingAutomations(account.workspaceId, "instagram_dm_keyword", event.message.text, lead.id);
         for (const automation of matches) {
-          await enqueueStart(automation.id, lead.id, conversation.id);
+          await enqueueStart(automation.id, lead.id, conversation.id, automation.delayMs);
         }
       }
     }

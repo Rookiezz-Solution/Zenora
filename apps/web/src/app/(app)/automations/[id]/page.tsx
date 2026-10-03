@@ -3,9 +3,17 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FlowBlockEditor } from "@/components/automations/flow-block-editor";
+import { TriggerEditor } from "@/components/automations/trigger-editor";
 import { apiFetch, type ApiError } from "@/lib/api";
 import type { Automation, AutomationStats, AutomationVersion, FlowGraph, TestRunResult } from "@/lib/automation-types";
-import type { Pipeline } from "@/lib/pipeline-types";
+import type { CustomField, Pipeline } from "@/lib/pipeline-types";
+import {
+  EMPTY_TRIGGER,
+  fromStored,
+  toTriggerPayload,
+  type SavedTrigger,
+  type TriggerDefinition
+} from "@/lib/trigger-definition";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
 
 type Tab = "build" | "test" | "versions" | "stats";
@@ -24,23 +32,29 @@ export default function AutomationEditorPage() {
   const [members, setMembers] = useState<{ id: string; name: string | null; email: string }[]>([]);
   const [tab, setTab] = useState<Tab>("build");
   const [pendingGraph, setPendingGraph] = useState<FlowGraph | null>(null);
-  const [channel, setChannel] = useState<"instagram" | "whatsapp">("whatsapp");
-  const [keywords, setKeywords] = useState("");
-  const [matchType, setMatchType] = useState<"contains" | "exact" | "any">("contains");
+  const [trigger, setTrigger] = useState<TriggerDefinition>(EMPTY_TRIGGER);
+  const [savedTriggers, setSavedTriggers] = useState<SavedTrigger[]>([]);
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+
+  function loadSavedTriggers() {
+    if (!workspaceId) return;
+    apiFetch<SavedTrigger[]>(`/automations/${workspaceId}/saved-triggers`).then(setSavedTriggers).catch(() => setSavedTriggers([]));
+  }
 
   function load() {
     if (!workspaceId) return;
     apiFetch<Automation>(`/automations/${workspaceId}/${id}`).then((a) => {
       setAutomation(a);
-      if (a.trigger) {
-        setChannel(a.trigger.type === "instagram_dm_keyword" ? "instagram" : "whatsapp");
-        setKeywords(a.trigger.config.keywords.join(", "));
-        setMatchType(a.trigger.config.matchType as "contains" | "exact" | "any");
-      }
+      if (a.trigger) setTrigger(fromStored(a.trigger.type, a.trigger.config));
     });
   }
   useEffect(load, [workspaceId, id]);
+  useEffect(() => {
+    loadSavedTriggers();
+    if (!workspaceId) return;
+    apiFetch<CustomField[]>(`/workspaces/${workspaceId}/custom-fields`).then(setCustomFields).catch(() => setCustomFields([]));
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -61,15 +75,33 @@ export default function AutomationEditorPage() {
 
   async function saveTrigger() {
     if (!workspaceId) return;
-    await apiFetch(`/automations/${workspaceId}/${id}/trigger`, {
-      method: "POST",
-      body: JSON.stringify({
-        type: channel === "instagram" ? "instagram_dm_keyword" : "whatsapp_message_keyword",
-        config: { keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean), matchType }
-      })
-    });
-    setMessage("Trigger saved.");
-    load();
+    try {
+      await apiFetch(`/automations/${workspaceId}/${id}/trigger`, { method: "POST", body: JSON.stringify(toTriggerPayload(trigger)) });
+      setMessage("Trigger saved.");
+      load();
+    } catch (err) {
+      setMessage((err as ApiError).message ?? "Could not save trigger");
+    }
+  }
+
+  async function saveTriggerAs(name: string) {
+    if (!workspaceId) return;
+    try {
+      await apiFetch(`/automations/${workspaceId}/saved-triggers`, {
+        method: "POST",
+        body: JSON.stringify({ name, ...toTriggerPayload(trigger) })
+      });
+      setMessage(`Saved "${name}" to My triggers.`);
+      loadSavedTriggers();
+    } catch (err) {
+      setMessage((err as ApiError).message ?? "Could not save to My triggers");
+    }
+  }
+
+  async function deleteSavedTrigger(savedId: string) {
+    if (!workspaceId) return;
+    await apiFetch(`/automations/${workspaceId}/saved-triggers/${savedId}`, { method: "DELETE" });
+    loadSavedTriggers();
   }
 
   async function publish() {
@@ -148,26 +180,16 @@ export default function AutomationEditorPage() {
         <div className="mt-4 space-y-6">
           <div className="rounded-md border border-gray-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-gray-900">Trigger</h2>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              <select value={channel} onChange={(e) => setChannel(e.target.value as "instagram" | "whatsapp")} className="rounded-md border border-gray-300 px-2 py-1.5">
-                <option value="whatsapp">WhatsApp message</option>
-                <option value="instagram">Instagram DM</option>
-              </select>
-              contains
-              <input
-                value={keywords}
-                onChange={(e) => setKeywords(e.target.value)}
-                placeholder="keyword1, keyword2"
-                className="flex-1 rounded-md border border-gray-300 px-2 py-1.5"
+            <div className="mt-2">
+              <TriggerEditor
+                value={trigger}
+                onChange={setTrigger}
+                customFields={customFields}
+                savedTriggers={savedTriggers}
+                onSave={saveTrigger}
+                onSaveAs={saveTriggerAs}
+                onDeleteSaved={deleteSavedTrigger}
               />
-              <select value={matchType} onChange={(e) => setMatchType(e.target.value as "contains" | "exact" | "any")} className="rounded-md border border-gray-300 px-2 py-1.5">
-                <option value="contains">contains</option>
-                <option value="exact">exact match</option>
-                <option value="any">any message</option>
-              </select>
-              <button type="button" onClick={saveTrigger} className="rounded-md bg-gray-800 px-3 py-1.5 text-sm font-semibold text-white">
-                Save trigger
-              </button>
             </div>
           </div>
 
