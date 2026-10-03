@@ -8,6 +8,7 @@ import { BillingModule } from "./billing/billing.module";
 import { BroadcastsModule } from "./broadcasts/broadcasts.module";
 import { CalendarModule } from "./calendar/calendar.module";
 import { ChannelsModule } from "./channels/channels.module";
+import { DevelopersModule } from "./developers/developers.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { FlowTemplatesModule } from "./flow-templates/flow-templates.module";
 import { HealthController } from "./health/health.controller";
@@ -56,7 +57,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     LinkInBioModule,
     CalendarModule,
     AdminModule,
-    AdsModule
+    AdsModule,
+    DevelopersModule
   ],
   controllers: [HealthController]
 })

@@ -8,6 +8,8 @@ const prismaMock = vi.hoisted(() => ({
 vi.mock("@zenora/db", () => ({ prisma: prismaMock }));
 const applyToNewLead = vi.hoisted(() => vi.fn());
 vi.mock("./routing", () => ({ applyToNewLead }));
+const emitWebhookEvent = vi.hoisted(() => vi.fn());
+vi.mock("../webhooks/emit", () => ({ emitWebhookEvent }));
 
 import { findOrCreateLeadByIdentity } from "./lead-identity";
 
@@ -29,11 +31,12 @@ describe("findOrCreateLeadByIdentity", () => {
       include: { lead: true }
     });
     expect(applyToNewLead).not.toHaveBeenCalled();
+    expect(emitWebhookEvent).not.toHaveBeenCalled();
   });
 
   it("creates a new lead with the identity attached when none exists", async () => {
     prismaMock.leadIdentity.findUnique.mockResolvedValue(null);
-    const newLead = { id: "lead_2" };
+    const newLead = { id: "lead_2", name: "Arun", phone: "+919999999999", email: null, source: "whatsapp", stageId: null, createdAt: new Date("2026-10-05T00:00:00Z") };
     prismaMock.lead.create.mockResolvedValue(newLead);
 
     const result = await findOrCreateLeadByIdentity("ws_1", "wa_phone", "+919999999999", {
@@ -42,6 +45,7 @@ describe("findOrCreateLeadByIdentity", () => {
     });
 
     expect(result).toBe(newLead);
+    expect(emitWebhookEvent).toHaveBeenCalledWith("ws_1", "lead.created", expect.objectContaining({ id: "lead_2", source: "whatsapp" }));
     expect(prismaMock.lead.create).toHaveBeenCalledWith({
       data: {
         workspaceId: "ws_1",

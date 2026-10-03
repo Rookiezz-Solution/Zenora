@@ -7,7 +7,10 @@ export class ZodValidationPipe implements PipeTransform {
   transform(value: unknown) {
     const result = this.schema.safeParse(value);
     if (!result.success) {
-      throw new BadRequestException(result.error.flatten().fieldErrors);
+      const { fieldErrors, formErrors } = result.error.flatten();
+      // Errors from a whole-object rule (e.g. "phone or email") have no field,
+      // so without this they would come back as an empty object.
+      throw new BadRequestException(formErrors.length > 0 ? { ...fieldErrors, form: formErrors } : fieldErrors);
     }
     return result.data;
   }

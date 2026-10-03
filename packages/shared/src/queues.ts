@@ -10,6 +10,7 @@ export const QUEUE_NAMES = [
   "billing",
   "routing",
   "sequences",
-  "appointments"
+  "appointments",
+  "webhooks"
 ] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];

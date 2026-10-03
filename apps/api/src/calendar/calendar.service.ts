@@ -14,6 +14,7 @@ import {
 } from "@zenora/shared";
 import { decryptToken, encryptToken } from "../common/encryption";
 import { captureLeadWithConsent } from "../common/public-lead";
+import { WebhooksService } from "../developers/webhooks.service";
 import { RateLimiter } from "../common/rate-limiter";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -33,7 +34,8 @@ export class CalendarService {
     private readonly prisma: PrismaService,
     private readonly google: GoogleCalendarClient,
     private readonly routing: RoutingEngineService,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly webhooks: WebhooksService
   ) {}
 
   // --- Google connection (each member connects their own account) ---------
@@ -162,7 +164,10 @@ export class CalendarService {
       source: "booking",
       consentSource: `booking:${type.id} | ${LINK_IN_BIO_CONSENT_TEXT}`
     });
-    if (created) await this.routing.applyToNewLead(type.workspaceId, leadId);
+    if (created) {
+      await this.routing.applyToNewLead(type.workspaceId, leadId);
+      await this.webhooks.emitLeadCreated(type.workspaceId, leadId);
+    }
 
     const startsAt = new Date(startsAtMs);
     const endsAt = new Date(startsAtMs + type.durationMin * 60_000);
@@ -186,6 +191,16 @@ export class CalendarService {
       endsAt
     });
     if (googleEventId) await this.prisma.client.appointment.update({ where: { id: appointment.id }, data: { googleEventId } });
+
+    await this.webhooks.emit(type.workspaceId, "appointment.booked", {
+      id: appointment.id,
+      leadId,
+      appointmentType: { id: type.id, name: type.name },
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      guestName: dto.name,
+      guestPhone: phone
+    });
 
     await this.notifications
       .create({

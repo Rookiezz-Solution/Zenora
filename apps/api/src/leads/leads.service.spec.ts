@@ -1,3 +1,4 @@
+import type { WebhooksService } from "../developers/webhooks.service";
 import { ConflictException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { AiClient } from "../ai/ai.client";
@@ -64,7 +65,7 @@ describe("LeadsService.merge", () => {
   it("moves identities, notes, conversations and tasks onto the primary lead", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "dup" });
 
@@ -77,7 +78,7 @@ describe("LeadsService.merge", () => {
   it("re-points every tag from the duplicate onto the primary without violating the (leadId, tagId) primary key", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "dup" });
 
@@ -95,7 +96,7 @@ describe("LeadsService.merge", () => {
   it("keeps the primary's own field values and only fills gaps from the duplicate", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "dup" });
 
@@ -108,7 +109,7 @@ describe("LeadsService.merge", () => {
   it("marks the duplicate as merged into the primary", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "dup" });
 
@@ -118,7 +119,7 @@ describe("LeadsService.merge", () => {
   it("refuses to merge a lead into itself", async () => {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await expect(service.merge("ws1", "user1", { primaryLeadId: "primary", duplicateLeadId: "primary" })).rejects.toBeInstanceOf(
       ConflictException
@@ -151,7 +152,7 @@ describe("LeadsService.moveStage", () => {
 
   it("blocks the move and names the missing required fields when they aren't provided", async () => {
     const { prisma } = makeMoveStagePrisma();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     const attempt = service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won" });
 
@@ -163,7 +164,7 @@ describe("LeadsService.moveStage", () => {
 
   it("treats an empty string as missing, not provided", async () => {
     const { prisma } = makeMoveStagePrisma();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await expect(
       service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "" } })
@@ -172,7 +173,7 @@ describe("LeadsService.moveStage", () => {
 
   it("moves the lead and saves the required field values once they're all provided", async () => {
     const { prisma, tx } = makeMoveStagePrisma();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await service.moveStage("ws1", "lead-1", "user1", {
       stageId: "stage-won",
@@ -193,7 +194,7 @@ describe("LeadsService.moveStage", () => {
   it("logs a distinguishable audit action for a won/lost stage vs. a plain stage change", async () => {
     const { prisma } = makeMoveStagePrisma();
     const audit = makeAudit();
-    const service = new LeadsService(prisma, audit, makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, audit, makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "1" } });
 
@@ -203,7 +204,7 @@ describe("LeadsService.moveStage", () => {
   it("captures the lost reason when moving to a lost-type stage", async () => {
     const lostStage = { id: "stage-lost", pipelineId: "pipe-1", type: "lost", name: "Lost", requiredFieldIds: [] };
     const { prisma, tx } = makeMoveStagePrisma(lostStage);
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-lost", lostReason: "Went with a competitor" });
 
@@ -215,7 +216,7 @@ describe("LeadsService.moveStage", () => {
 
   it("does not touch lostReason for a non-lost stage move", async () => {
     const { prisma, tx } = makeMoveStagePrisma();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-won", fieldValues: { "field-budget": "1" } });
 
@@ -244,14 +245,14 @@ describe("LeadsService.scoreIntent", () => {
 
   it("throws when the lead doesn't exist", async () => {
     const prisma = { client: { lead: { findFirst: vi.fn().mockResolvedValue(null) }, message: { findMany: vi.fn() } } } as unknown as PrismaService;
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await expect(service.scoreIntent("ws1", "missing")).rejects.toThrow("Lead not found");
   });
 
   it("throws when the lead has no conversation yet", async () => {
     const prisma = makeScoringPrisma({ messages: [] });
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await expect(service.scoreIntent("ws1", "lead1")).rejects.toThrow("No conversation yet to score intent from");
   });
@@ -261,7 +262,7 @@ describe("LeadsService.scoreIntent", () => {
     const usage = makeUsage();
     (usage.checkAiCredits as ReturnType<typeof vi.fn>).mockResolvedValue({ allowed: false, remaining: 0, limit: 50 });
     const ai = makeAi();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), usage, ai, makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), usage, ai, makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     await expect(service.scoreIntent("ws1", "lead1")).rejects.toThrow("AI credits are used up for this month");
     expect(ai.scoreLeadIntent).not.toHaveBeenCalled();
@@ -271,7 +272,7 @@ describe("LeadsService.scoreIntent", () => {
     const prisma = makeScoringPrisma();
     const usage = makeUsage();
     const ai = makeAi();
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), usage, ai, makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), usage, ai, makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     const result = await service.scoreIntent("ws1", "lead1");
 
@@ -337,7 +338,7 @@ describe("LeadsService.listMine", () => {
   it("returns only the caller's open, unmerged leads with their next open task", async () => {
     const findMany = vi.fn().mockResolvedValue([{ id: "l1" }]);
     const prisma = { client: { lead: { findMany } } } as unknown as PrismaService;
-    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
 
     const result = await service.listMine("ws1", "user1");
 

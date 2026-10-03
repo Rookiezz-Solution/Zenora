@@ -1,5 +1,25 @@
 # Zenora — build progress
 
+## 2026-10-06 — Phase 3: public API keys and outbound webhooks
+
+**Done**
+- **API keys** (Settings → Developers, `settings.manage` only): create a key with scopes `leads:read` / `leads:write`; the full key (`znr_live_…`) is shown **once**, only its SHA-256 is stored, listings never include it; revoke any time. Every use updates "last used". Create/revoke are audit-logged.
+- **Public REST API** under `/v1`, authenticated by `Authorization: Bearer <key>` (a session cookie does **not** work there, and a key can't manage keys): `GET /v1/leads` (cursor paging, filter by phone/email), `GET /v1/leads/:id`, `POST /v1/leads` (phone or email required; duplicate → 409 with the existing lead id; routing and scoring run as for any new lead). The workspace always comes from the key, never the URL/body. Per-key limit of 120 requests/minute. Output is a small stable lead shape, not the database row.
+- **Webhooks**: add an https URL and choose events — `lead.created`, `lead.stage_changed`, `appointment.booked` — emitted from the leads service, API-created leads, inbound DMs (worker), booking pages, link in bio. Deliveries are a signed POST: `X-Zenora-Signature: t=<unix>,v1=<HMAC-SHA256 of "t.rawBody" with the endpoint secret>`, plus `X-Zenora-Event` and `X-Zenora-Delivery`. The signing secret is shown once, stored encrypted like channel tokens, and decrypted only by the worker. Retries after 1 min, 5 min, 30 min, 2 h, 6 h (six attempts total, ~8 h); every attempt is recorded on the delivery (status, attempts, HTTP status, error) and shown in the UI, with **Send test**, pause/resume and delete. Emitting never throws into the feature that triggered it.
+- **SSRF protection** (a webhook URL makes *our* servers call a customer-typed address): https only; literal private/loopback/link-local/metadata/IPv4-mapped-IPv6 and internal-looking names are refused at save time; at send time DNS is resolved and **every** address re-checked on the very connection used (blocks DNS rebinding), redirects are never followed, 10 s timeout, response body discarded; a blocked target fails permanently, no retries. `WEBHOOK_ALLOW_PRIVATE=true` (local development only, documented in env.ts) switches this off so a localhost receiver can be tested — never set it in production.
+- Small fix found on the way: the validation pipe returned an empty `{}` for whole-object rule failures (e.g. "phone or email"); it now returns `{ form: [...] }`.
+- Schema: `ApiKey`, `WebhookEndpoint`, `WebhookDelivery` (migration `20261006090000_api_keys_webhooks`); new `webhooks` queue.
+
+**Verified**
+- Typecheck, lint, build, tests (shared 124, worker 75, api 239 = 438) green.
+- Live (real Neon/Redis, API + worker + web, a local signature-checking receiver, browser pane): URL checks rejected http, metadata IP, localhost and 10.x with protection on; missing/wrong/revoked keys → 401, read-only key can read but gets 403 writing, session cookie → 401 on `/v1`; create/duplicate/invalid lead via the API; test ping, an API-created lead and an inbound-DM lead each reached the receiver with a **valid signature**; a receiver crash produced a real `ECONNRESET` → "retrying" → delivered on the 1-minute retry; a receiver answering 500 showed "retrying, 2 attempts, HTTP 500"; UI shows the one-time key banner, key list (revoked dimmed), delivery history. Real-network SSRF check: a public DNS name resolving to 127.0.0.1 was blocked at connect time, the metadata IP was blocked, and a genuine public host still connected. Test data deleted (keys, hooks, deliveries cascade).
+
+**Not done / open**
+- Only `leads` in the public API (no tasks, appointments, tags, notes, stage moves); webhook events are lead.created, lead.stage_changed, appointment.booked only. Bulk CSV import does not fire `lead.created` (it would flood subscribers).
+- Rate limiter is per API process (as with the public forms).
+- No plan limits on keys/webhooks yet, no automatic disabling of an endpoint that keeps failing, no secret rotation (delete and re-add), and delivery rows (which hold lead details) are not pruned — retention belongs with the privacy tooling.
+- No OpenAPI document or SDK yet.
+
 ## 2026-10-05 — Phase 2: booking reminders (WhatsApp)
 
 **Done**

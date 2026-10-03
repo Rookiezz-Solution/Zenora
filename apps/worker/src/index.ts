@@ -6,6 +6,7 @@ import { processKnowledgeSource } from "./processors/knowledge";
 import { processReminderSweep } from "./processors/reminders";
 import { processSalespersonAlert, processSlaCheck } from "./processors/routing";
 import { processSequenceStep } from "./processors/sequence";
+import { processWebhookDelivery } from "./processors/webhook-delivery";
 import { processMetaWebhookEvent } from "./processors/webhook-event";
 import { QUEUE_NAMES, type QueueName } from "./queues";
 
@@ -47,6 +48,10 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
   sequences: async (job) => {
     const { enrollmentId } = job.data as { enrollmentId: string };
     await processSequenceStep(enrollmentId);
+  },
+  webhooks: async (job) => {
+    const { deliveryId } = job.data as { deliveryId: string };
+    await processWebhookDelivery(deliveryId);
   },
   appointments: async (job) => {
     if (job.name === "reminder_sweep") await processReminderSweep();

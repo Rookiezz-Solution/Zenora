@@ -1,6 +1,7 @@
 import { BadRequestException, HttpException, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { zonedTimeToUtc } from "@zenora/shared";
 import { describe, expect, it, vi } from "vitest";
+import type { WebhooksService } from "../developers/webhooks.service";
 import type { NotificationsService } from "../notifications/notifications.service";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { RoutingEngineService } from "../routing/routing-engine.service";
@@ -49,13 +50,15 @@ function make(overrides: { client?: Record<string, unknown>; google?: Partial<Re
   const google = { accessTokenFor: vi.fn(), freeBusy: vi.fn().mockResolvedValue([]), createEvent: vi.fn(), exchangeCode: vi.fn(), ...overrides.google };
   const routing = { applyToNewLead: vi.fn() };
   const notifications = { create: vi.fn().mockResolvedValue({}) };
+  const webhooks = { emit: vi.fn().mockResolvedValue(undefined), emitLeadCreated: vi.fn().mockResolvedValue(undefined) };
   const service = new CalendarService(
     { client } as unknown as PrismaService,
     google as unknown as GoogleCalendarClient,
     routing as unknown as RoutingEngineService,
-    notifications as unknown as NotificationsService
+    notifications as unknown as NotificationsService,
+    webhooks as unknown as WebhooksService
   );
-  return { service, client, google, routing, notifications };
+  return { service, client, google, routing, notifications, webhooks };
 }
 
 const guest = { date: DATE, startsAt: new Date(at("10:00")).toISOString(), name: "Ravi", phone: "+91 98123 45678", consent: true as const };
@@ -117,6 +120,22 @@ describe("CalendarService public booking", () => {
       guestPhone: "919812345678"
     });
     expect(notifications.create).toHaveBeenCalled();
+  });
+
+  it("tells webhook subscribers about the new lead and the appointment", async () => {
+    const { service, webhooks } = make();
+    await service.book("type1", "1.1.1.1", guest);
+
+    expect(webhooks.emitLeadCreated).toHaveBeenCalledWith("ws1", "lead1");
+    expect(webhooks.emit).toHaveBeenCalledWith("ws1", "appointment.booked", expect.objectContaining({ id: "appt1", leadId: "lead1", guestPhone: "919812345678" }));
+  });
+
+  it("does not announce a new lead when the booking matched an existing one", async () => {
+    const { service, webhooks } = make({ client: { lead: { findFirst: vi.fn().mockResolvedValue({ id: "existing" }), create: vi.fn() } } });
+    await service.book("type1", "1.1.1.1", guest);
+
+    expect(webhooks.emitLeadCreated).not.toHaveBeenCalled();
+    expect(webhooks.emit).toHaveBeenCalledWith("ws1", "appointment.booked", expect.anything());
   });
 
   it("refuses a time that isn't an offered slot", async () => {

@@ -1,3 +1,4 @@
+import type { WebhooksService } from "../developers/webhooks.service";
 import { ConflictException, HttpException, NotFoundException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "../prisma/prisma.service";
@@ -14,8 +15,9 @@ function make(overrides: Record<string, unknown> = {}) {
     ...overrides
   };
   const routing = { applyToNewLead: vi.fn() };
-  const service = new LinkInBioService({ client } as unknown as PrismaService, routing as unknown as RoutingEngineService);
-  return { service, client, routing };
+  const webhooks = { emitLeadCreated: vi.fn().mockResolvedValue(undefined) };
+  const service = new LinkInBioService({ client } as unknown as PrismaService, routing as unknown as RoutingEngineService, webhooks as unknown as WebhooksService);
+  return { service, client, routing, webhooks };
 }
 
 const input = { name: "Ravi", phone: "+91 98765 43210", consent: true as const };
@@ -36,8 +38,9 @@ describe("LinkInBioService.getPublic", () => {
 
 describe("LinkInBioService.submitCallback", () => {
   it("creates a lead with a recorded consent and routes it", async () => {
-    const { service, client, routing } = make();
+    const { service, client, routing, webhooks } = make();
     await service.submitCallback("asha", "1.1.1.1", input);
+    expect(webhooks.emitLeadCreated).toHaveBeenCalledWith("ws1", "lead1");
 
     const data = client.lead.create.mock.calls[0]![0].data;
     expect(data).toMatchObject({ workspaceId: "ws1", phone: "919876543210", source: "link_in_bio" });
@@ -47,12 +50,13 @@ describe("LinkInBioService.submitCallback", () => {
   });
 
   it("adds a consent to an existing lead instead of duplicating it, with the same response", async () => {
-    const { service, client } = make({ lead: { findFirst: vi.fn().mockResolvedValue({ id: "old" }), create: vi.fn() } });
+    const { service, client, webhooks } = make({ lead: { findFirst: vi.fn().mockResolvedValue({ id: "old" }), create: vi.fn() } });
     const result = await service.submitCallback("asha", "1.1.1.1", input);
 
     expect(result).toEqual({ ok: true });
     expect(client.lead.create).not.toHaveBeenCalled();
     expect(client.consent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ leadId: "old" }) });
+    expect(webhooks.emitLeadCreated).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid phone number", async () => {

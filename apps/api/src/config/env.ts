@@ -33,7 +33,11 @@ const envSchema = z.object({
   // Comma-separated emails allowed into the super admin dashboard. Env-only
   // on purpose: it can never be changed from the UI, so nobody can promote
   // themselves. Empty means nobody is a super admin.
-  SUPER_ADMIN_EMAILS: z.string().optional()
+  SUPER_ADMIN_EMAILS: z.string().optional(),
+  // Local development only: lets webhooks target localhost/private addresses.
+  // Never set in production — it turns off the check that stops a webhook URL
+  // from reaching internal services.
+  WEBHOOK_ALLOW_PRIVATE: z.string().optional()
 });
 
 export type Env = z.infer<typeof envSchema>;

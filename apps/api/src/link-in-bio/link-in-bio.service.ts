@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { LINK_IN_BIO_CONSENT_TEXT, normalizePhone } from "@zenora/shared";
 import { captureLeadWithConsent } from "../common/public-lead";
+import { WebhooksService } from "../developers/webhooks.service";
 import { RateLimiter } from "../common/rate-limiter";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoutingEngineService } from "../routing/routing-engine.service";
@@ -13,7 +14,8 @@ export class LinkInBioService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly routing: RoutingEngineService
+    private readonly routing: RoutingEngineService,
+    private readonly webhooks: WebhooksService
   ) {}
 
   get(workspaceId: string) {
@@ -63,7 +65,10 @@ export class LinkInBioService {
       source: "link_in_bio",
       consentSource: `link_in_bio:${slug} | ${LINK_IN_BIO_CONSENT_TEXT}`
     });
-    if (created) await this.routing.applyToNewLead(page.workspaceId, leadId);
+    if (created) {
+      await this.routing.applyToNewLead(page.workspaceId, leadId);
+      await this.webhooks.emitLeadCreated(page.workspaceId, leadId);
+    }
     return { ok: true };
   }
 

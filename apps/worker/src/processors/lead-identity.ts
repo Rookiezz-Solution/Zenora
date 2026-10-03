@@ -1,5 +1,7 @@
 import { prisma } from "@zenora/db";
+import { leadWebhookData } from "@zenora/shared";
 import { applyToNewLead } from "./routing";
+import { emitWebhookEvent } from "../webhooks/emit";
 
 // Finds the Lead already linked to this channel identity (ig-scoped id / wa
 // phone), or creates a new Lead + LeadIdentity. This is the merge point that
@@ -30,5 +32,6 @@ export async function findOrCreateLeadByIdentity(
   // Scoring + routing only apply to a genuinely new lead, not a returning
   // one whose identity we already knew (docs/ROADMAP.md Phase 1 item 8).
   await applyToNewLead(workspaceId, lead.id);
+  await emitWebhookEvent(workspaceId, "lead.created", leadWebhookData(lead));
   return lead;
 }

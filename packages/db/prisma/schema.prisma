@@ -55,6 +55,8 @@ model Workspace {
   instagramAccounts InstagramAccount[]
   whatsappNumbers   WhatsappNumber[]
   adAccounts        AdAccount[]
+  apiKeys           ApiKey[]
+  webhookEndpoints  WebhookEndpoint[]
 
   leads         Lead[]
   tags          Tag[]
@@ -1129,4 +1131,61 @@ model PlatformAuditLog {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Developers — public API keys and outbound webhooks
+// ---------------------------------------------------------------------------
+
+// Only the SHA-256 of the key is stored; the full key is shown once at
+// creation. `prefix` is the first characters, for telling keys apart in the UI.
+model ApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  prefix      String
+  keyHash     String    @unique
+  scopes      String[] // leads:read | leads:write
+  createdById String?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model WebhookEndpoint {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  url          String
+  description  String?
+  secretCipher String // signing secret, encrypted like channel tokens
+  events       String[] // lead.created | lead.stage_changed | appointment.booked
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  workspace  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([workspaceId])
+}
+
+model WebhookDelivery {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  endpointId     String
+  event          String // an event name, or "ping" for a test
+  payload        Json
+  status         String    @default("pending") // pending | retrying | delivered | failed
+  attempts       Int       @default(0)
+  responseStatus Int?
+  error          String?
+  createdAt      DateTime  @default(now())
+  deliveredAt    DateTime?
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, createdAt])
 }

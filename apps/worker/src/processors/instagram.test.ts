@@ -15,6 +15,7 @@ const enqueueStart = vi.hoisted(() => vi.fn());
 vi.mock("../automation-engine/trigger-matcher", () => ({ findMatchingAutomations }));
 vi.mock("../automation-engine/queue", () => ({ enqueueStart }));
 vi.mock("./routing", () => ({ applyToNewLead: vi.fn() }));
+vi.mock("../webhooks/emit", () => ({ emitWebhookEvent: vi.fn() }));
 
 import { processInstagramPayload } from "./instagram";
 
@@ -22,7 +23,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.instagramAccount.findUnique.mockResolvedValue({ id: "ig_acct_1", workspaceId: "ws_1" });
   prismaMock.leadIdentity.findUnique.mockResolvedValue(null);
-  prismaMock.lead.create.mockResolvedValue({ id: "lead_1" });
+  prismaMock.lead.create.mockResolvedValue({ id: "lead_1", name: null, phone: null, email: null, source: null, stageId: null, createdAt: new Date("2026-10-05T00:00:00Z") });
   prismaMock.conversation.findFirst.mockResolvedValue(null);
   prismaMock.conversation.create.mockResolvedValue({ id: "conv_1", botActive: true });
   findMatchingAutomations.mockResolvedValue([]);

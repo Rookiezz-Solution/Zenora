@@ -1,9 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@zenora/db";
+import { leadWebhookData } from "@zenora/shared";
 import { AiClient } from "../ai/ai.client";
 import { AuditService } from "../audit/audit.service";
 import { TriggerEventsService } from "../automations/trigger-events.service";
 import { UsageService } from "../billing/usage.service";
+import { WebhooksService } from "../developers/webhooks.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoutingEngineService } from "../routing/routing-engine.service";
 import type {
@@ -25,7 +27,8 @@ export class LeadsService {
     private readonly routingEngine: RoutingEngineService,
     private readonly usage: UsageService,
     private readonly ai: AiClient,
-    private readonly triggerEvents: TriggerEventsService
+    private readonly triggerEvents: TriggerEventsService,
+    private readonly webhooks: WebhooksService
   ) {}
 
   async list(workspaceId: string, query: ListLeadsQuery) {
@@ -147,6 +150,7 @@ export class LeadsService {
     const lead = await this.prisma.client.lead.create({ data: { workspaceId, ...dto } });
     await this.audit.log({ workspaceId, userId, action: "lead.created", entityType: "lead", entityId: lead.id });
     await this.routingEngine.applyToNewLead(workspaceId, lead.id);
+    await this.webhooks.emit(workspaceId, "lead.created", leadWebhookData(lead));
     return lead;
   }
 
@@ -337,6 +341,11 @@ export class LeadsService {
       entityType: "lead",
       entityId: lead.id,
       metadata: { stageId: stage.id, stageName: stage.name, pipelineId: stage.pipelineId }
+    });
+    await this.webhooks.emit(workspaceId, "lead.stage_changed", {
+      leadId: lead.id,
+      stage: { id: stage.id, name: stage.name, type: stage.type },
+      pipelineId: stage.pipelineId
     });
 
     return this.getById(workspaceId, lead.id);
