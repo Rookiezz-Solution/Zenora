@@ -37,7 +37,9 @@ const envSchema = z.object({
   // Local development only: lets webhooks target localhost/private addresses.
   // Never set in production — it turns off the check that stops a webhook URL
   // from reaching internal services.
-  WEBHOOK_ALLOW_PRIVATE: z.string().optional()
+  WEBHOOK_ALLOW_PRIVATE: z.string().optional(),
+  // Number of reverse proxies in front of the API (see main.ts). Unset = none.
+  TRUST_PROXY: z.string().regex(/^[0-9]+$/).optional()
 });
 
 export type Env = z.infer<typeof envSchema>;

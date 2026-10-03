@@ -10,6 +10,7 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import type { Request, Response } from "express";
 import { loadEnv } from "../config/env";
+import { authLimits } from "./auth-limits";
 import { AuthService } from "./auth.service";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { loginSchema, otpRequestSchema, otpVerifySchema, signUpSchema } from "./dto/auth.dto";
@@ -22,14 +23,16 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("signup")
-  async signUp(@Body(new ZodValidationPipe(signUpSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
+  async signUp(@Req() req: Request, @Body(new ZodValidationPipe(signUpSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
+    authLimits.signup(req.ip ?? "unknown");
     const result = await this.authService.signUp(body as never);
     setSessionCookie(res, result.token);
     return { user: result.user };
   }
 
   @Post("login")
-  async login(@Body(new ZodValidationPipe(loginSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
+  async login(@Req() req: Request, @Body(new ZodValidationPipe(loginSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
+    authLimits.login(req.ip ?? "unknown", (body as { email: string }).email);
     const result = await this.authService.login(body as never);
     setSessionCookie(res, result.token);
     return { user: result.user };
@@ -43,12 +46,14 @@ export class AuthController {
   }
 
   @Post("otp/request")
-  requestOtp(@Body(new ZodValidationPipe(otpRequestSchema)) body: unknown) {
+  requestOtp(@Req() req: Request, @Body(new ZodValidationPipe(otpRequestSchema)) body: unknown) {
+    authLimits.otpRequest(req.ip ?? "unknown", (body as { target: string }).target);
     return this.authService.requestOtp(body as never);
   }
 
   @Post("otp/verify")
-  async verifyOtp(@Body(new ZodValidationPipe(otpVerifySchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
+  async verifyOtp(@Req() req: Request, @Body(new ZodValidationPipe(otpVerifySchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
+    authLimits.otpVerify(req.ip ?? "unknown", (body as { target: string }).target);
     const result = await this.authService.verifyOtp(body as never);
     setSessionCookie(res, result.token);
     return { user: result.user };

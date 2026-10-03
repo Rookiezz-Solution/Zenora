@@ -14,12 +14,15 @@ interface RawBodyRequest extends Request {
 export class MetaSignatureGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<RawBodyRequest>();
-    const { META_APP_SECRET } = loadEnv();
+    const { META_APP_SECRET, NODE_ENV } = loadEnv();
     const signatureHeader = req.headers["x-hub-signature-256"];
 
     if (!META_APP_SECRET) {
-      // Not configured yet (no Meta app created) — Phase 1 dev fallback so
-      // the rest of the pipeline is testable before real credentials exist.
+      // Without the app secret nothing can be verified, so in production every
+      // webhook is refused (accepting them would let anyone who finds the URL
+      // inject fake messages and leads). Only local development, before a Meta
+      // app exists, lets unsigned events through.
+      if (NODE_ENV === "production") throw new ForbiddenException("Webhook signing is not configured");
       return true;
     }
     if (typeof signatureHeader !== "string" || !req.rawBody) {

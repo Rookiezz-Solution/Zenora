@@ -119,6 +119,7 @@ model User {
   phone             String?   @unique
   phoneVerifiedAt   DateTime?
   passwordHash      String?
+  sessionVersion    Int       @default(0) // bumped to sign out every existing session (e.g. when an unverified account is claimed)
   googleId          String?   @unique
   name              String?
   avatarUrl         String?

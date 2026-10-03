@@ -1,5 +1,15 @@
 # Zenora — build progress
 
+## 2026-10-11 — Phase 3: security review and fixes
+
+A full self-review of the API, worker, web app and dependencies; findings, fixes and known gaps are written up in **`docs/SECURITY.md`**. It is **not** a substitute for the external VAPT the roadmap calls for.
+
+**Fixed** (each with regression tests and a live attack attempt): admins promoting themselves/others to **owner** and a **cross-tenant** role-change hole; invites usable by anyone with the link; **OAuth connect CSRF** (state now bound to the starting browser); **account pre-hijacking** (claiming an unverified account removes the attacker's password and signs out their sessions); the **Meta webhook signature failing open** without its secret; no **brute-force limits** on login / sign-up / one-time codes; login **timing** that revealed which emails exist; one-time codes **written to logs** and reported as sent; session and OAuth tokens being interchangeable; missing security headers; **42 dependency advisories (2 critical, 16 high) → 3 moderate** by upgrading Next.js 14 → 15.5.27 and forcing patched `multer` / `qs` / `body-parser` / `postcss`.
+
+**Verified**: typecheck, lint, build, tests (shared 148, worker 77, api 314 = 539) green; Next 15 builds with no source changes. Live against the real API and database: security headers present on API and web; a 9th wrong login for an account → 429; attacker pre-registers a victim's email, the victim verifies with a code → the attacker's session and password both stop working while the victim's works; someone with another person's invite link → 403, the invited person → 201, a second accept → refused; an admin making themselves owner, demoting the owner, inviting an owner → all 403; an admin using a membership id from another workspace → 404 and the other workspace's owner untouched; the owner can change an admin's role but not demote themselves as last owner; forged OAuth states on all three callbacks → 400. Test data deleted.
+
+**Open** (see `docs/SECURITY.md`): no content-security-policy; no 2FA, email verification or password-reset mail; rate limits are per process; remaining advisories are `@nestjs/core` 10 and `file-type`; foreign ids inside request bodies (e.g. assignee) aren't uniformly validated as workspace members; **sessions were signed out once** by the token change.
+
 ## 2026-10-10 — Phase 3: privacy tooling (export, erase, retention)
 
 **Defaults chosen**: export and erase are per person; messages are kept until the owner picks a period; raw channel payloads and webhook logs are cleared after 30 days platform-wide. Owners/admins only (`settings.manage`). **Workspace deletion is deliberately not built** (see open items).

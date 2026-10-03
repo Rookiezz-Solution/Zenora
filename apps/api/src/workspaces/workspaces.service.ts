@@ -1,4 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { canChangeMemberRole, canInviteWithRole } from "@zenora/shared";
 import * as crypto from "node:crypto";
 import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
@@ -93,6 +94,10 @@ export class WorkspacesService {
   }
 
   async invite(workspaceId: string, invitedById: string, dto: InviteMemberDto) {
+    const actor = await this.ensureMember(workspaceId, invitedById);
+    const decision = canInviteWithRole(actor.role, dto.role);
+    if (!decision.ok) throw new ForbiddenException(decision.reason);
+
     const userLimit = await this.usage.checkUserLimit(workspaceId);
     if (!userLimit.allowed) {
       throw new BadRequestException(
@@ -103,7 +108,7 @@ export class WorkspacesService {
     const invite = await this.prisma.client.invite.create({
       data: {
         workspaceId,
-        email: dto.email,
+        email: dto.email.trim().toLowerCase(),
         role: dto.role,
         teamId: dto.teamId,
         invitedById,
@@ -128,6 +133,14 @@ export class WorkspacesService {
     if (!invite || invite.status !== "pending" || invite.expiresAt < new Date()) {
       throw new ForbiddenException("Invite is invalid or expired");
     }
+    // The link is only good for the person it was addressed to: anyone who got
+    // hold of the token (forwarded email, shared screenshot) can't use it.
+    const user = await this.prisma.client.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (!user || user.email.toLowerCase() !== invite.email.toLowerCase()) {
+      throw new ForbiddenException("This invite was sent to a different email address");
+    }
+    const already = await this.prisma.client.membership.findUnique({ where: { workspaceId_userId: { workspaceId: invite.workspaceId, userId } } });
+    if (already) throw new ConflictException("You are already a member of this workspace");
     const membership = await this.prisma.client.$transaction(async (tx) => {
       const created = await tx.membership.create({
         data: { workspaceId: invite.workspaceId, userId, role: invite.role, teamId: invite.teamId }
@@ -146,6 +159,14 @@ export class WorkspacesService {
   }
 
   async updateMemberRole(workspaceId: string, membershipId: string, actingUserId: string, dto: UpdateMemberRoleDto) {
+    // Scoped to this workspace: a membership id from anywhere else is "not found".
+    const target = await this.prisma.client.membership.findFirst({ where: { id: membershipId, workspaceId } });
+    if (!target) throw new NotFoundException("Member not found");
+    const actor = await this.ensureMember(workspaceId, actingUserId);
+    const ownerCount = await this.prisma.client.membership.count({ where: { workspaceId, role: "owner" } });
+    const decision = canChangeMemberRole({ actorRole: actor.role, targetRole: target.role, newRole: dto.role, isSelf: target.userId === actingUserId, ownerCount });
+    if (!decision.ok) throw new ForbiddenException(decision.reason);
+
     const membership = await this.prisma.client.membership.update({
       where: { id: membershipId },
       data: { role: dto.role }

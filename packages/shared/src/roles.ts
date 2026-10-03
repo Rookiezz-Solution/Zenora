@@ -44,3 +44,37 @@ export const ROLE_PERMISSIONS: Record<WorkspaceRole, readonly Permission[]> = {
 export function roleHasPermission(role: WorkspaceRole, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }
+
+export type RoleDecision = { ok: true } | { ok: false; reason: string };
+
+// Who may set a member's role. Owners are the only ones allowed to hand out or
+// take away ownership, nobody may promote themselves, and a workspace can't be
+// left without an owner. (Admins hold `members.manage`, which on its own would
+// let them make themselves owner and take over billing.)
+export function canChangeMemberRole(input: {
+  actorRole: WorkspaceRole;
+  targetRole: WorkspaceRole;
+  newRole: WorkspaceRole;
+  isSelf: boolean;
+  ownerCount: number;
+}): RoleDecision {
+  const { actorRole, targetRole, newRole, isSelf, ownerCount } = input;
+  if (actorRole !== "owner" && actorRole !== "admin") return { ok: false, reason: "You can't change roles" };
+  if (newRole === targetRole) return { ok: true };
+
+  if (isSelf) {
+    // The only self-change allowed is an owner stepping down while another owner remains.
+    if (!(actorRole === "owner" && ownerCount > 1)) return { ok: false, reason: "You can't change your own role" };
+    return { ok: true };
+  }
+  if ((newRole === "owner" || targetRole === "owner") && actorRole !== "owner") return { ok: false, reason: "Only an owner can grant or change the owner role" };
+  if (targetRole === "owner" && ownerCount <= 1) return { ok: false, reason: "A workspace needs at least one owner" };
+  return { ok: true };
+}
+
+// Inviting someone as owner hands over the keys, so only an owner may.
+export function canInviteWithRole(actorRole: WorkspaceRole, role: WorkspaceRole): RoleDecision {
+  if (actorRole !== "owner" && actorRole !== "admin") return { ok: false, reason: "You can't invite people" };
+  if (role === "owner" && actorRole !== "owner") return { ok: false, reason: "Only an owner can invite another owner" };
+  return { ok: true };
+}

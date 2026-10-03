@@ -3,11 +3,16 @@ import * as bcrypt from "bcryptjs";
 import * as crypto from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { signSession } from "./jwt.util";
+import { forgetSessionVersion } from "./guards/jwt-auth.guard";
 import { OtpSender } from "./otp-sender";
 import type { LoginDto, OtpRequestDto, OtpVerifyDto, SignUpDto } from "./dto/auth.dto";
 
 const OTP_TTL_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
+
+// Compared against when the email is unknown, so a missing account takes as long
+// to reject as a wrong password (otherwise response time reveals who has an account).
+const DUMMY_HASH = bcrypt.hashSync("zenora-timing-equaliser", 12);
 
 @Injectable()
 export class AuthService {
@@ -25,15 +30,16 @@ export class AuthService {
     const user = await this.prisma.client.user.create({
       data: { email: dto.email, passwordHash, name: dto.name }
     });
-    return { user: sanitizeUser(user), token: signSession({ sub: user.id }) };
+    return { user: sanitizeUser(user), token: signSession({ sub: user.id, ver: user.sessionVersion }) };
   }
 
   async login(dto: LoginDto) {
     const user = await this.prisma.client.user.findUnique({ where: { email: dto.email } });
-    if (!user?.passwordHash || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+    const passwordOk = await bcrypt.compare(dto.password, user?.passwordHash ?? DUMMY_HASH);
+    if (!user?.passwordHash || !passwordOk) {
       throw new UnauthorizedException("Invalid email or password");
     }
-    return { user: sanitizeUser(user), token: signSession({ sub: user.id }) };
+    return { user: sanitizeUser(user), token: signSession({ sub: user.id, ver: user.sessionVersion }) };
   }
 
   async requestOtp(dto: OtpRequestDto) {
@@ -73,21 +79,24 @@ export class AuthService {
     });
 
     const isEmail = dto.target.includes("@");
+    const claim = isEmail ? await this.claimUnverifiedAccount(dto.target) : {};
     const user = await this.prisma.client.user.upsert({
       where: isEmail ? { email: dto.target } : { phone: dto.target },
-      update: isEmail ? { emailVerifiedAt: new Date() } : { phoneVerifiedAt: new Date() },
+      update: isEmail ? { emailVerifiedAt: new Date(), ...claim } : { phoneVerifiedAt: new Date() },
       create: isEmail
         ? { email: dto.target, emailVerifiedAt: new Date() }
         : { email: `${dto.target}@otp.zenora.local`, phone: dto.target, phoneVerifiedAt: new Date() }
     });
+    forgetSessionVersion(user.id);
 
-    return { user: sanitizeUser(user), token: signSession({ sub: user.id }) };
+    return { user: sanitizeUser(user), token: signSession({ sub: user.id, ver: user.sessionVersion }) };
   }
 
   async validateOrCreateGoogleUser(profile: { googleId: string; email: string; name?: string; avatarUrl?: string }) {
+    const claim = await this.claimUnverifiedAccount(profile.email);
     const user = await this.prisma.client.user.upsert({
       where: { email: profile.email },
-      update: { googleId: profile.googleId, name: profile.name, avatarUrl: profile.avatarUrl },
+      update: { googleId: profile.googleId, name: profile.name, avatarUrl: profile.avatarUrl, emailVerifiedAt: new Date(), ...claim },
       create: {
         email: profile.email,
         googleId: profile.googleId,
@@ -96,7 +105,19 @@ export class AuthService {
         emailVerifiedAt: new Date()
       }
     });
-    return { user: sanitizeUser(user), token: signSession({ sub: user.id }) };
+    forgetSessionVersion(user.id);
+    return { user: sanitizeUser(user), token: signSession({ sub: user.id, ver: user.sessionVersion }) };
+  }
+
+  // Sign-up with a password never proves you own the email, so anyone could
+  // register a victim's address first and keep their password. When the real
+  // owner later proves the address (email code or Google), the account is taken
+  // back: the password is removed and every existing session is signed out.
+  private async claimUnverifiedAccount(email: string): Promise<{ passwordHash?: null; sessionVersion?: { increment: number } }> {
+    const existing = await this.prisma.client.user.findUnique({ where: { email }, select: { id: true, emailVerifiedAt: true, passwordHash: true } });
+    if (!existing || existing.emailVerifiedAt) return {};
+    forgetSessionVersion(existing.id);
+    return existing.passwordHash ? { passwordHash: null, sessionVersion: { increment: 1 } } : {};
   }
 
   async me(userId: string) {

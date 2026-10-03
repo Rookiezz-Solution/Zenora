@@ -1,12 +1,12 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuards } from "@nestjs/common";
-import type { Response } from "express";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import type { Request, Response } from "express";
 import { z } from "zod";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { RequirePermission } from "../auth/decorators/require-permission.decorator";
 import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../auth/guards/permissions.guard";
-import { signOAuthState, verifyOAuthState } from "../common/oauth-state";
+import { beginOAuth, completeOAuth } from "../common/oauth-state";
 import { loadEnv } from "../config/env";
 import { AdsService } from "./ads.service";
 import { MetaAdsClient } from "./meta-ads.client";
@@ -27,7 +27,7 @@ export class AdsController {
   @Get("connect")
   @RequirePermission("settings.manage")
   connect(@Param("workspaceId") workspaceId: string, @CurrentUser() userId: string, @Res() res: Response) {
-    res.redirect(this.metaAds.buildAuthUrl(signOAuthState({ workspaceId, userId })));
+    res.redirect(this.metaAds.buildAuthUrl(beginOAuth(res, { workspaceId, userId })));
   }
 
   @Get("accounts")
@@ -66,18 +66,13 @@ export class MetaAdsCallbackController {
   constructor(private readonly ads: AdsService) {}
 
   @Get("callback")
-  async callback(@Query("code") code: string, @Query("state") state: string, @Query("error") error: string, @Res() res: Response) {
+  async callback(@Query("code") code: string, @Query("state") state: string, @Query("error") error: string, @Req() req: Request, @Res() res: Response) {
     const { APP_URL } = loadEnv();
     if (error || !code) {
       res.redirect(`${APP_URL}/sources?ads=denied`);
       return;
     }
-    let payload: { workspaceId: string; userId: string };
-    try {
-      payload = verifyOAuthState(state);
-    } catch {
-      throw new BadRequestException("Invalid or expired OAuth state");
-    }
+    const payload = completeOAuth<{ workspaceId: string; userId: string }>(req, res, state);
     await this.ads.handleCallback(code, payload.workspaceId);
     res.redirect(`${APP_URL}/sources?ads=connected`);
   }
