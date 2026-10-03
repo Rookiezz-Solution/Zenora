@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { hasActiveConsent, type ConsentRecord } from "@zenora/shared";
 import { WHATSAPP_MESSAGE_COST_PAISE } from "@zenora/shared";
 import { AuditService } from "../audit/audit.service";
 import { UsageService } from "../billing/usage.service";
@@ -135,11 +136,15 @@ export class BroadcastsService {
     }
 
     if (filter.optedInOnly) {
-      const opted = await this.prisma.client.consent.findMany({
-        where: { leadId: { in: leadIds }, type: "marketing", granted: true },
-        select: { leadId: true }
+      // The latest marketing record decides: someone who agreed and later
+      // withdrew has not consented.
+      const records = await this.prisma.client.consent.findMany({
+        where: { leadId: { in: leadIds }, type: "marketing" },
+        select: { leadId: true, type: true, granted: true, createdAt: true }
       });
-      leadIds = opted.map((o) => o.leadId);
+      const byLead = new Map<string, ConsentRecord[]>();
+      for (const r of records) byLead.set(r.leadId, [...(byLead.get(r.leadId) ?? []), r]);
+      leadIds = leadIds.filter((id) => hasActiveConsent(byLead.get(id) ?? [], "marketing"));
     }
 
     if (filter.skipRecentlyMessagedHours && leadIds.length > 0) {

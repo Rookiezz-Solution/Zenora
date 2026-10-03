@@ -29,11 +29,24 @@ function makeClient(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const granted = (leadId: string, createdAt = "2026-01-01T00:00:00Z") => ({ leadId, type: "marketing", granted: true, createdAt });
+const withdrawn = (leadId: string, createdAt: string) => ({ leadId, type: "marketing", granted: false, createdAt });
+
 describe("BroadcastsService.estimateAudience", () => {
+  it("does not treat a withdrawn marketing consent as an opt-in, however long ago it was first granted", async () => {
+    const client = makeClient();
+    client.consent.findMany.mockResolvedValue([granted("l1"), withdrawn("l1", "2026-06-01T00:00:00Z"), granted("l2"), granted("l3", "2026-01-01T00:00:00Z"), withdrawn("l3", "2026-02-01T00:00:00Z"), granted("l3", "2026-03-01T00:00:00Z")]);
+    const service = new BroadcastsService({ client } as unknown as PrismaService, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
+
+    const result = await service.estimateAudience("ws1", { optedInOnly: true });
+
+    expect(result.count).toBe(2); // l2 (never withdrew) and l3 (re-granted); not l1
+  });
+
   it("narrows the audience through tag, opt-in, and recently-messaged filters in sequence", async () => {
     const client = makeClient();
     client.leadTag.findMany.mockResolvedValue([{ leadId: "l1" }, { leadId: "l2" }]);
-    client.consent.findMany.mockResolvedValue([{ leadId: "l1" }]);
+    client.consent.findMany.mockResolvedValue([granted("l1")]);
     const prisma = { client } as unknown as PrismaService;
     const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
 
@@ -87,7 +100,7 @@ describe("BroadcastsService.create", () => {
   it("prices the cost estimate by the template's category rate times the audience size", async () => {
     const client = makeClient();
     client.waTemplate.findFirst.mockResolvedValue({ id: "t1", category: "marketing", metaStatus: "approved" });
-    client.consent.findMany.mockResolvedValue([{ leadId: "l1" }, { leadId: "l2" }, { leadId: "l3" }]);
+    client.consent.findMany.mockResolvedValue([granted("l1"), granted("l2"), granted("l3")]);
     client.broadcast.create.mockImplementation(({ data }: { data: unknown }) => data);
     const prisma = { client } as unknown as PrismaService;
     const service = new BroadcastsService(prisma, makeAudit(), {} as MetaGraphClient, {} as QueueService, makeUsage());
@@ -101,7 +114,7 @@ describe("BroadcastsService.create", () => {
 describe("BroadcastsService.send", () => {
   it("materializes a BroadcastRecipient per resolved lead and marks the broadcast sending", async () => {
     const client = makeClient();
-    client.consent.findMany.mockResolvedValue([{ leadId: "l1" }, { leadId: "l2" }, { leadId: "l3" }]);
+    client.consent.findMany.mockResolvedValue([granted("l1"), granted("l2"), granted("l3")]);
     client.broadcast.findFirst.mockResolvedValue({
       id: "b1",
       status: "draft",
@@ -125,7 +138,7 @@ describe("BroadcastsService.send", () => {
 
   it("marks a future-scheduled broadcast as scheduled and delays the queue job accordingly", async () => {
     const client = makeClient();
-    client.consent.findMany.mockResolvedValue([{ leadId: "l1" }]);
+    client.consent.findMany.mockResolvedValue([granted("l1")]);
     const future = new Date(Date.now() + 60 * 60 * 1000);
     client.broadcast.findFirst.mockResolvedValue({
       id: "b1",

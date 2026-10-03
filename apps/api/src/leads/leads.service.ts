@@ -16,6 +16,7 @@ import type {
   ListLeadsQuery,
   MergeLeadsDto,
   MoveStageDto,
+  RecordConsentDto,
   UpdateLeadDto
 } from "./dto/leads.dto";
 
@@ -200,6 +201,13 @@ export class LeadsService {
   async removeTag(workspaceId: string, leadId: string, tagId: string) {
     await this.ensureLead(workspaceId, leadId);
     await this.prisma.client.leadTag.deleteMany({ where: { leadId, tagId } });
+  }
+
+  async recordConsent(workspaceId: string, leadId: string, userId: string, dto: RecordConsentDto) {
+    await this.ensureLead(workspaceId, leadId);
+    const consent = await this.prisma.client.consent.create({ data: { leadId, type: dto.type, granted: dto.granted, source: dto.source } });
+    await this.audit.log({ workspaceId, userId, action: dto.granted ? "lead.consent_granted" : "lead.consent_withdrawn", entityType: "lead", entityId: leadId, metadata: { type: dto.type, source: dto.source } });
+    return consent;
   }
 
   async addNote(workspaceId: string, leadId: string, authorId: string, dto: AddNoteDto) {

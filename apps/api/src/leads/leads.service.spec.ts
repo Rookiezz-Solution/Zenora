@@ -389,3 +389,30 @@ describe("LeadsService.getById", () => {
     expect(findFirst).toHaveBeenCalledWith({ where: { id: "other-workspace-lead", workspaceId: "ws1" } });
   });
 });
+
+describe("LeadsService.recordConsent", () => {
+  const make = (lead: unknown) => {
+    const create = vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: "c1", ...data }));
+    const audit = makeAudit();
+    const prisma = { client: { lead: { findFirst: vi.fn().mockResolvedValue(lead) }, consent: { create } } } as unknown as PrismaService;
+    return { service: new LeadsService(prisma, audit, makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService), create, audit };
+  };
+
+  it("adds a new record each time (a withdrawal is a record, not an edit) and audits it", async () => {
+    const { service, create, audit } = make({ id: "l1", workspaceId: "ws1" });
+    await service.recordConsent("ws1", "l1", "u1", { type: "marketing", granted: true, source: "signed form" });
+    await service.recordConsent("ws1", "l1", "u1", { type: "marketing", granted: false, source: "asked to stop" });
+
+    expect(create.mock.calls.map((c) => c[0].data)).toEqual([
+      { leadId: "l1", type: "marketing", granted: true, source: "signed form" },
+      { leadId: "l1", type: "marketing", granted: false, source: "asked to stop" }
+    ]);
+    expect(audit.log.mock.calls.map((c) => (c[0] as { action: string }).action)).toEqual(["lead.consent_granted", "lead.consent_withdrawn"]);
+  });
+
+  it("refuses a lead from another workspace", async () => {
+    const { service, create } = make(null);
+    await expect(service.recordConsent("ws1", "elsewhere", "u1", { type: "marketing", granted: true, source: "x y" })).rejects.toThrow("Lead not found");
+    expect(create).not.toHaveBeenCalled();
+  });
+});

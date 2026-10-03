@@ -39,6 +39,8 @@ export interface Consent {
   id: string;
   type: string;
   granted: boolean;
+  source?: string | null;
+  createdAt: string;
 }
 
 export interface LeadProfile extends Lead {

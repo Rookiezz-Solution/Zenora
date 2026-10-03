@@ -21,3 +21,4 @@ export * from "./owner-console";
 export * from "./referrals";
 export * from "./privacy";
 export * from "./template-sharing";
+export * from "./consent";

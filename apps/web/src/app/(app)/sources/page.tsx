@@ -8,6 +8,70 @@ import { useCurrentWorkspace } from "@/lib/use-workspace";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+interface AudiencePreview {
+  contacts: number;
+  withMarketingConsent: number;
+  uploadable: number;
+}
+
+function CustomerListCard({ workspaceId }: { workspaceId: string }) {
+  const [tag, setTag] = useState("");
+  const [preview, setPreview] = useState<AudiencePreview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const query = tag.trim() ? `?tag=${encodeURIComponent(tag.trim())}` : "";
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      apiFetch<AudiencePreview>(`/audiences/${workspaceId}/preview${query}`).then(setPreview).catch(() => setPreview(null));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [workspaceId, query]);
+
+  async function download() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/audiences/${workspaceId}/export/meta${query}`, { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { message?: string }).message ?? "Could not create the file");
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "zenora-meta-customer-list.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mt-6 rounded-md border border-gray-200 bg-white p-4">
+      <h2 className="text-sm font-semibold text-gray-900">Customer list for Meta ads</h2>
+      <p className="mt-1 text-xs text-gray-500">
+        Make a file of people who agreed to marketing, to upload to Meta Ads Manager (Audiences → Create audience → Customer list) so you can advertise to them or find people like them. Phone numbers are scrambled (hashed) in the file, and nothing is sent to Meta from Zenora.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Only contacts with this tag (optional)" className="w-64 rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+        <button type="button" onClick={download} disabled={busy || !preview || preview.uploadable === 0} className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+          {busy ? "Preparing…" : "Download list"}
+        </button>
+      </div>
+      {preview && (
+        <p className="mt-2 text-sm text-gray-700">
+          <span className="font-semibold">{preview.uploadable}</span> {preview.uploadable === 1 ? "person" : "people"} can be included, out of {preview.contacts} contact{preview.contacts === 1 ? "" : "s"} with a phone number ({preview.withMarketingConsent} agreed to marketing).
+        </p>
+      )}
+      {preview && preview.withMarketingConsent === 0 && preview.contacts > 0 && (
+        <p className="mt-1 text-xs text-amber-800">Nobody has agreed to marketing yet. Open a contact and choose &ldquo;Record that they agreed&rdquo; once they have given permission.</p>
+      )}
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </section>
+  );
+}
+
 function SourcesContent() {
   const { workspaceId } = useCurrentWorkspace();
   const params = useSearchParams();
@@ -178,6 +242,8 @@ function SourcesContent() {
           </div>
         )}
       </section>
+
+      <CustomerListCard workspaceId={workspaceId} />
 
       <section className="mt-6 rounded-md border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">Where leads come from</h2>

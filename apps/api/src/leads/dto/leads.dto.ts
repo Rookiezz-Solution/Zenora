@@ -32,6 +32,14 @@ export type UpdateLeadDto = z.infer<typeof updateLeadSchema>;
 export const addTagSchema = z.object({ name: z.string().min(1) });
 export type AddTagDto = z.infer<typeof addTagSchema>;
 
+export const recordConsentSchema = z.object({
+  type: z.enum(["marketing", "recording", "data_processing"]),
+  granted: z.boolean(),
+  // Where the agreement came from, e.g. "signed form", "verbal on call 12 Oct".
+  source: z.string().trim().min(2).max(120)
+});
+export type RecordConsentDto = z.infer<typeof recordConsentSchema>;
+
 export const addNoteSchema = z.object({ body: z.string().min(1) });
 export type AddNoteDto = z.infer<typeof addNoteSchema>;
 

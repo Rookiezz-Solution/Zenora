@@ -6,6 +6,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../auth/guards/permissions.guard";
 import {
   addNoteSchema,
+  recordConsentSchema,
   addTagSchema,
   createLeadSchema,
   importLeadsSchema,
@@ -126,6 +127,19 @@ export class LeadsController {
   @RequirePermission("leads.write")
   removeTag(@Param("workspaceId") workspaceId: string, @Param("leadId") leadId: string, @Param("tagId") tagId: string) {
     return this.leads.removeTag(workspaceId, leadId, tagId);
+  }
+
+  // Consent is a history: a withdrawal is a new record, never an edit, so there
+  // is always a trail of who agreed to what, when and how.
+  @Post(":leadId/consents")
+  @RequirePermission("leads.write")
+  recordConsent(
+    @Param("workspaceId") workspaceId: string,
+    @Param("leadId") leadId: string,
+    @CurrentUser() userId: string,
+    @Body(new ZodValidationPipe(recordConsentSchema)) body: unknown
+  ) {
+    return this.leads.recordConsent(workspaceId, leadId, userId, body as never);
   }
 
   @Post(":leadId/notes")

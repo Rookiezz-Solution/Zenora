@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { hasActiveConsent } from "@zenora/shared";
 import { apiFetch, type ApiError } from "@/lib/api";
 import type { Lead, LeadProfile, TimelineEvent } from "@/lib/lead-types";
 import type { Sequence } from "@/lib/sequence-types";
@@ -40,6 +41,14 @@ export default function LeadProfilePage() {
     });
     setEnrollMessage(result.enrolled > 0 ? "Enrolled." : "Already enrolled in this sequence.");
     setTimeout(() => setEnrollMessage(null), 3000);
+  }
+
+  async function recordMarketingConsent(granted: boolean) {
+    if (!workspaceId) return;
+    const source = prompt(granted ? "How did they agree to receive marketing? (e.g. signed form, verbal on a call)" : "Why is this being withdrawn? (e.g. asked to stop on WhatsApp)");
+    if (!source || source.trim().length < 2) return;
+    await apiFetch(`/leads/${workspaceId}/${id}/consents`, { method: "POST", body: JSON.stringify({ type: "marketing", granted, source: source.trim() }) });
+    load();
   }
 
   async function addNote(e: React.FormEvent) {
@@ -213,6 +222,34 @@ export default function LeadProfilePage() {
           </button>
         </div>
         {enrollMessage && <p className="mt-1 text-xs text-gray-500">{enrollMessage}</p>}
+
+        <h2 className="mt-6 text-sm font-semibold text-gray-900">Marketing consent</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          {hasActiveConsent(lead.consents, "marketing") ? "Agreed to receive marketing." : "No marketing consent on record."}{" "}
+          <span className="text-xs text-gray-400">Only people who agreed are included in broadcasts to opted-in contacts and in customer lists for Meta ads.</span>
+        </p>
+        <div className="mt-2 flex gap-3 text-xs">
+          <button type="button" onClick={() => recordMarketingConsent(true)} className="text-brand-700 underline">
+            Record that they agreed
+          </button>
+          {hasActiveConsent(lead.consents, "marketing") && (
+            <button type="button" onClick={() => recordMarketingConsent(false)} className="text-red-600 underline">
+              Record a withdrawal
+            </button>
+          )}
+        </div>
+        {lead.consents.length > 0 && (
+          <ul className="mt-2 space-y-0.5 text-xs text-gray-500">
+            {[...lead.consents]
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .map((c) => (
+                <li key={c.id}>
+                  {new Date(c.createdAt).toLocaleDateString()} · {c.type.replace("_", " ")} · {c.granted ? "agreed" : "withdrawn"}
+                  {c.source ? ` · ${c.source}` : ""}
+                </li>
+              ))}
+          </ul>
+        )}
 
         <h2 className="mt-6 text-sm font-semibold text-gray-900">Notes</h2>
         <form onSubmit={addNote} className="mt-2 flex flex-col gap-2">

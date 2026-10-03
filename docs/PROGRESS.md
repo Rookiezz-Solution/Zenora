@@ -1,5 +1,23 @@
 # Zenora — build progress
 
+## 2026-10-14 — Phase 2 leftover: audience sync (as a consent-filtered customer list)
+
+**Default chosen, deliberately narrower than "sync"**: Meta's API for pushing customer lists needs the `ads_management` permission, which can change and create a business's ads. Zenora tells users it asks for **read-only** access (`ads_read`), so I did not widen that. Instead Zenora produces the file Meta's own **Customer list** upload accepts, and the owner uploads it in Ads Manager. **Nothing is sent to Meta from Zenora.**
+
+**Done** (Ads and sources → "Customer list for Meta ads")
+- A CSV with a `phone` header and one **SHA-256 hash** per line — digits only, with the country code (a 10-digit number is completed with 91 for India-timezone workspaces, never guessed elsewhere) — so the file never contains a readable number. Optional tag filter; each number appears once; owners/admins only; `Cache-Control: no-store`.
+- **Only people with active marketing consent are included.** The page shows "X can be included, out of Y contacts with a phone number (Z agreed to marketing)" and, when nobody has agreed, explains how to record it.
+- **Consent can now be recorded**: a "Marketing consent" section on the contact page ("Record that they agreed" / "Record a withdrawal", each with a required source such as "signed form"), backed by `POST /leads/:ws/:id/consents`. A withdrawal is a *new record*, never an edit, so there is always a trail; both are audit-logged.
+- Every export is audit-logged with who, how many and the tag — never the numbers or hashes.
+- **Compliance bug fixed on the way**: broadcasts' "opted-in only" filter treated anyone who had *ever* granted marketing consent as opted in, even after a later withdrawal. Consent is now "latest record wins" (`hasActiveConsent`), used by both broadcasts and the export.
+
+**Verified**: typecheck, lint, build, tests (shared 163, worker 77, api 350 = 590) green. Live (real Neon, API + web): consents recorded for four contacts (one agreed then withdrew, one never agreed, one agreed and tagged); preview said 4 contacts / 2 agreed / 2 uploadable and 1 for the tag; the exported file held exactly the two consenting people and its hashes matched an independent SHA-256 of `919876543210` and `919833333333` — the withdrawn and never-agreed contacts were absent and no plain number appears; a user outside the workspace got 403 on preview, export and recording consent; a consent without a source is rejected; the audit entry recorded count 2 and the destination only; the card and contact page render, and the contact who withdrew shows "No marketing consent on record". Test data deleted.
+
+**Open**
+- No automatic push to Meta (by design, see above), and nothing for Google Ads (user said Meta first).
+- Existing contacts have no marketing consent on record, so the list is empty until consent is captured: booking and link-in-bio only record consent to be contacted about an enquiry, not marketing. A marketing tick box on those forms is a product decision.
+- Matching on phone only (no emails or names); numbers entered without a country code outside India are uploaded as stored.
+
 ## 2026-10-13 — Phase 3: public template gallery and agency sharing
 
 The gallery had `all` / `mine` / `public`, and "public" only meant Zenora's built-in templates. Now people can share what they build, safely.
