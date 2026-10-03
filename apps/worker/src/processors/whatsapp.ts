@@ -3,12 +3,13 @@ import { enqueueStart } from "../automation-engine/queue";
 import { findMatchingAutomations } from "../automation-engine/trigger-matcher";
 import { publishInboxEvent } from "../realtime";
 import { findOrCreateConversation } from "./conversation";
+import { recordAdReferral } from "./lead-attribution";
 import { findOrCreateLeadByIdentity } from "./lead-identity";
 
 interface MessagesValue {
   metadata: { phone_number_id: string };
   contacts?: Array<{ profile?: { name?: string }; wa_id: string }>;
-  messages?: Array<{ id: string; from: string; timestamp: string; type: string; text?: { body: string } }>;
+  messages?: Array<{ id: string; from: string; timestamp: string; type: string; text?: { body: string }; referral?: unknown }>;
 }
 
 // docs/ROADMAP.md Phase 1 item 7: "Meta approval sync" — this is how a
@@ -58,6 +59,7 @@ async function processMessages(value: MessagesValue) {
       name: contact?.profile?.name,
       phone: message.from
     });
+    await recordAdReferral(lead.id, message.referral, "whatsapp");
     const conversation = await findOrCreateConversation(number.workspaceId, lead.id, "whatsapp");
     const created = await prisma.message.upsert({
       where: { externalId: message.id },

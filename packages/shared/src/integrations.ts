@@ -46,7 +46,7 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
   {
     id: "meta",
     title: "Meta (Instagram, WhatsApp, Ads)",
-    description: "One Meta app powers Instagram DMs, WhatsApp Cloud API and (next) Meta Ads.",
+    description: "One Meta app powers Instagram DMs, WhatsApp Cloud API and Meta Ads (ads_read for spend and attribution).",
     fields: [
       { key: "META_APP_ID", label: "App ID", secret: false, public: true },
       { key: "META_APP_SECRET", label: "App secret", secret: true },
@@ -57,6 +57,7 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
     required: ["META_APP_ID", "META_APP_SECRET", "META_WEBHOOK_VERIFY_TOKEN"],
     setupLinks: [
       { label: "Instagram OAuth redirect URI", path: "/channels/instagram/callback" },
+      { label: "Ads OAuth redirect URI", path: "/ads/meta/callback" },
       { label: "Webhook callback URL", path: "/webhooks/meta" }
     ]
   },

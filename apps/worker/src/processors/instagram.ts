@@ -3,6 +3,7 @@ import { enqueueStart } from "../automation-engine/queue";
 import { findMatchingAutomations } from "../automation-engine/trigger-matcher";
 import { publishInboxEvent } from "../realtime";
 import { findOrCreateConversation } from "./conversation";
+import { recordAdReferral } from "./lead-attribution";
 import { findOrCreateLeadByIdentity } from "./lead-identity";
 
 interface InstagramWebhookPayload {
@@ -13,7 +14,9 @@ interface InstagramWebhookPayload {
       sender: { id: string };
       recipient: { id: string };
       timestamp: number;
-      message?: { mid: string; text?: string; attachments?: unknown[] };
+      message?: { mid: string; text?: string; attachments?: unknown[]; referral?: unknown };
+      // Click-to-Instagram ads may put the referral beside `message` instead.
+      referral?: unknown;
     }>;
   }>;
 }
@@ -33,6 +36,7 @@ export async function processInstagramPayload(payload: unknown): Promise<void> {
       if (!event.message || event.sender.id === entry.id) continue;
 
       const lead = await findOrCreateLeadByIdentity(account.workspaceId, "ig_scoped_id", event.sender.id);
+      await recordAdReferral(lead.id, event.message.referral ?? event.referral, "instagram");
       const conversation = await findOrCreateConversation(account.workspaceId, lead.id, "instagram");
       const message = await prisma.message.upsert({
         where: { externalId: event.message.mid },

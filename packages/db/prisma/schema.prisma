@@ -290,11 +290,41 @@ model AdAccount {
   externalAccountId String
   accessTokenCipher String?
   connectedAt       DateTime @default(now())
+  // inactive = found on the user's Meta login but not chosen for tracking yet;
+  // active = synced; error = last sync failed (e.g. token expired, reconnect).
   status            String   @default("active")
+  name              String?
+  currency          String?
+  tokenExpiresAt    DateTime?
+  lastSyncedAt      DateTime?
+  lastError         String?
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  stats     AdDailyStat[]
 
+  @@unique([workspaceId, provider, externalAccountId])
   @@index([workspaceId])
+}
+
+// One row per ad per day, synced from Meta's Insights API. Spend is stored in
+// integer minor units (paise/cents) of the account currency.
+model AdDailyStat {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  adAccountId   String
+  date          String // "YYYY-MM-DD", the account's reporting day
+  adId          String
+  adName        String?
+  campaignId    String
+  campaignName  String
+  spendMinor    Int      @default(0)
+  impressions   Int      @default(0)
+  clicks        Int      @default(0)
+
+  adAccount AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([adAccountId, date, adId])
+  @@index([workspaceId, date])
 }
 
 // Raw inbound Meta webhook events. Signature-verified and stored before
@@ -332,6 +362,8 @@ model Lead {
   pipelineId  String?
   stageId     String?
   lostReason  String? // captured when moved to a lost-type stage (docs/PRD.md Reports section)
+  adId        String? // Meta ad that opened the chat (first-touch attribution)
+  adReferral  Json?
   mergedIntoId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -357,6 +389,7 @@ model Lead {
   @@index([workspaceId, pipelineId, stageId])
   @@index([workspaceId, ownerId])
   @@index([workspaceId, phone])
+  @@index([workspaceId, adId])
   @@index([workspaceId, email])
 }
 

@@ -1,5 +1,28 @@
 # Zenora — build progress
 
+## 2026-10-04 — Phase 2 item 8: Meta ads attribution (spend → leads → bookings → sales)
+
+**Scope decisions, from the user**: Meta first (Google Ads later); each workspace connects **its own** ad accounts by logging in with Facebook, never a shared Zenora account. Audience sync (uploading hashed phone numbers to Meta) is **not built** — it is a privacy / Meta-policy question to ask the user first.
+
+**Done**
+- **Connect**: Facebook Login with the single read-only scope `ads_read` (Zenora can see spend and results, never change or create ads). `GET /ads/:ws/connect` → Facebook → public `GET /ads/meta/callback` (identity from the signed `state`). Every ad account the user can see is saved **inactive** with the long-lived token encrypted (AES-GCM, same as channel tokens); the user ticks which to **Track**. Reconnecting refreshes the token and recovers an errored account but never flips tracking on/off. The token is never returned by any endpoint.
+- **Sync**: `POST /ads/:ws/sync` pulls the last 30 days of per-ad, per-day insights (spend, impressions, clicks) for tracked accounts into `AdDailyStat`. Idempotent upserts, so numbers Meta restates are simply refreshed. One failing account (e.g. expired token) is marked `error` with a reconnect message while the others still sync.
+- **Attribution**: first touch wins. WhatsApp `referral` (`source_type: "ad"`, `source_id`) and Instagram `referral.ad_id` on the first inbound message set `Lead.adId` + `Lead.adReferral`; later referrals never overwrite it (`updateMany … adId: null`, so webhook retries are harmless).
+- **Report** (`GET /ads/:ws/report?days=`): per campaign — spend, leads, cost per lead, bookings, cost per booking, won, cost per sale (null/“—” when the denominator is zero); leads from ads outside any tracked account; and a lead-source breakdown (Meta ads vs organic WhatsApp/Instagram vs link in bio etc.). Pure maths in `packages/shared/src/ads.ts` (12 tests).
+- **UI** `/sources` (“Ads and sources”): connect/reconnect, per-account Track toggle + Remove + last-synced/error text, Sync now, campaign table, source bars, 7/30/90-day filter. The Meta card in the platform-admin dashboard now lists the **Ads OAuth redirect URI** to register.
+- Schema: `AdAccount` extended, new `AdDailyStat`, `Lead.adId/adReferral` (migration `20261004150000_meta_ads_attribution`).
+
+**Verified**
+- Typecheck, lint, tests (shared 81, worker 57, api 212 = 350) and build all green.
+- Live (real Neon/Redis, real dev servers, browser pane): connect with no Meta app configured → clean 400 pointing to the admin dashboard; sync with nothing tracked → clean 400; cross-workspace account id → 404; real worker referral processing: ad leads got `adId`, organic lead did not, a second referral on the same lead did **not** overwrite the first; report, campaign table and source bars matched the seeded numbers; Track toggle, Sync failure path (account flagged + message shown) exercised in the UI. Test data deleted.
+- **Bug caught live**: Track/Remove returned an empty body, which the web `apiFetch` can’t parse → red error banner and a stale checkbox. Endpoints now return `{ ok: true }` (regression test added).
+
+**Not verified / open**
+- No real Meta app exists yet, so the OAuth round trip and the Graph insights call are unit-tested against mocked responses only. **Instagram’s referral field shape is uncertain** (`referral.ad_id` on the message vs beside it — both are read) and must be confirmed with a real Click-to-Instagram ad.
+- “Qualified” is not a report column: there is no qualified-when builder yet.
+- Insights are only refreshed by **Sync now**; no scheduled sync yet. Long-lived tokens last ~60 days, after which the account shows “reconnect”.
+- Google Ads and audience sync (privacy / policy check-in first) not started. Telephony stays paused.
+
 ## 2026-10-04 — Platform admin dashboard: integrations configured by a super admin (not `.env`)
 
 **Scope decision, from the user**: all third-party integrations should be configured later by a **super admin from a dashboard**, with space for every functionality, rather than by editing `.env`. This pulls the first slice of Phase 3's "owner console" forward. It stores credentials only — no pricing, privacy or Meta-policy change and no new third-party service — so no check-in was needed beyond the user's own instruction.
