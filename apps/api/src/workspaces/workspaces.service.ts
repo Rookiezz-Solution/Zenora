@@ -3,6 +3,7 @@ import * as crypto from "node:crypto";
 import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
 import { UsageService } from "../billing/usage.service";
+import { ReferralsService } from "../referrals/referrals.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
   CreateWorkspaceDto,
@@ -19,7 +20,8 @@ export class WorkspacesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly usage: UsageService
+    private readonly usage: UsageService,
+    private readonly referrals: ReferralsService
   ) {}
 
   async create(userId: string, dto: CreateWorkspaceDto) {
@@ -31,6 +33,7 @@ export class WorkspacesService {
         memberships: { create: { userId, role: "owner" } }
       }
     });
+    await this.referrals.attribute(workspace.id, userId, dto.ref);
     await this.audit.log({
       workspaceId: workspace.id,
       userId,

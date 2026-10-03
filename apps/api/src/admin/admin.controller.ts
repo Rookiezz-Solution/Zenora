@@ -4,6 +4,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PrismaService } from "../prisma/prisma.service";
+import { ReferralsService } from "../referrals/referrals.service";
 import { OwnerConsoleService } from "./owner-console.service";
 import { PlatformSettingsService } from "./platform-settings.service";
 import { SuperAdminGuard, isSuperAdminEmail } from "./super-admin.guard";
@@ -13,18 +14,32 @@ const putSettingSchema = z.object({ value: z.string().max(500) });
 const limitValue = z.number().int().min(0).max(10_000_000).nullable().optional();
 const setLimitsSchema = z.object({ contacts: limitValue, users: limitValue, instagramAccounts: limitValue, note: z.string().trim().max(200).nullable().optional() });
 const grantCreditsSchema = z.object({ amount: z.number().int().min(1).max(100_000), reason: z.string().trim().min(3).max(200) });
+const payoutSchema = z.object({ referrerUserId: z.string().min(1), reference: z.string().trim().min(3).max(120), partnerInvoiceRef: z.string().trim().max(60).optional() });
 
 @Controller("admin")
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class AdminController {
   constructor(
     private readonly settings: PlatformSettingsService,
-    private readonly owner: OwnerConsoleService
+    private readonly owner: OwnerConsoleService,
+    private readonly referrals: ReferralsService
   ) {}
 
   @Get("overview")
   overview() {
     return this.owner.summary();
+  }
+
+  @Get("referrals")
+  referralsOwed() {
+    return this.referrals.owed();
+  }
+
+  // Records a payment you made outside Zenora; nothing is paid from here.
+  @Post("referrals/payouts")
+  recordPayout(@CurrentUser() userId: string, @Body(new ZodValidationPipe(payoutSchema)) body: unknown) {
+    const { referrerUserId, reference, partnerInvoiceRef } = body as z.infer<typeof payoutSchema>;
+    return this.referrals.recordPayout(userId, referrerUserId, reference, partnerInvoiceRef);
   }
 
   @Get("workspaces")

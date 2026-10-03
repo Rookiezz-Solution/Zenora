@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { computeCheckoutAmount, TOPUP_CREDITS, type CheckoutIntent } from "@zenora/shared";
 import { PrismaService } from "../prisma/prisma.service";
+import { ReferralsService } from "../referrals/referrals.service";
 import { RazorpayClient } from "./razorpay.client";
 import type { ConfirmPaymentDto, CreateCheckoutOrderDto, UpdateBillingProfileDto } from "./dto/billing.dto";
 
@@ -12,7 +13,8 @@ export class BillingService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly razorpay: RazorpayClient
+    private readonly razorpay: RazorpayClient,
+    private readonly referrals: ReferralsService
   ) {}
 
   async getOverview(workspaceId: string) {
@@ -62,6 +64,7 @@ export class BillingService {
     }
     const intent = JSON.parse(order.notes.payload ?? "{}") as CheckoutIntent;
     await this.applyPayment(workspaceId, intent, dto.razorpayOrderId, dto.razorpayPaymentId);
+    await this.referrals.accrueForPayment(dto.razorpayPaymentId);
     return { status: "paid" };
   }
 
@@ -82,6 +85,7 @@ export class BillingService {
     }
     const intent = JSON.parse(payment.notes.payload ?? "{}") as CheckoutIntent;
     await this.applyPayment(workspaceId, intent, payment.order_id, payment.id);
+    await this.referrals.accrueForPayment(payment.id);
   }
 
   private async applyPayment(workspaceId: string, intent: CheckoutIntent, orderId: string, paymentId: string): Promise<void> {

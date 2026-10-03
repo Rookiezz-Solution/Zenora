@@ -25,6 +25,7 @@ const NAV_ITEMS: { href: string; label: string; soon?: boolean }[] = [
   { href: "/sources", label: "Ads and sources" },
   { href: "/settings/link-in-bio", label: "Link in bio" },
   { href: "/reports", label: "Reports" },
+  { href: "/referrals", label: "Refer and earn" },
   { href: "/settings", label: "Settings" }
 ];
 

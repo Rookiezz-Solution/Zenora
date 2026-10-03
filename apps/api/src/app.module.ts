@@ -20,6 +20,7 @@ import { LinkInBioModule } from "./link-in-bio/link-in-bio.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PipelinesModule } from "./pipelines/pipelines.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ReferralsModule } from "./referrals/referrals.module";
 import { QueueModule } from "./queue/queue.module";
 import { QuickRepliesModule } from "./quick-replies/quick-replies.module";
 import { RealtimeModule } from "./realtime/realtime.module";
@@ -60,6 +61,7 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     AdminModule,
     AdsModule,
     AgenciesModule,
+    ReferralsModule,
     DevelopersModule
   ],
   controllers: [HealthController]

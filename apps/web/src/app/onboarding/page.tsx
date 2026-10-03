@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { WORKSPACE_ROLES } from "@zenora/shared";
 import { apiFetch } from "@/lib/api";
+import { clearReferral, pendingReferral } from "@/lib/referral-capture";
 import type { Automation, FlowTemplate } from "@/lib/automation-types";
 import { startWhatsappEmbeddedSignup } from "@/lib/whatsapp-embedded-signup";
 
@@ -55,8 +56,9 @@ export default function OnboardingPage() {
     try {
       const workspace = await apiFetch<{ id: string }>("/workspaces", {
         method: "POST",
-        body: JSON.stringify({ name: name.trim(), mode, industry })
+        body: JSON.stringify({ name: name.trim(), mode, industry, ref: pendingReferral() })
       });
+      clearReferral();
       setWorkspaceId(workspace.id);
       setStep(1);
     } catch (err) {

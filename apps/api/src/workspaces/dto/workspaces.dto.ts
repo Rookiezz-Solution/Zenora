@@ -4,7 +4,9 @@ import { WORKSPACE_ROLES } from "@zenora/shared";
 export const createWorkspaceSchema = z.object({
   name: z.string().min(1),
   mode: z.enum(["team", "creator"]).default("team"),
-  industry: z.string().optional()
+  industry: z.string().optional(),
+  // A referral code captured from a referral link; silently ignored if it is not valid.
+  ref: z.string().max(20).optional()
 });
 export type CreateWorkspaceDto = z.infer<typeof createWorkspaceSchema>;
 

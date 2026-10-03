@@ -1,6 +1,7 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "../prisma/prisma.service";
+import type { ReferralsService } from "../referrals/referrals.service";
 import { BillingService } from "./billing.service";
 import type { RazorpayClient } from "./razorpay.client";
 
@@ -27,7 +28,8 @@ function makeRazorpay(overrides: Partial<Record<keyof RazorpayClient, unknown>> 
 }
 
 function makeService(client: ReturnType<typeof makeClient>, razorpay = makeRazorpay()) {
-  return { service: new BillingService({ client } as unknown as PrismaService, razorpay), razorpay };
+  const referrals = { accrueForPayment: vi.fn().mockResolvedValue(undefined) };
+  return { service: new BillingService({ client } as unknown as PrismaService, razorpay, referrals as unknown as ReferralsService), razorpay, referrals };
 }
 
 describe("BillingService.createCheckoutOrder", () => {
@@ -76,9 +78,10 @@ describe("BillingService.confirmPayment", () => {
         notes: { workspaceId: "ws1", kind: "plan", payload: JSON.stringify({ kind: "plan", planId: "growth", billingCycle: "monthly" }) }
       })
     });
-    const { service } = makeService(client, razorpay);
+    const { service, referrals } = makeService(client, razorpay);
 
     await service.confirmPayment("ws1", { razorpayOrderId: "o1", razorpayPaymentId: "p1", razorpaySignature: "sig" });
+    expect(referrals.accrueForPayment).toHaveBeenCalledWith("p1"); // referral commission is computed once the invoice exists
 
     expect(client.subscription.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { workspaceId: "ws1" }, update: expect.objectContaining({ planId: "growth", status: "active" }) })

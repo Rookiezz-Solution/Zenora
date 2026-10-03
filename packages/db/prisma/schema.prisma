@@ -59,6 +59,7 @@ model Workspace {
   apiKeys           ApiKey[]
   limitOverride     WorkspaceLimitOverride?
   agency            Agency? @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  referral          Referral?
   webhookEndpoints  WebhookEndpoint[]
 
   leads         Lead[]
@@ -125,6 +126,7 @@ model User {
 
   memberships  Membership[]
   agencyMemberships AgencyMember[]
+  referralCode      ReferralCode?
   otpCodes     OtpCode[]
   auditLogs    AuditLog[]
   assignments  Assignment[]
@@ -1238,4 +1240,66 @@ model AgencyMember {
 
   @@unique([agencyId, userId])
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — refer and earn. Commission is a ledger: Zenora records what is owed
+// and what was paid; any actual payment happens outside the app.
+// ---------------------------------------------------------------------------
+
+model ReferralCode {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One row per referred business. Attribution is fixed when the workspace is
+// created; a workspace can only ever be referred once.
+model Referral {
+  id                  String   @id @default(cuid())
+  referrerUserId      String
+  referredWorkspaceId String   @unique
+  code                String
+  createdAt           DateTime @default(now())
+
+  referredWorkspace Workspace         @relation(fields: [referredWorkspaceId], references: [id], onDelete: Cascade)
+  commissions       CommissionEntry[]
+
+  @@index([referrerUserId])
+}
+
+model CommissionEntry {
+  id         String   @id @default(cuid())
+  referralId String
+  invoiceId  String   @unique // one commission per paid invoice, ever
+  baseInr    Int // invoice amount before GST
+  pct        Int
+  amountInr  Int
+  status     String   @default("accrued") // accrued | paid | void
+  payoutId   String?
+  createdAt  DateTime @default(now())
+
+  referral Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  payout   Payout?  @relation(fields: [payoutId], references: [id])
+
+  @@index([referralId])
+  @@index([status])
+}
+
+// A payment the platform owner made to a referrer outside Zenora, recorded here.
+model Payout {
+  id               String   @id @default(cuid())
+  referrerUserId   String
+  amountInr        Int
+  reference        String // e.g. bank transfer / UTR reference
+  partnerInvoiceRef String? // the referrer's GST invoice number this settles
+  paidById         String
+  createdAt        DateTime @default(now())
+
+  entries CommissionEntry[]
+
+  @@index([referrerUserId])
 }

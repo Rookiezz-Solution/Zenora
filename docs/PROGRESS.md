@@ -1,5 +1,24 @@
 # Zenora — build progress
 
+## 2026-10-09 — Phase 3: referral and commission tracking, payouts ledger
+
+**Defaults chosen** (the PRD left `[X]%` / `[N] months` as placeholders and I was told to use defaults): **20% commission for 12 months**, **30-day attribution window**, in `packages/shared/src/referrals.ts` (one edit to change). Commission is on the invoice amount **before GST**, on every paid invoice (plans, add-ons, top-ups) of a referred workspace.
+
+**Done**
+- **Referral link and code**: every user gets one 8-character code (no 0/O/1/I) the first time they open **Refer and earn** (`/referrals`). The link is `/r/CODE`; it stores the code in the browser for 30 days, sends the visitor to sign-up, and onboarding passes it when the first workspace is created. Invalid, expired, unknown, already-used and **self-owned** codes are silently ignored so they can never block sign-up or let anyone probe which codes exist. A workspace can be referred only once (unique).
+- **Commission accrual**: after a payment is applied (client callback and Razorpay webhook), a `CommissionEntry` is created from the paid invoice: once per invoice (unique), only within 12 months of the referral, never on a workspace the referrer belongs to. Accrual can never fail the customer's payment (errors are logged).
+- **Partner page**: the link (copy button), terms, businesses referred (name, join date, plan, what you earned — nothing about their data), owed vs paid, payout history.
+- **Payouts are a ledger only**: **no money is moved by Zenora.** `/admin/referrals` (super admin) lists who is owed what; after paying someone yourself against their GST invoice you "Record payment" with the bank reference (and their invoice number). That settles exactly the commissions owed at that instant, in one transaction that rolls back if anything changed underneath; it is audit-logged. The old "Referral payouts — Soon" sidebar entry is now real.
+- Schema: `ReferralCode`, `Referral`, `CommissionEntry`, `Payout` (migration `20261009090000_referrals`).
+
+**Verified**: typecheck, lint, build, tests (shared 137, worker 75, api 272 = 484) green. Live (real Neon, API + web, browser): a code is stable across calls; a referrer using their own code and a made-up code created workspaces with **no** referral; a referred business typed in lowercase was attributed; with two paid invoices (₹1,499 → ₹300, ₹2,199 → ₹440), a duplicate call and a failed invoice, exactly two commissions existed; the partner's view showed ₹740 owed; a normal user got 403 on both admin routes; short references are rejected; recording the payout moved ₹740 from owed to paid with its reference and invoice number, a second attempt returned "nothing owed"; `/r/CODE` stored the code and landed on sign-up; the partner page rendered correctly. Test data deleted.
+
+**Not done / open**
+- Real Razorpay payments weren't involved (no credentials): accrual is verified through the service against real invoice rows, and the billing flow's call to it is unit-tested.
+- **No refund handling**: there is no refund flow in billing yet, so nothing voids a commission when an invoice is refunded (`CommissionEntry.status` already has a `void` value for it).
+- No TDS/withholding or GST invoice generation for partners; that stays a manual step outside the app. Commission cost is not yet included in the owner-console margin.
+- Agency-created client workspaces don't carry a referral code (an agency is not a referral).
+
 ## 2026-10-08 — Phase 3: agency multi-workspace
 
 **Done**
