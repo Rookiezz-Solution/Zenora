@@ -10,15 +10,15 @@ import { useCurrentWorkspace } from "@/lib/use-workspace";
 // Nav order matches design/screens (Dashboard.dc.html / workspace shell) and
 // docs/PRD.md section 3. Icons come later with the shadcn/ui pass — labels
 // and structure are what Phase 0's app shell needs to match.
-const NAV_ITEMS = [
+const NAV_ITEMS: { href: string; label: string; soon?: boolean }[] = [
   { href: "/dashboard", label: "Home" },
   { href: "/inbox", label: "Inbox" },
   { href: "/leads", label: "Leads" },
   { href: "/pipeline", label: "Leads board" },
   { href: "/automations", label: "Automations" },
   { href: "/calendar", label: "Calendar" },
-  { href: "/calls", label: "Calls" },
-  { href: "/meetings", label: "Meetings" },
+  { href: "/calls", label: "Calls", soon: true },
+  { href: "/meetings", label: "Meetings", soon: true },
   { href: "/tasks", label: "Tasks and follow-ups" },
   { href: "/broadcasts", label: "Broadcasts and templates" },
   { href: "/settings/knowledge", label: "AI knowledge" },
@@ -50,6 +50,7 @@ export function Sidebar() {
                   }`}
                 >
                   {item.label}
+                  {item.soon && <span className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Soon</span>}
                 </Link>
               </li>
             );

@@ -90,6 +90,9 @@ model Workspace {
   faqs             Faq[]
   aiSettings       AiSettings?
   linkInBio        LinkInBioPage?
+  calendarAccounts CalendarAccount[]
+  appointmentTypes AppointmentType[]
+  appointments     Appointment[]
 
   @@index([planId])
 }
@@ -1006,4 +1009,62 @@ model LinkInBioPage {
   updatedAt   DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 item 7 — Calendar and booking (Google Calendar, docs/PRD.md section 11)
+// ---------------------------------------------------------------------------
+
+// One per user per workspace: each team member connects their own Google
+// account via OAuth. Tokens are encrypted at rest like every channel token.
+model CalendarAccount {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  userId             String
+  googleEmail        String?
+  refreshTokenCipher String
+  status             String    @default("active") // active | revoked
+  connectedAt        DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model AppointmentType {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  hostUserId   String
+  name         String
+  durationMin  Int
+  bufferMin    Int      @default(0)
+  minNoticeMin Int      @default(60)
+  availability Json // [{ day: 0-6, start: "HH:MM", end: "HH:MM" }] in the workspace timezone
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+}
+
+model Appointment {
+  id                String   @id @default(cuid())
+  workspaceId       String
+  appointmentTypeId String
+  leadId            String?
+  hostUserId        String
+  startsAt          DateTime
+  endsAt            DateTime
+  status            String   @default("booked") // booked | cancelled
+  guestName         String
+  guestPhone        String
+  googleEventId     String?
+  createdAt         DateTime @default(now())
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appointmentType AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, startsAt])
+  @@index([hostUserId, startsAt])
 }

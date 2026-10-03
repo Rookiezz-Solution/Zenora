@@ -12,3 +12,4 @@ export * from "./sequences";
 export * from "./billing";
 export * from "./knowledge";
 export * from "./link-in-bio";
+export * from "./scheduling";

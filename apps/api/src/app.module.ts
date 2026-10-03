@@ -4,6 +4,7 @@ import { AuthModule } from "./auth/auth.module";
 import { AutomationsModule } from "./automations/automations.module";
 import { BillingModule } from "./billing/billing.module";
 import { BroadcastsModule } from "./broadcasts/broadcasts.module";
+import { CalendarModule } from "./calendar/calendar.module";
 import { ChannelsModule } from "./channels/channels.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { FlowTemplatesModule } from "./flow-templates/flow-templates.module";
@@ -50,7 +51,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     KnowledgeModule,
     NotificationsModule,
     ReportsModule,
-    LinkInBioModule
+    LinkInBioModule,
+    CalendarModule
   ],
   controllers: [HealthController]
 })

@@ -1,5 +1,30 @@
 # Zenora — build progress
 
+## 2026-10-04 — Phase 2 item 7: Calendar and booking (Google Calendar) + telephony paused
+
+**Scope decisions, from the user**: calendar uses **Google Calendar** (not Microsoft); each team member connects their own account by signing in with Google. Ads attribution will start with **Meta only** (Google Ads later), also connected by each user logging in (next item). **Telephony is paused** and shown as "Coming soon" in the UI (also applied to Meetings, the same paused provider group — meeting bot).
+
+**Done**
+- **Telephony paused**: new `ComingSoon` component and `/calls` + `/meetings` pages (both were dead links before), with a "Soon" badge on the sidebar entries.
+- `packages/shared/src/scheduling.ts`: pure, timezone-aware slot calculator — availability windows × existing busy intervals × buffer (applied both sides) × minimum notice, plus `isSlotAvailable` so a booking is only accepted for a slot that would have been offered. DST-correct (`zonedTimeToUtc` is two-pass). 11 tests incl. a DST zone.
+- `packages/db`: `CalendarAccount` (per user per workspace; encrypted Google refresh token), `AppointmentType` (host, duration, buffer, minimum notice, weekly availability windows in the workspace timezone), `Appointment`. Two migrations (the second drops a `slug` column I'd added and then replaced with the unguessable type id in public URLs).
+- `apps/api/src/calendar`: `GoogleCalendarClient` (consent URL with offline access + calendar scopes, code→refresh-token exchange, free/busy, event creation; clear 400 when `GOOGLE_CLIENT_ID/SECRET` aren't set); `CalendarService`; owner endpoints (connect/status/disconnect, appointments, appointment-type CRUD under `settings.manage`, host must be a workspace member); public unauthenticated `GET/POST /public/booking/:typeId[/slots|/book]`. The OAuth callback reuses the signed-state pattern from Instagram connect, and its controller is registered first so it can't be shadowed by `calendar/:workspaceId/*`.
+- **Booking rules**: dates must be in the future and within 60 days; the server re-derives availability and refuses any time that isn't an offered slot; the guest's lead is captured with a recorded consent (same default sentence the user approved for link in bio) via a new shared `captureLeadWithConsent` helper (also now used by link in bio — duplicate numbers get a consent record, not a duplicate lead); the host is notified in-app; 5 bookings per IP per page per 10 minutes via a new shared `RateLimiter` (link in bio refactored onto it).
+- **Google behaviour**: a connected host's real calendar blocks slots; if the Google lookup fails it **fails closed** (503, no slots) rather than risk double-booking; if adding the event to Google fails after booking, the booking is kept and the failure logged.
+- `apps/web`: `/calendar` (Connect Google / connected-as / disconnect, a 14-day agenda grouped by day, appointment-type manager with duration/buffer/weekday windows and a shareable `/book/<id>` link) and the public `/book/[typeId]` page (date picker, slots in the business timezone, name + phone + consent tick box).
+- Tests: 11 shared + 14 calendar service + 6 Google client — 300 total (shared 61, worker 55, api 184). typecheck/lint/test/build green.
+
+**Verified live**: configuring an appointment type rejected reversed times and a non-member host; Connect Google returned the clean "isn't configured yet" 400 (no credentials in this environment); the public page offered 47 slots for a 00:00–23:30 window; booked 10:00 through the real page (submit disabled until consent was ticked) — afterwards that slot disappeared (46 left), booking it again, an off-grid time and a past date were all refused (400), and the lead (routed to an owner), consent record with the exact sentence, appointment and in-app notification all existed; `/calendar` showed the booking in the agenda and the Connect link; `/calls` showed "Coming soon" and the sidebar badges rendered. Test data deleted afterward.
+
+**Not verified live**: the Google side (connect, busy-time blocking, event creation) — needs real Google OAuth client credentials, so it is unit-tested against mocked responses only. To enable: create a Google Cloud OAuth client, add `http://localhost:4000/calendar/google/callback` (and the production equivalent) as a redirect URI, enable the Calendar API, and set `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`. Google may require app verification for the calendar scopes before non-test users can connect.
+
+**Simplifications / follow-ups**
+- **WhatsApp booking reminders and no-show follow-up** (PRD) aren't built — they need approved WhatsApp templates; follow-up item.
+- No reschedule/cancel for guests, no holidays/blocked dates, one host per appointment type (no round-robin), no Meet link on the event, no Microsoft calendar.
+- Two guests submitting the same slot at the same instant could both pass the availability check (no database-level uniqueness); the window is tiny and a later check would catch it, but it is not closed.
+- The agenda is a 14-day list, not the design's week grid.
+- The rate limiter is per API process (shared limiter needed if the API scales out).
+
 ## 2026-10-03 — Phase 2 item 6: Link in bio (public page + call-back form with consent)
 
 **Scope decision, checked with the user first**: the public call-back form collects personal data, so per the standing privacy rule the user was asked about the consent wording, what happens to submissions, and which actions the page offers. They answered "use your defaults": consent sentence **"I agree to be contacted about my enquiry."**, each submission becomes a lead with a recorded consent, and the page offers a WhatsApp button, a brochure link and the call-back form. Booking is left out — the calendar doesn't exist yet.

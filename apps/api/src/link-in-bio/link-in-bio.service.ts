@@ -1,17 +1,15 @@
-import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { LINK_IN_BIO_CONSENT_TEXT, normalizePhone } from "@zenora/shared";
+import { captureLeadWithConsent } from "../common/public-lead";
+import { RateLimiter } from "../common/rate-limiter";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoutingEngineService } from "../routing/routing-engine.service";
 import type { CallbackRequestDto, UpsertLinkInBioDto } from "./link-in-bio.dto";
 
-const WINDOW_MS = 10 * 60_000;
-const MAX_PER_WINDOW = 5;
 
 @Injectable()
 export class LinkInBioService {
-  // Per-process, per ip+slug. Good enough to blunt a casual flood on a single
-  // API instance; a shared limiter (Redis) is a follow-up if this scales out.
-  private readonly hits = new Map<string, number[]>();
+  private readonly limiter = new RateLimiter(5, 10 * 60_000);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -51,32 +49,22 @@ export class LinkInBioService {
   // and the response is identical either way so a visitor can't probe which
   // numbers the business already has.
   async submitCallback(slug: string, ip: string, dto: CallbackRequestDto) {
-    this.enforceRateLimit(`${ip}:${slug}`);
+    this.limiter.consume(`${ip}:${slug}`);
 
     const page = await this.prisma.client.linkInBioPage.findUnique({ where: { slug } });
     if (!page || !page.published) throw new NotFoundException("Page not found");
     const phone = normalizePhone(dto.phone);
     if (!phone) throw new BadRequestException("Enter a valid phone number");
 
-    const existing = await this.prisma.client.lead.findFirst({ where: { workspaceId: page.workspaceId, phone, mergedIntoId: null } });
-    const consent = { type: "data_processing", granted: true, source: `link_in_bio:${slug} | ${LINK_IN_BIO_CONSENT_TEXT}` };
-
-    if (existing) {
-      await this.prisma.client.consent.create({ data: { leadId: existing.id, ...consent } });
-      return { ok: true };
-    }
-
-    const lead = await this.prisma.client.lead.create({
-      data: { workspaceId: page.workspaceId, name: dto.name, phone, source: "link_in_bio", consents: { create: consent } }
+    const { leadId, created } = await captureLeadWithConsent(this.prisma, {
+      workspaceId: page.workspaceId,
+      name: dto.name,
+      phone,
+      source: "link_in_bio",
+      consentSource: `link_in_bio:${slug} | ${LINK_IN_BIO_CONSENT_TEXT}`
     });
-    await this.routing.applyToNewLead(page.workspaceId, lead.id);
+    if (created) await this.routing.applyToNewLead(page.workspaceId, leadId);
     return { ok: true };
   }
 
-  private enforceRateLimit(key: string) {
-    const now = Date.now();
-    const recent = (this.hits.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
-    if (recent.length >= MAX_PER_WINDOW) throw new HttpException("Too many requests — try again later", HttpStatus.TOO_MANY_REQUESTS);
-    this.hits.set(key, [...recent, now]);
-  }
 }
