@@ -332,3 +332,23 @@ describe("LeadsService.addTag", () => {
     await expect(service.addTag("ws1", "lead1", "user1", { name: "hot" })).resolves.toMatchObject({ id: "tag1" });
   });
 });
+
+describe("LeadsService.listMine", () => {
+  it("returns only the caller's open, unmerged leads with their next open task", async () => {
+    const findMany = vi.fn().mockResolvedValue([{ id: "l1" }]);
+    const prisma = { client: { lead: { findMany } } } as unknown as PrismaService;
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents());
+
+    const result = await service.listMine("ws1", "user1");
+
+    expect(result).toEqual([{ id: "l1" }]);
+    const args = findMany.mock.calls[0]![0];
+    expect(args.where).toEqual({
+      workspaceId: "ws1",
+      ownerId: "user1",
+      mergedIntoId: null,
+      OR: [{ stageId: null }, { stage: { type: "open" } }]
+    });
+    expect(args.select.tasks).toMatchObject({ where: { completedAt: null }, orderBy: { dueAt: "asc" }, take: 1 });
+  });
+});

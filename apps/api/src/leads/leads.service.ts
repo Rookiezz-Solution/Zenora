@@ -50,6 +50,27 @@ export class LeadsService {
     });
   }
 
+
+  // Mobile "my leads" (docs/PRD.md `MobileLead`): leads the caller owns, each
+  // with its earliest open task so the client can bucket due/overdue.
+  async listMine(workspaceId: string, userId: string) {
+    return this.prisma.client.lead.findMany({
+      where: { workspaceId, ownerId: userId, mergedIntoId: null, OR: [{ stageId: null }, { stage: { type: "open" } }] },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        source: true,
+        score: true,
+        stage: { select: { name: true } },
+        tags: { select: { tag: { select: { name: true } } } },
+        tasks: { where: { completedAt: null }, orderBy: { dueAt: "asc" }, take: 1, select: { id: true, title: true, dueAt: true } }
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 200
+    });
+  }
+
   async getById(workspaceId: string, leadId: string) {
     const lead = await this.prisma.client.lead.findFirst({
       where: { id: leadId, workspaceId },

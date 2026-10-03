@@ -1,4 +1,21 @@
 # Zenora — build progress
+## 2026-10-03 — Phase 2 item 5: Mobile web "my leads" view
+
+**Scope decision**: chosen over link in bio because link in bio includes a public call-back form that collects personal data with a consent notice (docs/PRD.md) — privacy-adjacent, so it needs a check-in with the user first (consent wording, where submissions land). This view is authenticated, uses existing data, and needs no new service, billing or policy change.
+
+**Done**
+- `GET /leads/:ws/mine` (`LeadsService.listMine`, `leads.read`): the caller's open, unmerged leads, each with stage, tags and its earliest open task. Declared before `:leadId` so it isn't swallowed as an id.
+- `/m/leads` (`apps/web/src/app/m/leads`, outside the desktop sidebar shell): phone-width list matching design `MobileLead` — filter pills (All / Due now / Today / Overdue, with counts), a card per lead with a due-status chip and Call (`tel:`) / WhatsApp (`wa.me`) / Open buttons, bottom nav. Bucketing and phone-number helpers are pure functions in `lib/mobile-leads.ts`.
+- Tests: 1 new API test (query scoping and next-task selection) — 257 total (shared 46, worker 55, api 156). typecheck/lint/test/build green.
+
+**Verified live**: with real data at a 375px viewport, the page showed the correct pill counts, chips (Overdue / Due now), working `tel:` and `wa.me` links, a "No phone on file" fallback, the Overdue filter narrowing to one card, and no horizontal scroll. Test data deleted afterward.
+
+**Simplifications / follow-ups**
+- No Appointments pill and no Calls tab — calendar and telephony don't exist yet.
+- The web package has no test runner, so the bucketing helper is covered by the live check rather than unit tests.
+- Open goes to the desktop lead profile, which isn't mobile-optimised; a mobile profile is a follow-up.
+- No auth redirect: logged-out visitors see "Log in to see your leads", same as other pages here.
+
 
 ## 2026-10-03 — Phase 2 item 4: Custom trigger builder (tag_added event, AND conditions, limits, My triggers)
 

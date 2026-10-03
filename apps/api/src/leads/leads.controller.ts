@@ -57,6 +57,11 @@ export class LeadsController {
     return this.leads.merge(workspaceId, userId, body as never);
   }
 
+  @Get("mine")
+  mine(@Param("workspaceId") workspaceId: string, @CurrentUser() userId: string) {
+    return this.leads.listMine(workspaceId, userId);
+  }
+
   @Get(":leadId")
   getById(@Param("workspaceId") workspaceId: string, @Param("leadId") leadId: string) {
     return this.leads.getById(workspaceId, leadId);
