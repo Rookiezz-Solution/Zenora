@@ -44,13 +44,18 @@ export async function sendWhatsappTemplate(
   to: string,
   templateName: string,
   languageCode: string,
-  accessToken: string
+  accessToken: string,
+  bodyParams: string[] = []
 ): Promise<string> {
   const body = (await post(`/${phoneNumberId}/messages`, accessToken, {
     messaging_product: "whatsapp",
     to,
     type: "template",
-    template: { name: templateName, language: { code: languageCode } }
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      ...(bodyParams.length ? { components: [{ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text })) }] } : {})
+    }
   })) as { messages: Array<{ id: string }> };
   return body.messages[0]!.id;
 }

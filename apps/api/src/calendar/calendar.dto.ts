@@ -1,3 +1,4 @@
+import { MAX_REMINDER_HOURS } from "@zenora/shared";
 import { z } from "zod";
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
@@ -13,7 +14,10 @@ export const appointmentTypeSchema = z.object({
   bufferMin: z.number().int().min(0).max(120).default(0),
   minNoticeMin: z.number().int().min(0).max(10_080).default(60),
   availability: z.array(windowSchema).min(1),
-  active: z.boolean().default(true)
+  active: z.boolean().default(true),
+  // WhatsApp reminder to the guest N hours before; both set, or both null.
+  reminderHoursBefore: z.number().int().min(1).max(MAX_REMINDER_HOURS).nullable().optional(),
+  reminderTemplateId: z.string().min(1).nullable().optional()
 });
 export type AppointmentTypeDto = z.infer<typeof appointmentTypeSchema>;
 

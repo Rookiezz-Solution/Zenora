@@ -9,6 +9,7 @@ export const QUEUE_NAMES = [
   "broadcasts",
   "billing",
   "routing",
-  "sequences"
+  "sequences",
+  "appointments"
 ] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];

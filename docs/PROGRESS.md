@@ -1,5 +1,25 @@
 # Zenora — build progress
 
+## 2026-10-05 — Phase 2: booking reminders (WhatsApp)
+
+**Done**
+- **Per appointment type**: "WhatsApp reminder — N hours before (1/2/4/12/24/48)" plus an **approved** WhatsApp template, set when creating a type or changed on an existing one (`/calendar`). Both or neither; the API rejects a template that is missing, from another workspace, not yet approved by Meta, or has more than 5 variables, and caps timing at 72h.
+- **Template variables** are filled automatically: `{{1}}` guest name, `{{2}}` date and time in the workspace timezone (e.g. "Tue, 7 Oct, 10:30 am"), `{{3}}` appointment type; any further placeholder gets "-" so the parameter count always matches what Meta expects. `sendWhatsappTemplate` gained optional body parameters (broadcasts are unchanged).
+- **Sending**: a BullMQ job scheduler (`reminder-sweep`, every 5 min, new `appointments` queue) scans booked appointments starting within 72h. A sweep rather than one delayed job per booking: it survives config changes and cancellations, and BullMQ delays can't reach a booking made 60 days ahead. Each appointment gets **one** attempt; `reminderStatus` is `sent` or `failed` (+ `reminderError`) either way, so a flaky send can never repeat to a guest. A booking made *inside* the reminder window gets no reminder (the guest was just told). The sent template also appears in the lead's WhatsApp thread in the inbox.
+- **Consent**: the message goes to the number the guest entered on the booking page, under the existing contact-consent tick box ("I agree to be contacted about my enquiry."). It is a utility-style reminder using an approved template, so it works outside the 24h window.
+- **UI**: reminder controls on the create form and per type; each appointment shows "Reminder sent" / "Reminder failed" (hover for the reason).
+- Schema: `AppointmentType.reminderHoursBefore/reminderTemplateId`, `Appointment.reminderStatus/reminderSentAt/reminderError` (migration `20261005090000_booking_reminders`).
+
+**Verified**
+- Typecheck, lint, tests (shared 90, worker 63, api 217 = 370) and build all green.
+- Live (real Neon/Redis, real API + worker + web, browser pane): API rejected a pending template, hours-without-template, hours > 72 and an unknown template; the scheduler was registered in Redis (`every: 300000`); the worker's own scheduled sweep fired on its own and touched **only** the in-window booking (too-early and booked-inside-window ones untouched); with a fake WhatsApp token the reminder was recorded `failed` with the reason and the calendar showed "Reminder failed"; changing the reminder from the UI saved correctly. Test data deleted.
+
+**Not verified / open**
+- The success path (a real template send through Meta) is unit-tested with mocks only — no real WhatsApp number or approved template exists yet.
+- Cancelled bookings are skipped, but there is **no cancel / reschedule flow yet** (guest or owner), so the status can't currently change after booking.
+- Changing a type's reminder timing applies to bookings that haven't been reminded yet (the sweep reads the current setting).
+- Only WhatsApp reminders (no SMS/email); the host is not reminded.
+
 ## 2026-10-04 — Phase 2 item 8: Meta ads attribution (spend → leads → bookings → sales)
 
 **Scope decisions, from the user**: Meta first (Google Ads later); each workspace connects **its own** ad accounts by logging in with Facebook, never a shared Zenora account. Audience sync (uploading hashed phone numbers to Meta) is **not built** — it is a privacy / Meta-policy question to ask the user first.

@@ -2,9 +2,11 @@ import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnav
 import { Prisma } from "@zenora/db";
 import {
   LINK_IN_BIO_CONSENT_TEXT,
+  MAX_TEMPLATE_VARIABLES,
   computeSlots,
   isSlotAvailable,
   normalizePhone,
+  templateVariableCount,
   zonedTimeToUtc,
   type AvailabilityWindow,
   type Interval,
@@ -63,6 +65,7 @@ export class CalendarService {
 
   async createType(workspaceId: string, dto: AppointmentTypeDto) {
     await this.ensureMember(workspaceId, dto.hostUserId);
+    await this.assertReminderConfig(workspaceId, dto.reminderHoursBefore ?? null, dto.reminderTemplateId ?? null);
     return this.prisma.client.appointmentType.create({
       data: { workspaceId, ...dto, availability: dto.availability as unknown as Prisma.InputJsonValue }
     });
@@ -70,6 +73,15 @@ export class CalendarService {
 
   async updateType(workspaceId: string, id: string, dto: UpdateAppointmentTypeDto) {
     if (dto.hostUserId) await this.ensureMember(workspaceId, dto.hostUserId);
+    if (dto.reminderHoursBefore !== undefined || dto.reminderTemplateId !== undefined) {
+      const current = await this.prisma.client.appointmentType.findFirst({ where: { id, workspaceId } });
+      if (!current) throw new NotFoundException("Appointment type not found");
+      await this.assertReminderConfig(
+        workspaceId,
+        dto.reminderHoursBefore !== undefined ? dto.reminderHoursBefore : current.reminderHoursBefore,
+        dto.reminderTemplateId !== undefined ? dto.reminderTemplateId : current.reminderTemplateId
+      );
+    }
     const { availability, ...rest } = dto;
     const result = await this.prisma.client.appointmentType.updateMany({
       where: { id, workspaceId },
@@ -90,6 +102,18 @@ export class CalendarService {
       include: { appointmentType: { select: { name: true } } },
       orderBy: { startsAt: "asc" }
     });
+  }
+
+  // Hours and template go together. The template must be this workspace's and
+  // already approved — a reminder that can never send would fail silently
+  // the night before the appointment.
+  private async assertReminderConfig(workspaceId: string, hours: number | null, templateId: string | null) {
+    if (hours === null && templateId === null) return;
+    if (hours === null || templateId === null) throw new BadRequestException("Choose both when to send the reminder and which template to use");
+    const template = await this.prisma.client.waTemplate.findFirst({ where: { id: templateId, workspaceId } });
+    if (!template) throw new BadRequestException("Reminder template not found");
+    if (template.metaStatus !== "approved") throw new BadRequestException("That template is not approved by Meta yet");
+    if (templateVariableCount(template.bodyText) > MAX_TEMPLATE_VARIABLES) throw new BadRequestException(`Use a template with at most  variables`);
   }
 
   private async ensureMember(workspaceId: string, userId: string) {

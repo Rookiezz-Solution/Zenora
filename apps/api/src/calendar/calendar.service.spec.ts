@@ -170,3 +170,44 @@ describe("CalendarService appointment types", () => {
     await expect(service.removeType("ws1", "x")).rejects.toThrow(NotFoundException);
   });
 });
+
+describe("CalendarService booking reminders", () => {
+  const dto = { name: "Consult", hostUserId: "host1", durationMin: 30, bufferMin: 0, minNoticeMin: 60, availability: [{ day: 1, start: "10:00", end: "12:00" }], active: true };
+  const approved = { id: "t1", metaStatus: "approved", bodyText: "Hi {{1}}, see you {{2}}" };
+  const withTemplate = (template: unknown) => make({ client: { waTemplate: { findFirst: vi.fn().mockResolvedValue(template) }, appointmentType: { create: vi.fn().mockResolvedValue({ id: "ty" }) } } });
+
+  it("accepts a reminder with an approved template from this workspace", async () => {
+    const { service, client } = withTemplate(approved);
+    await service.createType("ws1", { ...dto, reminderHoursBefore: 24, reminderTemplateId: "t1" });
+    expect(client.waTemplate.findFirst).toHaveBeenCalledWith({ where: { id: "t1", workspaceId: "ws1" } });
+    expect((client.appointmentType.create as ReturnType<typeof vi.fn>).mock.calls[0]![0].data).toMatchObject({ reminderHoursBefore: 24, reminderTemplateId: "t1" });
+  });
+
+  it("needs both the timing and the template", async () => {
+    const { service } = withTemplate(approved);
+    await expect(service.createType("ws1", { ...dto, reminderHoursBefore: 24 })).rejects.toThrow("both");
+    await expect(service.createType("ws1", { ...dto, reminderTemplateId: "t1" })).rejects.toThrow("both");
+  });
+
+  it("rejects a template that is missing, from another workspace, or not approved", async () => {
+    await expect(withTemplate(null).service.createType("ws1", { ...dto, reminderHoursBefore: 24, reminderTemplateId: "x" })).rejects.toThrow("not found");
+    await expect(withTemplate({ ...approved, metaStatus: "pending" }).service.createType("ws1", { ...dto, reminderHoursBefore: 24, reminderTemplateId: "t1" })).rejects.toThrow("not approved");
+  });
+
+  it("rejects a template with too many variables", async () => {
+    const { service } = withTemplate({ ...approved, bodyText: "{{1}} {{2}} {{3}} {{4}} {{5}} {{6}}" });
+    await expect(service.createType("ws1", { ...dto, reminderHoursBefore: 24, reminderTemplateId: "t1" })).rejects.toThrow("at most");
+  });
+
+  it("turns a reminder off by clearing both, and checks a partial update against the stored values", async () => {
+    const stored = { id: "ty", workspaceId: "ws1", reminderHoursBefore: 24, reminderTemplateId: "t1" };
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const { service } = make({ client: { appointmentType: { findFirst: vi.fn().mockResolvedValue(stored), updateMany, findUniqueOrThrow: vi.fn().mockResolvedValue(stored) } } });
+
+    await service.updateType("ws1", "ty", { reminderHoursBefore: null, reminderTemplateId: null });
+    expect(updateMany.mock.calls[0]![0].data).toMatchObject({ reminderHoursBefore: null, reminderTemplateId: null });
+
+    // Clearing only the timing would leave a template with no schedule.
+    await expect(service.updateType("ws1", "ty", { reminderHoursBefore: null })).rejects.toThrow("both");
+  });
+});

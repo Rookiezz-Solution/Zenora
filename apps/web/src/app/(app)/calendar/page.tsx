@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, type ApiError } from "@/lib/api";
+import type { WaTemplate } from "@/lib/broadcast-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -13,6 +14,8 @@ interface Appointment {
   guestName: string;
   guestPhone: string;
   appointmentType: { name: string };
+  reminderStatus: "sent" | "failed" | null;
+  reminderError: string | null;
 }
 interface AppointmentType {
   id: string;
@@ -21,9 +24,62 @@ interface AppointmentType {
   bufferMin: number;
   hostUserId: string;
   availability: { day: number; start: string; end: string }[];
+  reminderHoursBefore: number | null;
+  reminderTemplateId: string | null;
 }
 interface Member {
   user: { id: string; name: string | null; email: string };
+}
+
+const REMINDER_HOURS = [1, 2, 4, 12, 24, 48];
+const inputClass = "rounded-md border border-gray-300 px-2 py-1.5 text-sm";
+
+function ReminderFields({
+  hours,
+  templateId,
+  templates,
+  onChange
+}: {
+  hours: number | null;
+  templateId: string | null;
+  templates: WaTemplate[];
+  onChange: (hours: number | null, templateId: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+      <label>
+        WhatsApp reminder{" "}
+        <select
+          value={hours ?? ""}
+          onChange={(e) => {
+            const h = e.target.value ? Number(e.target.value) : null;
+            onChange(h, h === null ? null : (templateId ?? templates[0]?.id ?? null));
+          }}
+          className={inputClass}
+        >
+          <option value="">Off</option>
+          {REMINDER_HOURS.map((h) => (
+            <option key={h} value={h}>
+              {h} hour{h === 1 ? "" : "s"} before
+            </option>
+          ))}
+        </select>
+      </label>
+      {hours !== null && (
+        <label>
+          Template{" "}
+          <select value={templateId ?? ""} onChange={(e) => onChange(hours, e.target.value || null)} className={inputClass}>
+            {templates.length === 0 && <option value="">No approved templates</option>}
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
+  );
 }
 
 export default function CalendarPage() {
@@ -32,6 +88,9 @@ export default function CalendarPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [types, setTypes] = useState<AppointmentType[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [templates, setTemplates] = useState<WaTemplate[]>([]);
+  const [reminderHours, setReminderHours] = useState<number | null>(null);
+  const [reminderTemplateId, setReminderTemplateId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -57,6 +116,9 @@ export default function CalendarPage() {
         setHostUserId((cur) => cur || m[0]?.user.id || "");
       })
       .catch(() => setMembers([]));
+    apiFetch<WaTemplate[]>(`/workspaces/${workspaceId}/templates`)
+      .then((all) => setTemplates(all.filter((t) => t.metaStatus === "approved")))
+      .catch(() => setTemplates([]));
   }, [workspaceId]);
 
   async function disconnect() {
@@ -75,6 +137,8 @@ export default function CalendarPage() {
           hostUserId,
           durationMin,
           bufferMin,
+          reminderHoursBefore: reminderHours,
+          reminderTemplateId: reminderHours === null ? null : reminderTemplateId,
           availability: days.map((day) => ({ day, start, end }))
         })
       });
@@ -82,6 +146,19 @@ export default function CalendarPage() {
       load();
     } catch (err) {
       setMessage((err as ApiError).message ?? "Could not create");
+    }
+  }
+
+  async function saveReminder(id: string, hours: number | null, templateId: string | null) {
+    setMessage(null);
+    try {
+      await apiFetch(`/calendar/${workspaceId}/types/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ reminderHoursBefore: hours, reminderTemplateId: templateId })
+      });
+      load();
+    } catch (err) {
+      setMessage((err as ApiError).message ?? "Could not save the reminder");
     }
   }
 
@@ -97,7 +174,7 @@ export default function CalendarPage() {
     const key = new Date(a.startsAt).toDateString();
     byDay.set(key, [...(byDay.get(key) ?? []), a]);
   }
-  const input = "rounded-md border border-gray-300 px-2 py-1.5 text-sm";
+  const input = inputClass;
 
   return (
     <div className="max-w-3xl">
@@ -137,6 +214,12 @@ export default function CalendarPage() {
                   </span>
                   <span className="text-gray-500">
                     {a.guestName} · {a.guestPhone}
+                    {a.reminderStatus === "sent" && <span className="ml-2 text-xs text-green-700">Reminder sent</span>}
+                    {a.reminderStatus === "failed" && (
+                      <span className="ml-2 text-xs text-red-600" title={a.reminderError ?? undefined}>
+                        Reminder failed
+                      </span>
+                    )}
                   </span>
                 </li>
               ))}
@@ -149,17 +232,27 @@ export default function CalendarPage() {
         <h2 className="text-sm font-semibold text-gray-900">Appointment types</h2>
         <ul className="mt-2 divide-y divide-gray-100">
           {types.map((t) => (
-            <li key={t.id} className="flex items-center justify-between py-2 text-sm">
-              <span>
-                {t.name} <span className="text-xs text-gray-400">· {t.durationMin} min</span>
-                <br />
-                <a href={`/book/${t.id}`} target="_blank" rel="noreferrer" className="text-xs text-brand-700 underline">
-                  /book/{t.id}
-                </a>
-              </span>
-              <button type="button" onClick={() => removeType(t.id)} className="text-xs text-red-600">
-                Delete
-              </button>
+            <li key={t.id} className="py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span>
+                  {t.name} <span className="text-xs text-gray-400">· {t.durationMin} min</span>
+                  <br />
+                  <a href={`/book/${t.id}`} target="_blank" rel="noreferrer" className="text-xs text-brand-700 underline">
+                    /book/{t.id}
+                  </a>
+                </span>
+                <button type="button" onClick={() => removeType(t.id)} className="text-xs text-red-600">
+                  Delete
+                </button>
+              </div>
+              <div className="mt-1.5">
+                <ReminderFields
+                  hours={t.reminderHoursBefore}
+                  templateId={t.reminderTemplateId}
+                  templates={templates}
+                  onChange={(h, tpl) => saveReminder(t.id, h, tpl)}
+                />
+              </div>
             </li>
           ))}
           {types.length === 0 && <li className="py-2 text-sm text-gray-400">No appointment types yet.</li>}
@@ -192,6 +285,15 @@ export default function CalendarPage() {
               To <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className={input} />
             </label>
           </div>
+          <ReminderFields
+            hours={reminderHours}
+            templateId={reminderTemplateId}
+            templates={templates}
+            onChange={(h, tpl) => {
+              setReminderHours(h);
+              setReminderTemplateId(tpl);
+            }}
+          />
           <div className="flex flex-wrap gap-1">
             {DAYS.map((label, day) => (
               <button

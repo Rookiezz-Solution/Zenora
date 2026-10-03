@@ -1,8 +1,9 @@
-import { Worker, type Job } from "bullmq";
+import { Queue, Worker, type Job } from "bullmq";
 import { resumeRun, startRun } from "./automation-engine/engine";
 import { createRedisConnection } from "./redis";
 import { processBroadcast } from "./processors/broadcast";
 import { processKnowledgeSource } from "./processors/knowledge";
+import { processReminderSweep } from "./processors/reminders";
 import { processSalespersonAlert, processSlaCheck } from "./processors/routing";
 import { processSequenceStep } from "./processors/sequence";
 import { processMetaWebhookEvent } from "./processors/webhook-event";
@@ -47,6 +48,9 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
     const { enrollmentId } = job.data as { enrollmentId: string };
     await processSequenceStep(enrollmentId);
   },
+  appointments: async (job) => {
+    if (job.name === "reminder_sweep") await processReminderSweep();
+  },
   ai: async (job) => {
     if (job.name === "process_knowledge_source") {
       const { sourceId } = job.data as { sourceId: string };
@@ -59,11 +63,18 @@ const workers = QUEUE_NAMES.map(
   (queueName) => new Worker(queueName, PROCESSORS[queueName] ?? placeholderProcessor, { connection })
 );
 
+// Idempotent: the same scheduler id just updates the existing schedule on restart.
+const appointmentsQueue = new Queue("appointments", { connection: createRedisConnection() });
+appointmentsQueue
+  .upsertJobScheduler("reminder-sweep", { every: 5 * 60_000 }, { name: "reminder_sweep" })
+  .catch((err) => console.error("Could not schedule the reminder sweep:", err));
+
 console.log(`Zenora worker listening on queues: ${QUEUE_NAMES.join(", ")}`);
 
 async function shutdown() {
   console.log("Shutting down worker...");
   await Promise.all(workers.map((w) => w.close()));
+  await appointmentsQueue.close();
   await connection.quit();
   process.exit(0);
 }

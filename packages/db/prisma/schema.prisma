@@ -1072,6 +1072,8 @@ model AppointmentType {
   durationMin  Int
   bufferMin    Int      @default(0)
   minNoticeMin Int      @default(60)
+  reminderHoursBefore Int? // null = no reminder
+  reminderTemplateId  String? // approved WaTemplate sent to the guest
   availability Json // [{ day: 0-6, start: "HH:MM", end: "HH:MM" }] in the workspace timezone
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -1093,6 +1095,9 @@ model Appointment {
   guestName         String
   guestPhone        String
   googleEventId     String?
+  reminderStatus   String? // sent | failed
+  reminderSentAt   DateTime?
+  reminderError    String?
   createdAt         DateTime @default(now())
 
   workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
