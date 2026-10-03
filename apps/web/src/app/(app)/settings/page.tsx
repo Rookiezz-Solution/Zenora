@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AgencyAccessCard } from "@/components/settings/agency-access-card";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { apiFetch } from "@/lib/api";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
@@ -30,6 +31,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-xl">
       <SettingsTabs />
+      {workspaceId && <AgencyAccessCard workspaceId={workspaceId} />}
       <h1 className="text-2xl font-semibold text-gray-900">Connect channels</h1>
       <p className="mt-1 text-sm text-gray-500">
         Official Meta APIs only — you connect your own Instagram account and WhatsApp number.

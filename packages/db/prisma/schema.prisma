@@ -43,6 +43,7 @@ model Workspace {
   billingName    String? // legal/trade name on the GST invoice
   gstin          String?
   billingAddress String?
+  agencyId       String? // set when this workspace is managed by an agency
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
@@ -57,6 +58,7 @@ model Workspace {
   adAccounts        AdAccount[]
   apiKeys           ApiKey[]
   limitOverride     WorkspaceLimitOverride?
+  agency            Agency? @relation(fields: [agencyId], references: [id], onDelete: SetNull)
   webhookEndpoints  WebhookEndpoint[]
 
   leads         Lead[]
@@ -122,6 +124,7 @@ model User {
   updatedAt         DateTime  @updatedAt
 
   memberships  Membership[]
+  agencyMemberships AgencyMember[]
   otpCodes     OtpCode[]
   auditLogs    AuditLog[]
   assignments  Assignment[]
@@ -135,6 +138,7 @@ model Membership {
   role        WorkspaceRole @default(sales)
   teamId      String?
   available   Boolean       @default(true) // team availability toggle for routing's least-busy/round-robin fallback
+  viaAgencyId String? // set when this access exists only because of an agency; removed when the agency link goes
   createdAt   DateTime      @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -1206,4 +1210,32 @@ model WorkspaceLimitOverride {
   updatedAt       DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — agencies: manage several client workspaces from one login. Clients
+// still pay Zenora directly (no white label / reselling).
+// ---------------------------------------------------------------------------
+
+model Agency {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  members AgencyMember[]
+  clients Workspace[]
+}
+
+model AgencyMember {
+  id        String   @id @default(cuid())
+  agencyId  String
+  userId    String
+  role      String   @default("admin") // owner | admin
+  createdAt DateTime @default(now())
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyId, userId])
+  @@index([userId])
 }

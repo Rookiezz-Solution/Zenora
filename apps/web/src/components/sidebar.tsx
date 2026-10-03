@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { UsageOverview } from "@/lib/billing-types";
-import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { switchWorkspace, useCurrentWorkspace } from "@/lib/use-workspace";
 
 // Nav order matches design/screens (Dashboard.dc.html / workspace shell) and
 // docs/PRD.md section 3. Icons come later with the shadcn/ui pass — labels
@@ -64,19 +64,37 @@ export function Sidebar() {
 }
 
 function WorkspaceSwitcher() {
+  const { workspaceId, workspaces } = useCurrentWorkspace();
+  const [open, setOpen] = useState(false);
+  const current = workspaces.find((w) => w.id === workspaceId);
+
   return (
-    <button
-      type="button"
-      className="flex items-center gap-2 border-b border-gray-200 px-4 py-3 text-left hover:bg-gray-50"
-    >
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand text-sm font-semibold text-white">
-        Z
-      </span>
-      <span className="flex-1 truncate text-sm font-semibold text-gray-900">Workspace</span>
-      <span aria-hidden className="text-gray-400">
-        ⌄
-      </span>
-    </button>
+    <div className="relative border-b border-gray-200">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-gray-50">
+        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand text-sm font-semibold text-white">{(current?.name ?? "Z").slice(0, 1).toUpperCase()}</span>
+        <span className="flex-1 truncate text-sm font-semibold text-gray-900">{current?.name ?? "Workspace"}</span>
+        <span aria-hidden className="text-gray-400">
+          ⌄
+        </span>
+      </button>
+      {open && (
+        <div className="absolute left-2 right-2 top-full z-20 mt-1 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+          {workspaces.map((w) => (
+            <button
+              key={w.id}
+              type="button"
+              onClick={() => switchWorkspace(w.id)}
+              className={`block w-full truncate px-3 py-2 text-left text-sm hover:bg-gray-50 ${w.id === workspaceId ? "font-semibold text-brand-700" : "text-gray-700"}`}
+            >
+              {w.name}
+            </button>
+          ))}
+          <Link href="/agency" onClick={() => setOpen(false)} className="block border-t border-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">
+            Agency and clients
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }
 

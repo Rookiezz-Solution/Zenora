@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AdminModule } from "./admin/admin.module";
+import { AgenciesModule } from "./agencies/agencies.module";
 import { AdsModule } from "./ads/ads.module";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
@@ -58,6 +59,7 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     CalendarModule,
     AdminModule,
     AdsModule,
+    AgenciesModule,
     DevelopersModule
   ],
   controllers: [HealthController]

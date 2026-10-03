@@ -1,5 +1,20 @@
 # Zenora — build progress
 
+## 2026-10-08 — Phase 3: agency multi-workspace
+
+**Done**
+- **Agencies** (`/agency`): a user creates an agency (one owned agency per user), creates client workspaces under it or links a workspace they themselves own, and sees a client dashboard: plan, leads, new leads this week, open and overdue tasks. Clients still pay Zenora directly (no white label).
+- **How access works**: ordinary workspace memberships tagged `viaAgencyId`, so the existing permission system is unchanged. The agency owner who creates a client becomes its owner; every other agency teammate gets **admin** (no billing, no deleting the workspace) and is added to existing and future clients; agency access **never uses up the client's seats**. The dashboard lists only workspaces the caller is actually a member of, so being on an agency team never reveals a workspace you can't open.
+- **The client stays in control**: the workspace's own owner (not someone there via the agency) sees "Managed by <agency>" with who has access and can **remove the agency** at any time (Settings → Channels). Unlinking is refused if it would leave a workspace with no owner of its own (invite the client's owner first). Removing an agency teammate removes only the access that came through the agency. Linking an existing workspace needs that workspace's own owner. Linking/unlinking/creation are audit-logged on the workspace.
+- **Real workspace switching**: the sidebar switcher was a stub and every page used the caller's first workspace. The selection is now remembered per browser (localStorage), falls back to the first workspace if access was removed, and the switcher lists all workspaces plus an "Agency and clients" link.
+- Schema: `Agency`, `AgencyMember`, `Workspace.agencyId`, `Membership.viaAgencyId` (migration `20261008090000_agencies`).
+
+**Verified**: typecheck, lint, build, tests (shared 130, worker 75, api 260 = 465) green. Live (real Neon, API + web): create agency twice → 409; linking someone else's workspace → 403; unknown teammate email → 404; teammate added gets admin on every client (not on a workspace outside the agency), cannot manage the agency, and costs the client zero seats; dashboard stats match seeded data; unlink without an own owner → 409; the client's owner accepted an owner invite, saw who manages the workspace, an agency-side owner could **not** revoke (403) while the client's owner could, after which the agency and teammate lost access and the client kept it; removing a teammate removed their agency access. UI: agency page, create-client, and the switcher moving to another workspace. Test data deleted.
+
+**Not done / open**
+- Invites still return a token rather than sending email (an existing gap), so handing a client its workspace is by invite link.
+- One agency per owner; no transfer of agency ownership; agency teammates can't be given other roles; the sidebar list refreshes on reload.
+
 ## 2026-10-07 — Phase 3: owner console (usage, margins, limits editor)
 
 **Done** (super admin only, under `/admin`; same guard as the integrations dashboard)

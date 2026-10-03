@@ -54,7 +54,7 @@ export class UsageService {
     const override = await this.prisma.client.workspaceLimitOverride.findUnique({ where: { workspaceId } });
     const [contacts, users, instagramAccounts, extraUsers, extraInstagram, extraContacts, aiCreditsRemaining] = await Promise.all([
       this.prisma.client.lead.count({ where: { workspaceId, mergedIntoId: null } }),
-      this.prisma.client.membership.count({ where: { workspaceId } }),
+      this.prisma.client.membership.count({ where: { workspaceId, viaAgencyId: null } }), // agency staff never use up the client's seats
       this.prisma.client.instagramAccount.count({ where: { workspaceId, status: "active" } }),
       this.addonQuantity(workspaceId, "extraUser"),
       this.addonQuantity(workspaceId, "extraInstagramAccount"),
