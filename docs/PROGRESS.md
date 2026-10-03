@@ -1,5 +1,31 @@
 # Zenora — build progress
 
+## 2026-10-04 — Platform admin dashboard: integrations configured by a super admin (not `.env`)
+
+**Scope decision, from the user**: all third-party integrations should be configured later by a **super admin from a dashboard**, with space for every functionality, rather than by editing `.env`. This pulls the first slice of Phase 3's "owner console" forward. It stores credentials only — no pricing, privacy or Meta-policy change and no new third-party service — so no check-in was needed beyond the user's own instruction.
+
+**Done**
+- **Who is a super admin**: platform-level, not a workspace role. Decided by `SUPER_ADMIN_EMAILS` in the **environment only** (case-insensitive, whitespace-tolerant; empty means nobody). It is deliberately not editable from the UI, so nobody can promote themselves. `SuperAdminGuard` runs after the normal session guard; `GET /admin/me` lets any signed-in user ask whether they are one (it grants nothing).
+- **Catalog** (`packages/shared/src/integrations.ts`): Google (Calendar + sign-in), Meta (Instagram/WhatsApp/Ads — one app), Razorpay, Anthropic, SMS/OTP, plus paused groups shown as coming soon (telephony, speech-to-text/meeting bot, Google Ads). Each field is marked secret/public; each group lists the redirect/webhook URLs to paste into the provider's console, and whether it needs an API restart. The platform's own secrets (`DATABASE_URL`, `AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY`, `REDIS_URL`, and `SUPER_ADMIN_EMAILS` itself) are **not** in the catalog and can't be written.
+- **Storage**: `PlatformSetting` (key → value encrypted with `TOKEN_ENCRYPTION_KEY`, like channel tokens) and `PlatformAuditLog` (records which key was set or cleared, never the value). Migration applied.
+- **How the rest of the app sees it, with no call-site changes**: `loadEnv()` now merges dashboard values over `process.env` (`setRuntimeOverrides`). Values load at API start and refresh every 60 s so multiple instances converge; saving refreshes immediately. Every existing reader (Razorpay, Anthropic, Meta, Google Calendar clients, OAuth state, ...) picks the new value on its next call.
+- **Secrets are write-only**: the integrations API never returns a secret's value — only whether it's set and where it comes from (dashboard / `.env` / not set). Non-secret values (e.g. an OAuth client ID) are shown so the admin can check what they pasted. An empty value clears the setting.
+- **Public ids**: `GET /public/config` (unauthenticated) returns only `metaAppId`, `metaWhatsappConfigId`, `razorpayKeyId`. The web app's WhatsApp Embedded Signup and Razorpay Checkout helpers now read these from the API instead of build-time `NEXT_PUBLIC_*` variables (which still work as a fallback), so a super admin can set them without a rebuild.
+- **UI** (`/admin`, outside any workspace): an access check ("Super admin only" for everyone else), an overview (workspace/user counts, integrations ready), and an Integrations page with a card per group (status, copyable setup URLs, per-field Save/Clear, masked secret inputs). Placeholders for the other owner-console areas (plans and limits, workspaces, usage and margins, referral payouts) are listed as "Soon". A "Platform admin" link appears in the sidebar only for super admins.
+- A group reads "Partly set" only when some *required* key is set — optional extras with built-in defaults (the AI model names) don't count.
+- Tests: 8 shared (catalog invariants: platform secrets never exposed, secrets never public, status rules) + 13 API (encrypted-at-rest, audit without values, unknown/platform keys rejected, multi-line rejected, empty clears, overrides win over env, undecryptable value skipped, **secret never in the list response**, public config keys, strict allowlist guard) — 321 total (shared 69, worker 55, api 197). typecheck/lint/test/build green.
+
+**Verified live**: a normal user got 403 on the admin API, anonymous got 401, and the UI showed "Super admin only" with no admin link. As the super admin, the Integrations page showed all eight groups with the setup URLs and the restart note. Entering a Google client ID and secret through the real page marked the card "Configured"; **Calendar connect then switched from the "isn't configured" 400 to a redirect to Google with no API restart**. The secret appeared nowhere in any API response; the database held only ciphertext; the audit log held only key names. A public key set in the dashboard was served to an unauthenticated caller; writing `AUTH_SECRET` was rejected (400); clearing values put Calendar connect back to the "isn't configured" message. All test data (workspace, two users, settings, audit rows) was deleted afterward.
+
+**Not verified live**: Google sign-in picking up changes (it reads its keys once at startup, hence the restart note — making that dynamic is a follow-up), and any real provider call (still no real credentials).
+
+**Simplifications / follow-ups**
+- Keys are saved one field at a time; there's no "test connection" button yet (a real provider check per group would be a good next addition once credentials exist).
+- No two-person approval or secret-rotation history; the audit log shows who changed which key and when, not the old value.
+- The rest of the owner console (plan/limit editor, workspace list, usage and margins, payouts) is Phase 3.
+- `.env` still holds the platform's own secrets and DB/Redis URLs by design.
+- Multiple super admins share one permission level; no read-only admin role.
+
 ## 2026-10-04 — Phase 2 item 7: Calendar and booking (Google Calendar) + telephony paused
 
 **Scope decisions, from the user**: calendar uses **Google Calendar** (not Microsoft); each team member connects their own account by signing in with Google. Ads attribution will start with **Meta only** (Google Ads later), also connected by each user logging in (next item). **Telephony is paused** and shown as "Coming soon" in the UI (also applied to Meetings, the same paused provider group — meeting bot).

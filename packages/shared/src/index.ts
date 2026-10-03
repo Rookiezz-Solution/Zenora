@@ -13,3 +13,4 @@ export * from "./billing";
 export * from "./knowledge";
 export * from "./link-in-bio";
 export * from "./scheduling";
+export * from "./integrations";

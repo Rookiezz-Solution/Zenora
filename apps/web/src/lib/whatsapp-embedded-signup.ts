@@ -1,3 +1,4 @@
+import { getPublicConfig } from "./public-config";
 // WhatsApp Embedded Signup: loads the Facebook JS SDK, opens the signup
 // popup, and listens for the `WA_EMBEDDED_SIGNUP` postMessage Meta sends
 // with the new WABA/phone number ids (the OAuth `code` alone doesn't carry
@@ -39,10 +40,9 @@ function loadFacebookSdk(appId: string): Promise<void> {
 }
 
 export async function startWhatsappEmbeddedSignup(): Promise<EmbeddedSignupResult> {
-  const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-  const configId = process.env.NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID;
+  const { metaAppId: appId, metaWhatsappConfigId: configId } = await getPublicConfig();
   if (!appId || !configId) {
-    throw new Error("WhatsApp connect isn't configured yet — set NEXT_PUBLIC_META_APP_ID and NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID");
+    throw new Error("WhatsApp connect isn't configured yet — ask your platform admin to add the Meta app in the admin dashboard");
   }
 
   await loadFacebookSdk(appId);

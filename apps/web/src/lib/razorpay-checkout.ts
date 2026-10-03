@@ -1,3 +1,4 @@
+import { getPublicConfig } from "./public-config";
 // Razorpay Checkout.js — loads the widget script once, opens the payment
 // modal for an order the API already created, and resolves with the three
 // ids the API's /billing/:workspaceId/confirm endpoint needs to verify and
@@ -38,9 +39,9 @@ export async function openRazorpayCheckout(params: {
   name?: string;
   email?: string;
 }): Promise<RazorpayPaymentResult> {
-  const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  const keyId = (await getPublicConfig()).razorpayKeyId;
   if (!keyId) {
-    throw new Error("Payments aren't configured yet — set NEXT_PUBLIC_RAZORPAY_KEY_ID");
+    throw new Error("Payments aren't configured yet — ask your platform admin to add the Razorpay key in the admin dashboard");
   }
   await loadCheckoutJs();
 

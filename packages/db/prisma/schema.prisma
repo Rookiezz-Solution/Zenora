@@ -1068,3 +1068,27 @@ model Appointment {
   @@index([workspaceId, startsAt])
   @@index([hostUserId, startsAt])
 }
+
+// ---------------------------------------------------------------------------
+// Platform admin — integration credentials set from the super admin dashboard
+// ---------------------------------------------------------------------------
+
+// Third-party credentials (Google, Meta, Razorpay, ...). Every value is
+// encrypted at rest with TOKEN_ENCRYPTION_KEY, like channel tokens.
+model PlatformSetting {
+  key             String   @id
+  valueCipher     String
+  updatedByUserId String?
+  updatedAt       DateTime @updatedAt
+}
+
+// Platform-level audit trail. Records which setting changed, never the value.
+model PlatformAuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String // "setting.set" | "setting.cleared"
+  key       String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

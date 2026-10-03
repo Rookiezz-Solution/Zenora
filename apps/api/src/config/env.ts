@@ -27,22 +27,47 @@ const envSchema = z.object({
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   AI_MODEL_VOLUME: z.string().default("claude-haiku-4-5-20251001"),
-  AI_MODEL_SUMMARY: z.string().default("claude-sonnet-5-5")
+  AI_MODEL_SUMMARY: z.string().default("claude-sonnet-5-5"),
+  META_WHATSAPP_CONFIG_ID: z.string().optional(),
+  WHATSAPP_TECH_PROVIDER_ID: z.string().optional(),
+  // Comma-separated emails allowed into the super admin dashboard. Env-only
+  // on purpose: it can never be changed from the UI, so nobody can promote
+  // themselves. Empty means nobody is a super admin.
+  SUPER_ADMIN_EMAILS: z.string().optional()
 });
 
 export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | undefined;
 
+// Values set from the super admin dashboard. They win over .env, so every
+// existing loadEnv() call site picks them up without any change.
+let overrides: Record<string, string> = {};
+
+export function setRuntimeOverrides(next: Record<string, string>): void {
+  overrides = next;
+}
+
+// Where a key's effective value comes from — for the admin dashboard.
+export function envSource(key: string): "dashboard" | "env" | "none" {
+  if (overrides[key]) return "dashboard";
+  loadEnv();
+  return (cached as Record<string, unknown> | undefined)?.[key] ? "env" : "none";
+}
+
+function withOverrides(base: Env): Env {
+  return Object.keys(overrides).length === 0 ? base : ({ ...base, ...overrides } as Env);
+}
+
 // Fails fast on boot rather than surfacing missing-config bugs at request
 // time — cheaper to debug a crash on `pnpm dev` than a 500 in the inbox.
 export function loadEnv(): Env {
-  if (cached) return cached;
+  if (cached) return withOverrides(cached);
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     console.error("Invalid environment configuration:", parsed.error.flatten().fieldErrors);
     throw new Error("Invalid environment configuration");
   }
   cached = parsed.data;
-  return cached;
+  return withOverrides(cached);
 }

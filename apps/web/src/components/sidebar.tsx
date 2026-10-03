@@ -111,11 +111,21 @@ function AiCreditsMeter() {
 }
 
 function FooterLinks() {
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  useEffect(() => {
+    apiFetch<{ isSuperAdmin: boolean }>("/admin/me").then((r) => setIsSuperAdmin(r.isSuperAdmin)).catch(() => setIsSuperAdmin(false));
+  }, []);
+
   return (
     <div className="border-t border-gray-200 px-2 py-2 text-sm">
       <Link href="/notifications" className="block rounded-md px-3 py-2 text-gray-700 hover:bg-gray-50">
         Notifications
       </Link>
+      {isSuperAdmin && (
+        <Link href="/admin" className="block rounded-md px-3 py-2 text-gray-700 hover:bg-gray-50">
+          Platform admin
+        </Link>
+      )}
       <Link href="/help" className="block rounded-md px-3 py-2 text-gray-700 hover:bg-gray-50">
         Help and support
       </Link>

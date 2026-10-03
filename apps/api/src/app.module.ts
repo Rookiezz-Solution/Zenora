@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AdminModule } from "./admin/admin.module";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { AutomationsModule } from "./automations/automations.module";
@@ -52,7 +53,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     NotificationsModule,
     ReportsModule,
     LinkInBioModule,
-    CalendarModule
+    CalendarModule,
+    AdminModule
   ],
   controllers: [HealthController]
 })
