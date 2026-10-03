@@ -8,6 +8,7 @@ const TABS = [
   { href: "/settings/fields", label: "Custom fields" },
   { href: "/settings/routing", label: "Routing" },
   { href: "/settings/knowledge", label: "AI knowledge" },
+  { href: "/settings/link-in-bio", label: "Link in bio" },
   { href: "/settings/labels", label: "Industry and labels" },
   { href: "/settings/billing", label: "Billing and plan" }
 ];

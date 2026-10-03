@@ -89,6 +89,7 @@ model Workspace {
   knowledgeChunks  KnowledgeChunk[]
   faqs             Faq[]
   aiSettings       AiSettings?
+  linkInBio        LinkInBioPage?
 
   @@index([planId])
 }
@@ -984,6 +985,25 @@ model AiSettings {
   sharePricesToggle       Boolean  @default(false)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 item 6 — Link in bio (docs/PRD.md section 12, `LinkInBio`)
+// ---------------------------------------------------------------------------
+
+model LinkInBioPage {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  slug        String   @unique
+  title       String
+  bio         String?
+  whatsappPhone String? // digits only, used for the wa.me button
+  brochureUrl String?
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

@@ -11,6 +11,7 @@ import { HealthController } from "./health/health.controller";
 import { InboxModule } from "./inbox/inbox.module";
 import { KnowledgeModule } from "./knowledge/knowledge.module";
 import { LeadsModule } from "./leads/leads.module";
+import { LinkInBioModule } from "./link-in-bio/link-in-bio.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PipelinesModule } from "./pipelines/pipelines.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -48,7 +49,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     BillingModule,
     KnowledgeModule,
     NotificationsModule,
-    ReportsModule
+    ReportsModule,
+    LinkInBioModule
   ],
   controllers: [HealthController]
 })

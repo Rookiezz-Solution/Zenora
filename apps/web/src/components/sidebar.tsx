@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: "/broadcasts", label: "Broadcasts and templates" },
   { href: "/settings/knowledge", label: "AI knowledge" },
   { href: "/sources", label: "Ads and sources" },
-  { href: "/link-in-bio", label: "Link in bio" },
+  { href: "/settings/link-in-bio", label: "Link in bio" },
   { href: "/reports", label: "Reports" },
   { href: "/settings", label: "Settings" }
 ];

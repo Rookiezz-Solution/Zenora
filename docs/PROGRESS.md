@@ -1,6 +1,26 @@
 # Zenora — build progress
 ## 2026-10-03 — Phase 2 item 5: Mobile web "my leads" view
 
+## 2026-10-03 — Phase 2 item 6: Link in bio (public page + call-back form with consent)
+
+**Scope decision, checked with the user first**: the public call-back form collects personal data, so per the standing privacy rule the user was asked about the consent wording, what happens to submissions, and which actions the page offers. They answered "use your defaults": consent sentence **"I agree to be contacted about my enquiry."**, each submission becomes a lead with a recorded consent, and the page offers a WhatsApp button, a brochure link and the call-back form. Booking is left out — the calendar doesn't exist yet.
+
+**Done**
+- `packages/db`: `LinkInBioPage` (one per workspace; unique public `slug`, title, bio, WhatsApp number, brochure URL, `published`). Migration applied.
+- `packages/shared/src/link-in-bio.ts`: the consent sentence (single source of truth — the API serves it to the public page and stores it with each consent), slug pattern, and `normalizePhone` (8-15 digits, tolerates `+`, spaces, dashes).
+- `apps/api/src/link-in-bio`: owner endpoints `GET/PUT /link-in-bio/:ws` (`settings.manage`; slug unique across workspaces, brochure must be https, WhatsApp number validated) and **unauthenticated** `GET /public/link-in-bio/:slug` and `POST .../callback`. The public GET exposes only title/bio/WhatsApp/brochure/consent text (never the workspace id) and 404s for unpublished pages. The callback requires `consent: true` literally, creates a lead (`source: link_in_bio`) with a `data_processing` consent row whose `source` records the page and the exact sentence shown, then runs the normal routing/scoring. Plan limits never block it (inbound capture, per docs/PLANS_AND_LIMITS.md).
+- **Privacy/abuse choices**: a repeat phone number adds a fresh consent record to the existing lead instead of a duplicate, and returns the identical response, so a visitor can't probe which numbers the business already has. An in-memory limiter allows 5 submissions per IP per page per 10 minutes (429 after).
+- `apps/web`: public `/l/[slug]` page (outside the app shell; submit disabled until the tick box is checked) and a "Link in bio" settings tab. The sidebar's Link in bio entry used to point at a Phase 0 placeholder route; it now goes to the settings tab.
+- Tests: 4 shared + 8 API (public hiding, no workspace-id leak, lead+consent creation and routing, duplicate handling, bad phone, rate limit, slug conflict, number normalisation) — 269 total (shared 50, worker 55, api 164). typecheck/lint/test/build green.
+
+**Verified live**: configured the page; an unpublished page returned 404 and an `http://` brochure was rejected (400). The public page rendered title, bio, normalised WhatsApp link, brochure and the consent sentence, with submit disabled until ticked. Filled and submitted it through the real page: a lead appeared with the normalised phone, routed to an owner, with the consent stored with the exact sentence. A repeat number (no login cookie) returned the same response with no second lead and a second consent record; a request without consent got 400. Test workspace/user deleted afterward.
+
+**Simplifications / follow-ups**
+- The consent sentence is a fixed default; per-workspace custom wording (and translations) is a follow-up. Consent withdrawal/export belongs to the Phase 3 privacy tooling.
+- The rate limiter is per API process; a shared (Redis) limiter is needed if the API scales to several instances. No CAPTCHA/bot check yet.
+- The page has no booking (calendar not built), no custom branding/links list, and no analytics (views/clicks).
+- The unpublished-page 404 and the rate limit were checked by tests/one request, not by browser automation of the full flow.
+
 **Scope decision**: chosen over link in bio because link in bio includes a public call-back form that collects personal data with a consent notice (docs/PRD.md) — privacy-adjacent, so it needs a check-in with the user first (consent wording, where submissions land). This view is authenticated, uses existing data, and needs no new service, billing or policy change.
 
 **Done**
