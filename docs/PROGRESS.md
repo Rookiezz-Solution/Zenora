@@ -1,5 +1,23 @@
 # Zenora — build progress
 
+## 2026-10-10 — Phase 3: privacy tooling (export, erase, retention)
+
+**Defaults chosen**: export and erase are per person; messages are kept until the owner picks a period; raw channel payloads and webhook logs are cleared after 30 days platform-wide. Owners/admins only (`settings.manage`). **Workspace deletion is deliberately not built** (see open items).
+
+**Done** (Settings → Privacy)
+- **Download a person's data**: one JSON record of everything held about them — details, channel identities, tags, custom fields, notes, consent records, tasks, bookings and every conversation with its messages. Audit-logged.
+- **Erase a person**: search by name/phone/email, type `ERASE` to confirm (the API also requires `confirm: true`). Done explicitly in **one transaction** rather than by cascade, because several links to a lead are optional — deleting only the lead would leave conversations and messages behind. It removes conversations and messages, automation runs, tasks, SLA timers, bookings, **webhook delivery logs** that hold a copy of the person, **raw Meta webhook payloads** mentioning their phone/email/handle, merged duplicates of the same person, and then the lead (cascading identities, tags, notes, consents, field values). The audit entry records counts only, never the person's details.
+- **Message retention**: per workspace — keep until deleted, or delete after 90 / 180 / 365 / 730 days. A new daily job (`retention-sweep`, `privacy` queue) applies it; leads, notes and tasks are untouched. The same job clears raw Meta payloads and webhook delivery logs older than 30 days for everyone.
+- Schema: `Workspace.messageRetentionDays` (migration `20261010090000_message_retention`).
+
+**Verified**: typecheck, lint, build, tests (shared 139, worker 77, api 281 = 497) green. Live (real Neon, API + web): export returned the full record; a user from another workspace got 403 on export and erase, and another workspace path gave 404; erase without `confirm` → 400; **the first live erase failed** — about 20 sequential statements to the cloud database exceeded Prisma's 5-second transaction limit, and the whole thing rolled back cleanly (the person was untouched, which also proved atomicity). Fixed by batching the raw-event deletion into one statement and allowing 30 s, then re-run: the target, their merged duplicate, conversation, messages, task, SLA timer, booking, delivery log and both raw events were gone while a bystander lead's messages, tasks, notes, delivery log and raw event were intact (checked directly in the database); retention set to 90 days removed only the 200-day-old message, the 45-day-old raw event and the 40-day-old delivery log; UI shows saved retention, search, download/erase links and the confirmation panel. Test data deleted.
+
+**Not done / open**
+- **Workspace deletion / "delete my account"**: not built. Invoices must be kept for tax purposes for years, and today they are deleted along with a workspace, so this needs a decision (e.g. keep invoice records detached from the workspace) before it is safe to build.
+- Erasure cannot reach events already created in a connected Google Calendar, data held by Meta, or past invoices; the page says so. Staff members' own data (users, audit log entries naming them) is out of scope here.
+- Deleting old raw webhook payloads means a replay of the identical payload after 30 days would be processed again (the payload hash is the de-duplication key); Meta does not replay that late.
+- Erasure is a manual action; there is no self-service request form for end customers and no automatic erasure on consent withdrawal.
+
 ## 2026-10-09 — Phase 3: referral and commission tracking, payouts ledger
 
 **Defaults chosen** (the PRD left `[X]%` / `[N] months` as placeholders and I was told to use defaults): **20% commission for 12 months**, **30-day attribution window**, in `packages/shared/src/referrals.ts` (one edit to change). Commission is on the invoice amount **before GST**, on every paid invoice (plans, add-ons, top-ups) of a referred workspace.

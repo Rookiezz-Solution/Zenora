@@ -4,6 +4,7 @@ import { createRedisConnection } from "./redis";
 import { processBroadcast } from "./processors/broadcast";
 import { processKnowledgeSource } from "./processors/knowledge";
 import { processReminderSweep } from "./processors/reminders";
+import { processRetentionSweep } from "./processors/retention";
 import { processSalespersonAlert, processSlaCheck } from "./processors/routing";
 import { processSequenceStep } from "./processors/sequence";
 import { processWebhookDelivery } from "./processors/webhook-delivery";
@@ -53,6 +54,9 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
     const { deliveryId } = job.data as { deliveryId: string };
     await processWebhookDelivery(deliveryId);
   },
+  privacy: async (job) => {
+    if (job.name === "retention_sweep") await processRetentionSweep();
+  },
   appointments: async (job) => {
     if (job.name === "reminder_sweep") await processReminderSweep();
   },
@@ -74,12 +78,18 @@ appointmentsQueue
   .upsertJobScheduler("reminder-sweep", { every: 5 * 60_000 }, { name: "reminder_sweep" })
   .catch((err) => console.error("Could not schedule the reminder sweep:", err));
 
+const privacyQueue = new Queue("privacy", { connection: createRedisConnection() });
+privacyQueue
+  .upsertJobScheduler("retention-sweep", { every: 24 * 3_600_000 }, { name: "retention_sweep" })
+  .catch((err) => console.error("Could not schedule the retention sweep:", err));
+
 console.log(`Zenora worker listening on queues: ${QUEUE_NAMES.join(", ")}`);
 
 async function shutdown() {
   console.log("Shutting down worker...");
   await Promise.all(workers.map((w) => w.close()));
   await appointmentsQueue.close();
+  await privacyQueue.close();
   await connection.quit();
   process.exit(0);
 }

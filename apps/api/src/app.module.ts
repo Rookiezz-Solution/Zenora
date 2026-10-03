@@ -21,6 +21,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { PipelinesModule } from "./pipelines/pipelines.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ReferralsModule } from "./referrals/referrals.module";
+import { PrivacyModule } from "./privacy/privacy.module";
 import { QueueModule } from "./queue/queue.module";
 import { QuickRepliesModule } from "./quick-replies/quick-replies.module";
 import { RealtimeModule } from "./realtime/realtime.module";
@@ -62,6 +63,7 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     AdsModule,
     AgenciesModule,
     ReferralsModule,
+    PrivacyModule,
     DevelopersModule
   ],
   controllers: [HealthController]

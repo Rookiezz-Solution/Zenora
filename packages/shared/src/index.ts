@@ -19,3 +19,4 @@ export * from "./reminders";
 export * from "./developers";
 export * from "./owner-console";
 export * from "./referrals";
+export * from "./privacy";

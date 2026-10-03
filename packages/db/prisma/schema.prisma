@@ -44,6 +44,7 @@ model Workspace {
   gstin          String?
   billingAddress String?
   agencyId       String? // set when this workspace is managed by an agency
+  messageRetentionDays Int? // null = keep messages until deleted; otherwise older messages are purged daily
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
