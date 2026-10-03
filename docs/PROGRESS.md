@@ -1,5 +1,4 @@
 # Zenora — build progress
-## 2026-10-03 — Phase 2 item 5: Mobile web "my leads" view
 
 ## 2026-10-03 — Phase 2 item 6: Link in bio (public page + call-back form with consent)
 
@@ -20,6 +19,7 @@
 - The rate limiter is per API process; a shared (Redis) limiter is needed if the API scales to several instances. No CAPTCHA/bot check yet.
 - The page has no booking (calendar not built), no custom branding/links list, and no analytics (views/clicks).
 - The unpublished-page 404 and the rate limit were checked by tests/one request, not by browser automation of the full flow.
+## 2026-10-03 — Phase 2 item 5: Mobile web "my leads" view
 
 **Scope decision**: chosen over link in bio because link in bio includes a public call-back form that collects personal data with a consent notice (docs/PRD.md) — privacy-adjacent, so it needs a check-in with the user first (consent wording, where submissions land). This view is authenticated, uses existing data, and needs no new service, billing or policy change.
 
