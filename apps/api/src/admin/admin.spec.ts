@@ -110,11 +110,6 @@ describe("PlatformSettingsService", () => {
     const { service } = makeService();
     expect(Object.keys(service.publicConfig()).sort()).toEqual(["metaAppId", "metaWhatsappConfigId", "razorpayKeyId"]);
   });
-
-  it("counts workspaces and users for the overview", async () => {
-    const { service } = makeService();
-    await expect(service.overview()).resolves.toEqual({ workspaces: 3, users: 7 });
-  });
 });
 
 describe("super admin access", () => {

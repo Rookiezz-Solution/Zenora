@@ -1,5 +1,26 @@
 # Zenora — build progress
 
+## 2026-10-07 — Phase 3: owner console (usage, margins, limits editor)
+
+**Done** (super admin only, under `/admin`; same guard as the integrations dashboard)
+- **Overview** now shows platform totals: workspaces, users, plan mix, **MRR** (active paid subscriptions only; a yearly plan is spread over 12 months), paid invoices (before GST) for the last 30 days, **AI provider cost** (credits spent × 0.25) and the **estimated margin**.
+- **Workspaces** (`/admin/workspaces`, searchable, newest 100): plan and status, members, contacts, credits used, 30-day revenue, AI cost and margin per workspace (negative margins in red), plus a "Custom limits" badge. Built with a fixed number of grouped queries, not one per row.
+- **Workspace detail**: owners, subscription, current usage vs plan vs the limit that applies now, 30-day usage by type, and a history of every change made from the console.
+- **Limits editor**: per-workspace override of **contacts, team members and Instagram accounts**. An override replaces "plan + add-ons" for that workspace only and is read by `UsageService.getUsage`, so every existing limit check and the workspace's own billing page respect it automatically. Clearing a box goes back to the plan; clearing all removes the override. The plan definitions and prices are **not** changed by this.
+- **Grant AI credits**: adds to the running balance through the credit ledger (reason `admin_grant`; the plan's first allotment is written first if the workspace never spent, so the ledger stays complete). A reason is mandatory.
+- Every change is recorded in `PlatformAuditLog` (new `workspaceId` and `detail` columns; the detail says what changed, never a secret).
+- Schema: `WorkspaceLimitOverride`, audit columns (migration `20261007090000_owner_console`).
+
+**Verified**
+- Typecheck, lint, build, tests (shared 130, worker 75, api 249 = 454) green.
+- Live (real Neon, API + web, browser pane): a normal user gets 403 on every `/admin` route and a logged-out request gets 401; with a seeded starter subscription, a paid ₹1,499 invoice, a *failed* ₹999 invoice and 400 credits spent, the overview and list showed MRR ₹1,499, revenue ₹1,499 (failed invoice excluded), cost ₹100, margin ₹1,399 (93.3%) — matching a hand calculation; setting contacts 8,000 and users 4 showed up in the workspace's **own** billing usage endpoint, clearing one then the other returned it to plan values; negative limits and unknown workspaces are rejected (400/404); a 250-credit grant moved the balance 600 → 850, with the audit trail visible; saving limits and granting credits both worked from the UI. Test data deleted, including the audit rows (they don't cascade).
+
+**Not done / open**
+- **Plans and pricing** (editing plan prices and plan-wide limits) is deliberately *not* built: it changes what customers are charged, so it needs your call first. It stays "Soon" in the sidebar, as does Referral payouts.
+- Margin counts AI cost only (transcription and meeting minutes aren't tracked yet) and is cash-basis: a yearly invoice shows in full in the month it was paid.
+- Credit allotments still don't reset monthly (an existing simplification), so "AI credits left" is a running balance.
+- No list pagination beyond the newest 100, and no filter by plan.
+
 ## 2026-10-06 — Phase 3: public API keys and outbound webhooks
 
 **Done**

@@ -10,6 +10,7 @@ function makeClient(overrides: Record<string, unknown> = {}) {
     membership: { count: vi.fn().mockResolvedValue(1) },
     instagramAccount: { count: vi.fn().mockResolvedValue(0) },
     workspaceAddon: { findMany: vi.fn().mockResolvedValue([]) },
+    workspaceLimitOverride: { findUnique: vi.fn().mockResolvedValue(null) },
     creditLedger: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
     usageEvent: { create: vi.fn() },
     usageMonthly: { upsert: vi.fn() },
@@ -299,5 +300,47 @@ describe("UsageService.debitAiCredits alert thresholds", () => {
     const result = await service.debitAiCredits("ws1", 1, "ai_reply");
 
     expect(result).toEqual({ remaining: 0, allowed: true });
+  });
+});
+
+describe("UsageService owner-console overrides and grants", () => {
+  it("lets a super-admin override replace the plan-plus-add-ons figure, per limit", async () => {
+    const client = makeClient({
+      subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
+      workspaceLimitOverride: { findUnique: vi.fn().mockResolvedValue({ contacts: 12_000, users: null, instagramAccounts: 0 }) }
+    });
+    const { service } = makeService(client);
+
+    const result = await service.getUsage("ws1");
+
+    expect(result.effectiveLimits).toEqual({ contacts: 12_000, users: 2, instagramAccounts: 0 });
+    expect(result.limits.contacts).toBe(5_000); // the plan itself is untouched
+  });
+
+  it("enforces an overridden limit in the same checks as any other", async () => {
+    const client = makeClient({
+      lead: { count: vi.fn().mockResolvedValue(1500) },
+      workspaceLimitOverride: { findUnique: vi.fn().mockResolvedValue({ contacts: 2000, users: null, instagramAccounts: null }) }
+    });
+    const { service } = makeService(client);
+    expect((await service.checkContactLimit("ws1")).allowed).toBe(true); // free plan would say no (1000)
+  });
+
+  it("grants credits on top of the running balance", async () => {
+    const create = vi.fn();
+    const client = makeClient({ creditLedger: { findFirst: vi.fn().mockResolvedValue({ balanceAfter: 40 }), create } });
+    const { service } = makeService(client);
+
+    await expect(service.grantCredits("ws1", 500, "admin_grant")).resolves.toEqual({ balance: 540 });
+    expect(create).toHaveBeenCalledWith({ data: { workspaceId: "ws1", delta: 500, reason: "admin_grant", balanceAfter: 540 } });
+  });
+
+  it("writes the plan's first allotment before the grant when the workspace never spent", async () => {
+    const create = vi.fn();
+    const client = makeClient({ creditLedger: { findFirst: vi.fn().mockResolvedValue(null), create } });
+    const { service } = makeService(client);
+
+    await expect(service.grantCredits("ws1", 100, "admin_grant")).resolves.toEqual({ balance: 150 }); // free plan: 50 + 100
+    expect(create.mock.calls.map((c) => c[0].data.reason)).toEqual(["monthly_reset", "admin_grant"]);
   });
 });

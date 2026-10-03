@@ -51,6 +51,7 @@ export class UsageService {
     const planId = await this.currentPlanId(workspaceId);
     const limits = PLAN_LIMITS[planId];
 
+    const override = await this.prisma.client.workspaceLimitOverride.findUnique({ where: { workspaceId } });
     const [contacts, users, instagramAccounts, extraUsers, extraInstagram, extraContacts, aiCreditsRemaining] = await Promise.all([
       this.prisma.client.lead.count({ where: { workspaceId, mergedIntoId: null } }),
       this.prisma.client.membership.count({ where: { workspaceId } }),
@@ -61,10 +62,11 @@ export class UsageService {
       this.aiCreditBalance(workspaceId, planId)
     ]);
 
+    // A super-admin override (owner console) replaces the plan-plus-add-ons figure.
     const effectiveLimits = {
-      contacts: this.addToLimit(limits.contacts, extraContacts * 25_000),
-      users: this.addToLimit(limits.users, extraUsers),
-      instagramAccounts: this.addToLimit(limits.instagramAccounts, extraInstagram)
+      contacts: override?.contacts ?? this.addToLimit(limits.contacts, extraContacts * 25_000),
+      users: override?.users ?? this.addToLimit(limits.users, extraUsers),
+      instagramAccounts: override?.instagramAccounts ?? this.addToLimit(limits.instagramAccounts, extraInstagram)
     };
 
     return {
@@ -73,6 +75,24 @@ export class UsageService {
       effectiveLimits,
       usage: { contacts, users, instagramAccounts, aiCreditsRemaining }
     };
+  }
+
+  // Support action from the owner console: adds credits to the running balance.
+  // The plan's first allotment is written first when the workspace has never
+  // spent, so the ledger stays a complete history.
+  async grantCredits(workspaceId: string, amount: number, reason: string): Promise<{ balance: number }> {
+    const planId = await this.currentPlanId(workspaceId);
+    const last = await this.prisma.client.creditLedger.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" } });
+    const ops: Prisma.PrismaPromise<unknown>[] = [];
+    let balance = last?.balanceAfter;
+    if (balance === undefined) {
+      balance = PLAN_LIMITS[planId].aiCreditsPerMonth;
+      if (balance > 0) ops.push(this.prisma.client.creditLedger.create({ data: { workspaceId, delta: balance, reason: "monthly_reset", balanceAfter: balance } }));
+    }
+    const balanceAfter = balance + amount;
+    ops.push(this.prisma.client.creditLedger.create({ data: { workspaceId, delta: amount, reason, balanceAfter } }));
+    await this.prisma.client.$transaction(ops);
+    return { balance: balanceAfter };
   }
 
   async checkAiCredits(workspaceId: string): Promise<AiCreditCheck> {

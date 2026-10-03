@@ -96,8 +96,4 @@ export class PlatformSettingsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async overview() {
-    const [workspaces, users] = await Promise.all([this.prisma.client.workspace.count(), this.prisma.client.user.count()]);
-    return { workspaces, users };
-  }
 }

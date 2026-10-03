@@ -1,22 +1,51 @@
-import { Body, Controller, Delete, Get, Param, Put, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PrismaService } from "../prisma/prisma.service";
+import { OwnerConsoleService } from "./owner-console.service";
 import { PlatformSettingsService } from "./platform-settings.service";
 import { SuperAdminGuard, isSuperAdminEmail } from "./super-admin.guard";
 
 const putSettingSchema = z.object({ value: z.string().max(500) });
 
+const limitValue = z.number().int().min(0).max(10_000_000).nullable().optional();
+const setLimitsSchema = z.object({ contacts: limitValue, users: limitValue, instagramAccounts: limitValue, note: z.string().trim().max(200).nullable().optional() });
+const grantCreditsSchema = z.object({ amount: z.number().int().min(1).max(100_000), reason: z.string().trim().min(3).max(200) });
+
 @Controller("admin")
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class AdminController {
-  constructor(private readonly settings: PlatformSettingsService) {}
+  constructor(
+    private readonly settings: PlatformSettingsService,
+    private readonly owner: OwnerConsoleService
+  ) {}
 
   @Get("overview")
   overview() {
-    return this.settings.overview();
+    return this.owner.summary();
+  }
+
+  @Get("workspaces")
+  workspaces(@Query("search") search?: string) {
+    return this.owner.listWorkspaces(search?.trim() || undefined);
+  }
+
+  @Get("workspaces/:id")
+  workspace(@Param("id") id: string) {
+    return this.owner.getWorkspace(id);
+  }
+
+  @Put("workspaces/:id/limits")
+  setLimits(@Param("id") id: string, @CurrentUser() userId: string, @Body(new ZodValidationPipe(setLimitsSchema)) body: unknown) {
+    return this.owner.setLimits(userId, id, body as z.infer<typeof setLimitsSchema>);
+  }
+
+  @Post("workspaces/:id/credits")
+  grantCredits(@Param("id") id: string, @CurrentUser() userId: string, @Body(new ZodValidationPipe(grantCreditsSchema)) body: unknown) {
+    const { amount, reason } = body as z.infer<typeof grantCreditsSchema>;
+    return this.owner.grantCredits(userId, id, amount, reason);
   }
 
   @Get("integrations")

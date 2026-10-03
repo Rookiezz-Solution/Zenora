@@ -7,9 +7,10 @@ import { apiFetch } from "@/lib/api";
 
 const SECTIONS = [
   { href: "/admin", label: "Overview" },
+  { href: "/admin/workspaces", label: "Workspaces" },
   { href: "/admin/integrations", label: "Integrations" }
 ];
-const COMING_SOON = ["Plans and limits", "Workspaces", "Usage and margins", "Referral payouts"];
+const COMING_SOON = ["Plans and pricing", "Referral payouts"];
 
 // Platform-level area for the Zenora team — separate from any workspace.
 // Access is enforced by the API; this only decides what to render.
@@ -45,7 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Link
               key={s.href}
               href={s.href}
-              className={`block rounded-md px-3 py-2 text-sm font-medium ${pathname === s.href ? "bg-brand-50 text-brand-700" : "text-gray-700 hover:bg-gray-50"}`}
+              className={`block rounded-md px-3 py-2 text-sm font-medium ${pathname === s.href || (s.href !== "/admin" && pathname.startsWith(s.href)) ? "bg-brand-50 text-brand-700" : "text-gray-700 hover:bg-gray-50"}`}
             >
               {s.label}
             </Link>

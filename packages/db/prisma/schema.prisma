@@ -56,6 +56,7 @@ model Workspace {
   whatsappNumbers   WhatsappNumber[]
   adAccounts        AdAccount[]
   apiKeys           ApiKey[]
+  limitOverride     WorkspaceLimitOverride?
   webhookEndpoints  WebhookEndpoint[]
 
   leads         Lead[]
@@ -1126,8 +1127,10 @@ model PlatformSetting {
 model PlatformAuditLog {
   id        String   @id @default(cuid())
   userId    String
-  action    String // "setting.set" | "setting.cleared"
+  action    String // setting.set | setting.cleared | limits.set | credits.granted
   key       String?
+  workspaceId String? // for actions on one workspace (not a relation: the log outlives it)
+  detail    String? // human summary, never a secret value
   createdAt DateTime @default(now())
 
   @@index([createdAt])
@@ -1188,4 +1191,19 @@ model WebhookDelivery {
   endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
 
   @@index([endpointId, createdAt])
+}
+
+// Owner console: a super admin's per-workspace override of plan limits. A null
+// column means "no override" — the plan (plus add-ons) applies.
+model WorkspaceLimitOverride {
+  id              String   @id @default(cuid())
+  workspaceId     String   @unique
+  contacts        Int?
+  users           Int?
+  instagramAccounts Int?
+  note            String?
+  updatedById     String
+  updatedAt       DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
