@@ -8,6 +8,7 @@ import {
   createFlowTemplateSchema,
   listFlowTemplatesQuerySchema,
   updateFlowTemplateSchema,
+  shareFlowTemplateSchema,
   useFlowTemplateSchema
 } from "./dto/flow-templates.dto";
 import { FlowTemplatesService } from "./flow-templates.service";
@@ -50,6 +51,26 @@ export class FlowTemplatesController {
   @Delete(":id")
   remove(@Param("workspaceId") workspaceId: string, @Param("id") id: string, @CurrentUser() userId: string) {
     return this.templates.remove(workspaceId, id, userId);
+  }
+
+  @Post(":id/share")
+  share(
+    @Param("workspaceId") workspaceId: string,
+    @Param("id") id: string,
+    @CurrentUser() userId: string,
+    @Body(new ZodValidationPipe(shareFlowTemplateSchema)) body: unknown
+  ) {
+    return this.templates.share(workspaceId, id, userId, (body as { scope: "private" | "agency" }).scope);
+  }
+
+  @Post(":id/request-publish")
+  requestPublish(@Param("workspaceId") workspaceId: string, @Param("id") id: string, @CurrentUser() userId: string) {
+    return this.templates.requestPublish(workspaceId, id, userId);
+  }
+
+  @Post(":id/withdraw-publish")
+  withdrawPublish(@Param("workspaceId") workspaceId: string, @Param("id") id: string, @CurrentUser() userId: string) {
+    return this.templates.withdrawPublish(workspaceId, id, userId);
   }
 
   @Post(":id/use")

@@ -1,5 +1,22 @@
 # Zenora — build progress
 
+## 2026-10-13 — Phase 3: public template gallery and agency sharing
+
+The gallery had `all` / `mine` / `public`, and "public" only meant Zenora's built-in templates. Now people can share what they build, safely.
+
+**Done**
+- **Scopes**: a template is *private*, **shared with the owner's agency** (visible to the agency's other client workspaces; only workspaces managed by an agency can use it), or **public**. The gallery has the four scopes the PRD asks for: all, my templates, shared by agency, public gallery, with an origin label (Mine / From your agency / Community / By Zenora).
+- **Publishing needs approval.** "Publish to the public gallery" puts a template in a review queue; nothing becomes public until a super admin approves it at **Admin → Template review**, where the reviewer reads every message in the template. Rejection records a reason the author sees.
+- **Personal data is blocked.** A template containing a phone number or an email address (in any block, including quick-reply options) is refused with the offending items masked (`98••••••10`); it is checked again at the moment of approval. `{placeholders}` are fine and are filled from the workspace that uses the template.
+- **Approved content can't be swapped.** Editing a public or pending template takes it back to private; the author can ask again.
+- **Who made it is never revealed**: other workspaces get the origin label, a null `workspaceId`, and no review state. Using a template copies it with `{business_name}` filled from the *user's* workspace.
+- Schema: `FlowTemplate.publishStatus`, `publishNote` (migration `20261013090000_template_sharing`).
+
+**Verified**: typecheck, lint, build, tests (shared 154, worker 77, api 339 = 570) green. Live (real Neon, API + web): a private template is seen only by its workspace, then by the agency's other workspace after sharing (an outsider gets neither the template nor a direct open: 404); publishing a template with a phone number → 400 naming it; after cleaning it and asking again it waits for review, still invisible to outsiders; non-admins get 403 on review and approve; the reviewer sees the text; after approval an outsider sees it as "Community" with no trace of the author's workspace id and using it produced "Welcome to Outsider WS!"; the author editing it returned it to private and the outsider lost it; the reject path stores the reason and a second approve is refused; gallery and review pages render. Test data deleted.
+
+**Open**
+- The personal-data check is a pattern match (emails, 8+ digit numbers): it won't catch names, addresses or a number spelled out in words, so human review stays the real gate. No ratings, usage counts or report-abuse flow; no un-publish by an admin once approved other than the author withdrawing it; template bundles (stages, fields, WhatsApp templates) are not part of what is shared, only the flow.
+
 ## 2026-10-12 — Phase 3: performance and load testing
 
 Method, results and caveats are in **`docs/PERFORMANCE.md`**. New tooling: `scripts/load-test.mjs` (dependency-free, per-scenario throughput and p50/p95/p99, tags created data) and `ZENORA_LOG_QUERIES=true` (prints every SQL statement to count queries per request).

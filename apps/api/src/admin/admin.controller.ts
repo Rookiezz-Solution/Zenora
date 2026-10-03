@@ -5,6 +5,7 @@ import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReferralsService } from "../referrals/referrals.service";
+import { FlowTemplatesService } from "../flow-templates/flow-templates.service";
 import { OwnerConsoleService } from "./owner-console.service";
 import { PlatformSettingsService } from "./platform-settings.service";
 import { SuperAdminGuard, isSuperAdminEmail } from "./super-admin.guard";
@@ -14,6 +15,7 @@ const putSettingSchema = z.object({ value: z.string().max(500) });
 const limitValue = z.number().int().min(0).max(10_000_000).nullable().optional();
 const setLimitsSchema = z.object({ contacts: limitValue, users: limitValue, instagramAccounts: limitValue, note: z.string().trim().max(200).nullable().optional() });
 const grantCreditsSchema = z.object({ amount: z.number().int().min(1).max(100_000), reason: z.string().trim().min(3).max(200) });
+const rejectTemplateSchema = z.object({ reason: z.string().trim().min(3).max(200) });
 const payoutSchema = z.object({ referrerUserId: z.string().min(1), reference: z.string().trim().min(3).max(120), partnerInvoiceRef: z.string().trim().max(60).optional() });
 
 @Controller("admin")
@@ -22,7 +24,8 @@ export class AdminController {
   constructor(
     private readonly settings: PlatformSettingsService,
     private readonly owner: OwnerConsoleService,
-    private readonly referrals: ReferralsService
+    private readonly referrals: ReferralsService,
+    private readonly templates: FlowTemplatesService
   ) {}
 
   @Get("overview")
@@ -40,6 +43,21 @@ export class AdminController {
   recordPayout(@CurrentUser() userId: string, @Body(new ZodValidationPipe(payoutSchema)) body: unknown) {
     const { referrerUserId, reference, partnerInvoiceRef } = body as z.infer<typeof payoutSchema>;
     return this.referrals.recordPayout(userId, referrerUserId, reference, partnerInvoiceRef);
+  }
+
+  @Get("templates/pending")
+  pendingTemplates() {
+    return this.templates.pendingReview();
+  }
+
+  @Post("templates/:id/approve")
+  approveTemplate(@Param("id") id: string, @CurrentUser() userId: string) {
+    return this.templates.approve(userId, id);
+  }
+
+  @Post("templates/:id/reject")
+  rejectTemplate(@Param("id") id: string, @CurrentUser() userId: string, @Body(new ZodValidationPipe(rejectTemplateSchema)) body: unknown) {
+    return this.templates.reject(userId, id, (body as { reason: string }).reason);
   }
 
   @Get("workspaces")

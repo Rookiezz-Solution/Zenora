@@ -62,6 +62,10 @@ export interface FlowTemplate {
   name: string;
   industry: string | null;
   scope: "private" | "agency" | "public";
+  // Where it came from (never who made it) and, for your own templates, review state.
+  origin: "mine" | "agency" | "community" | "zenora";
+  publishStatus: "pending" | "approved" | "rejected" | null;
+  publishNote: string | null;
   graph: FlowGraph;
   variables: Record<string, string>;
   createdAt: string;

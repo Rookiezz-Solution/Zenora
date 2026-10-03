@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 const SECTIONS = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/workspaces", label: "Workspaces" },
+  { href: "/admin/templates", label: "Template review" },
   { href: "/admin/referrals", label: "Referral payouts" },
   { href: "/admin/integrations", label: "Integrations" }
 ];

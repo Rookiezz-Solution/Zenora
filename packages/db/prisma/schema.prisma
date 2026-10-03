@@ -683,6 +683,8 @@ model FlowTemplate {
   name        String
   industry    String?
   scope       String   @default("private") // private | agency | public
+  publishStatus String? // pending | approved | rejected: set when the author asks to publish publicly
+  publishNote   String? // the reviewer's reason when rejected
   graph       Json
   variables   Json     @default("{}") // {business_name} etc.
   createdAt   DateTime @default(now())

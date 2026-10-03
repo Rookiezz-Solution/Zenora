@@ -3,7 +3,7 @@ import { INDUSTRY_STARTER_KITS } from "@zenora/shared";
 import { flowGraphSchema } from "../../automations/dto/automations.dto";
 
 export const listFlowTemplatesQuerySchema = z.object({
-  scope: z.enum(["all", "mine", "public"]).default("all"),
+  scope: z.enum(["all", "mine", "agency", "public"]).default("all"),
   industry: z.enum(INDUSTRY_STARTER_KITS).optional()
 });
 export type ListFlowTemplatesQuery = z.infer<typeof listFlowTemplatesQuerySchema>;
@@ -32,3 +32,6 @@ export const saveAsTemplateSchema = z.object({
   industry: z.enum(INDUSTRY_STARTER_KITS).optional()
 });
 export type SaveAsTemplateDto = z.infer<typeof saveAsTemplateSchema>;
+
+export const shareFlowTemplateSchema = z.object({ scope: z.enum(["private", "agency"]) });
+export type ShareFlowTemplateDto = z.infer<typeof shareFlowTemplateSchema>;

@@ -4,6 +4,7 @@ import { FlowTemplatesService } from "./flow-templates.service";
 
 @Module({
   controllers: [FlowTemplatesController],
-  providers: [FlowTemplatesService]
+  providers: [FlowTemplatesService],
+  exports: [FlowTemplatesService]
 })
 export class FlowTemplatesModule {}
