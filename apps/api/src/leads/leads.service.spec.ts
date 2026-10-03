@@ -44,6 +44,15 @@ function makeTx() {
   };
 }
 
+// The lead detail read fetches each relation separately (in parallel).
+const relationStubs = () => ({
+  leadIdentity: { findMany: vi.fn().mockResolvedValue([]) },
+  leadTag: { findMany: vi.fn().mockResolvedValue([]) },
+  note: { findMany: vi.fn().mockResolvedValue([]) },
+  consent: { findMany: vi.fn().mockResolvedValue([]) },
+  leadFieldValue: { findMany: vi.fn().mockResolvedValue([]) }
+});
+
 function makePrisma(tx: ReturnType<typeof makeTx>) {
   const primary = { id: "primary", workspaceId: "ws1", name: "Primary", phone: "111", email: null };
   const duplicate = { id: "dup", workspaceId: "ws1", name: null, phone: null, email: "dup@example.com" };
@@ -52,6 +61,7 @@ function makePrisma(tx: ReturnType<typeof makeTx>) {
   );
   const client = {
     lead: { findFirst, findUniqueOrThrow: vi.fn().mockResolvedValue(primary) },
+    ...relationStubs(),
     $transaction: vi.fn().mockImplementation((cb: (tx: unknown) => unknown) => cb(tx))
   };
   return { client } as unknown as PrismaService;
@@ -143,6 +153,7 @@ describe("LeadsService.moveStage", () => {
         findFirst: vi.fn().mockResolvedValue({ id: "lead-1", workspaceId: "ws1" }),
         findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "lead-1" })
       },
+      ...relationStubs(),
       stage: { findFirst: vi.fn().mockResolvedValue(stageOverride) },
       customField: { findMany: vi.fn().mockResolvedValue([{ id: "field-budget", label: "Budget" }]) },
       $transaction: vi.fn().mockImplementation((cb: (tx: unknown) => unknown) => cb(tx))
@@ -351,5 +362,30 @@ describe("LeadsService.listMine", () => {
       OR: [{ stageId: null }, { stage: { type: "open" } }]
     });
     expect(args.select.tasks).toMatchObject({ where: { completedAt: null }, orderBy: { dueAt: "asc" }, take: 1 });
+  });
+});
+
+describe("LeadsService.getById", () => {
+  it("returns the lead with every relation, fetched together", async () => {
+    const stubs = relationStubs();
+    stubs.leadTag.findMany.mockResolvedValue([{ leadId: "l1", tagId: "t1", tag: { id: "t1", name: "vip" } }]);
+    stubs.note.findMany.mockResolvedValue([{ id: "n1", body: "hi", author: { id: "u1", name: "A" } }]);
+    const prisma = { client: { lead: { findFirst: vi.fn().mockResolvedValue({ id: "l1", workspaceId: "ws1", name: "Asha" }) }, ...stubs } } as unknown as PrismaService;
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
+
+    const lead = await service.getById("ws1", "l1");
+
+    expect(lead).toMatchObject({ id: "l1", name: "Asha", tags: [{ tag: { name: "vip" } }], notes: [{ author: { name: "A" } }], identities: [], consents: [], fieldValues: [] });
+  });
+
+  it("is not found — and returns nothing from the relations — for a lead in another workspace", async () => {
+    const stubs = relationStubs();
+    stubs.note.findMany.mockResolvedValue([{ id: "n1", body: "secret" }]);
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const prisma = { client: { lead: { findFirst }, ...stubs } } as unknown as PrismaService;
+    const service = new LeadsService(prisma, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), makeTriggerEvents(), { emit: vi.fn() } as unknown as WebhooksService);
+
+    await expect(service.getById("ws1", "other-workspace-lead")).rejects.toThrow("Lead not found");
+    expect(findFirst).toHaveBeenCalledWith({ where: { id: "other-workspace-lead", workspaceId: "ws1" } });
   });
 });

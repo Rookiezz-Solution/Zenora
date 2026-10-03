@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { canChangeMemberRole, canInviteWithRole } from "@zenora/shared";
+import { forgetMembership } from "../auth/guards/permissions.guard";
 import * as crypto from "node:crypto";
 import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
@@ -171,6 +172,7 @@ export class WorkspacesService {
       where: { id: membershipId },
       data: { role: dto.role }
     });
+    forgetMembership(workspaceId, target.userId); // the new role applies on the very next request
     await this.audit.log({
       workspaceId,
       userId: actingUserId,

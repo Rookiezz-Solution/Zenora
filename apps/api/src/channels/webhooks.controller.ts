@@ -37,15 +37,25 @@ export class WebhooksController {
     const body = req.body as { object?: string };
     const source = body.object === "instagram" ? "instagram" : body.object === "whatsapp_business_account" ? "whatsapp" : null;
 
-    // Always ack fast — Meta retries (and eventually disables the
-    // subscription) if we don't return 200 quickly, even for payloads we
-    // don't recognise yet.
-    res.status(200).send("EVENT_RECEIVED");
-
+    // Unrecognised payloads are acknowledged and dropped, so Meta doesn't keep
+    // retrying (or disable the subscription over) something we'll never handle.
     if (!source) {
       this.logger.warn(`Ignoring webhook with unknown object type: ${body.object}`);
+      res.status(200).send("EVENT_RECEIVED");
       return;
     }
-    await this.webhooks.ingest(source, req.rawBody ?? Buffer.from(JSON.stringify(body)), body);
+
+    // The event is stored (and queued) BEFORE it is acknowledged. Acknowledging
+    // first looked faster, but Meta treats a 200 as "delivered" and never resends:
+    // if the save then failed — a crash, or the database pool saturated by a
+    // burst — the message was lost for good. Failing here returns a 500 instead,
+    // and Meta retries; the content hash makes the retry idempotent.
+    try {
+      await this.webhooks.ingest(source, req.rawBody ?? Buffer.from(JSON.stringify(body)), body);
+      res.status(200).send("EVENT_RECEIVED");
+    } catch (err) {
+      this.logger.error(`Could not store ${source} webhook: ${err instanceof Error ? err.message : String(err)}`);
+      res.status(500).send("RETRY");
+    }
   }
 }

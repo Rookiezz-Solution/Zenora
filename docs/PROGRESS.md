@@ -1,5 +1,19 @@
 # Zenora — build progress
 
+## 2026-10-12 — Phase 3: performance and load testing
+
+Method, results and caveats are in **`docs/PERFORMANCE.md`**. New tooling: `scripts/load-test.mjs` (dependency-free, per-scenario throughput and p50/p95/p99, tags created data) and `ZENORA_LOG_QUERIES=true` (prints every SQL statement to count queries per request).
+
+**Biggest result: a correctness bug, not a speed problem.** Bursting 21,000 Meta webhook events showed "2,099 req/s, p50 4 ms" — but only **1,388 (≈7 %) were stored**. The handler acknowledged Meta before saving, the background writes exhausted the database pool and failed after the 200 had been sent, and Meta never resends after a 200. Events are now stored and queued **before** the acknowledgement (a failure returns 500 so Meta retries; the payload hash makes retries idempotent). Re-run: 260 sent, 260 stored.
+
+**Tuning** (measured at 20 concurrent users): the sidebar's billing-usage call (made on every page) went from 13 SQL statements and ~5 sequential round trips to one parallel batch; the caller's role is cached for 10 s (cleared at once by role changes, removals and agency changes) instead of a query per request; lead detail loads its relations together; lead creation parallelises its independent steps. Pipelines throughput doubled (32 → 64 req/s, p50 590 → 273 ms), lead list +50 %, one lead p50 −34 %, conversation messages +57 %, lead creation p50 8.7 s → 5.4 s.
+
+**Caveat that matters**: every database round trip from this machine costs ~250 ms (Redis ~57 ms), so absolute latencies are network-bound and say little about production; what carries over is queries and sequential depth per request. The load must be re-run from inside the production network before trusting any capacity figure.
+
+**Verified**: typecheck, lint, build, tests green; live runs against the real database with 3,000 leads / 500 conversations / 12,500 messages / 800 tasks; before/after tables in `docs/PERFORMANCE.md`; test data deleted.
+
+**Open**: leads list could be one query with Prisma's join strategy (preview feature); lead creation is still ~20 statements — moving routing to the worker would make the API answer after the insert but changes behaviour; list endpoints lack real pagination; no sustained (soak) or spike testing; no browser-level (web vitals) measurements.
+
 ## 2026-10-11 — Phase 3: security review and fixes
 
 A full self-review of the API, worker, web app and dependencies; findings, fixes and known gaps are written up in **`docs/SECURITY.md`**. It is **not** a substitute for the external VAPT the roadmap calls for.

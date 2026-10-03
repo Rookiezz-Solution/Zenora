@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { AuditService } from "../audit/audit.service";
+import { clearMembershipCache } from "../auth/guards/permissions.guard";
 import { PrismaService } from "../prisma/prisma.service";
 import type { AddAgencyMemberDto, CreateAgencyDto, CreateClientDto, LinkClientDto } from "./agencies.dto";
 
@@ -61,6 +62,7 @@ export class AgenciesService {
       this.prisma.client.membership.deleteMany({ where: { userId: memberUserId, viaAgencyId: agencyId } }),
       this.prisma.client.agencyMember.delete({ where: { id: target.id } })
     ]);
+    clearMembershipCache(); // removed access must stop working immediately
     return this.mine(userId);
   }
 
@@ -169,6 +171,7 @@ export class AgenciesService {
       this.prisma.client.membership.deleteMany({ where: { workspaceId, viaAgencyId: agencyId } }),
       this.prisma.client.workspace.update({ where: { id: workspaceId }, data: { agencyId: null } })
     ]);
+    clearMembershipCache(); // the agency's access must stop working immediately
     await this.audit.log({ workspaceId, userId: actorId, action: "agency.unlinked", entityType: "workspace", entityId: workspaceId, metadata: { agencyId } });
   }
 

@@ -5,6 +5,22 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { PERMISSION_KEY } from "../decorators/require-permission.decorator";
 import type { AuthedRequest } from "./jwt-auth.guard";
 
+// A member's role is trusted for this long before it is read again, so a busy
+// page doesn't pay a database round trip per request just to re-learn it.
+// Changes made through this API (role change, removal, agency access) clear it
+// immediately; a change made by another API instance takes at most this long.
+// Only successful lookups are cached, so a newly added member works straight away.
+const ROLE_CACHE_MS = 10_000;
+const roleCache = new Map<string, { role: WorkspaceRole; at: number }>();
+const roleKey = (workspaceId: string, userId: string) => `${workspaceId}:${userId}`;
+
+export function forgetMembership(workspaceId: string, userId: string) {
+  roleCache.delete(roleKey(workspaceId, userId));
+}
+export function clearMembershipCache() {
+  roleCache.clear();
+}
+
 // Runs after JwtAuthGuard. Resolves the caller's role for the workspace in
 // the route (:workspaceId) and checks it against the handler's
 // @RequirePermission(...). CLAUDE.md rule #7: every check is workspace-scoped
@@ -31,10 +47,20 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException("Missing workspace context");
     }
 
-    const membership = await this.prisma.client.membership.findUnique({
-      where: { workspaceId_userId: { workspaceId, userId: req.userId } }
-    });
-    if (!membership || !roleHasPermission(membership.role as WorkspaceRole, required)) {
+    const key = roleKey(workspaceId, req.userId);
+    let role: WorkspaceRole | undefined;
+    const cached = roleCache.get(key);
+    if (cached && Date.now() - cached.at < ROLE_CACHE_MS) {
+      role = cached.role;
+    } else {
+      const membership = await this.prisma.client.membership.findUnique({
+        where: { workspaceId_userId: { workspaceId, userId: req.userId } }
+      });
+      role = membership?.role as WorkspaceRole | undefined;
+      if (role) roleCache.set(key, { role, at: Date.now() });
+      else roleCache.delete(key);
+    }
+    if (!role || !roleHasPermission(role, required)) {
       throw new ForbiddenException(`Missing permission: ${required}`);
     }
     return true;

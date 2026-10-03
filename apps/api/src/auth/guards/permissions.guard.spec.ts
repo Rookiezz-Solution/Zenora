@@ -1,8 +1,10 @@
 import { ForbiddenException, type ExecutionContext } from "@nestjs/common";
 import type { Reflector } from "@nestjs/core";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "../../prisma/prisma.service";
-import { PermissionsGuard } from "./permissions.guard";
+import { PermissionsGuard, clearMembershipCache, forgetMembership } from "./permissions.guard";
+
+beforeEach(() => clearMembershipCache());
 
 function makeContext(params: Record<string, string>): ExecutionContext {
   const handler = () => undefined;
@@ -82,5 +84,46 @@ describe("PermissionsGuard", () => {
     await guard.canActivate(context);
 
     expect(getAllAndOverride).toHaveBeenCalledWith("permission", [context.getHandler(), context.getClass()]);
+  });
+});
+
+describe("PermissionsGuard role cache", () => {
+  it("reads a member's role once, then serves it from memory", async () => {
+    const { prisma, findUnique } = makePrisma({ role: "admin" });
+    const guard = new PermissionsGuard(makeReflector("leads.write"), prisma);
+    const ctx = makeContext({ workspaceId: "w1", userId: "u1" });
+
+    await guard.canActivate(ctx);
+    await guard.canActivate(ctx);
+    await guard.canActivate(ctx);
+    expect(findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps workspaces and users apart", async () => {
+    const { prisma, findUnique } = makePrisma({ role: "admin" });
+    const guard = new PermissionsGuard(makeReflector("leads.write"), prisma);
+    await guard.canActivate(makeContext({ workspaceId: "w1", userId: "u1" }));
+    await guard.canActivate(makeContext({ workspaceId: "w2", userId: "u1" }));
+    await guard.canActivate(makeContext({ workspaceId: "w1", userId: "u2" }));
+    expect(findUnique).toHaveBeenCalledTimes(3);
+  });
+
+  it("re-reads straight away once a change is announced, so a demotion takes effect at once", async () => {
+    const findUnique = vi.fn().mockResolvedValueOnce({ role: "admin" }).mockResolvedValueOnce({ role: "viewer" });
+    const guard = new PermissionsGuard(makeReflector("settings.manage"), { client: { membership: { findUnique } } } as unknown as PrismaService);
+    const ctx = makeContext({ workspaceId: "w1", userId: "u1" });
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    forgetMembership("w1", "u1");
+    await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+  });
+
+  it("never caches a non-member, so someone just added gets in immediately", async () => {
+    const findUnique = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ role: "sales" });
+    const guard = new PermissionsGuard(makeReflector("leads.write"), { client: { membership: { findUnique } } } as unknown as PrismaService);
+    const ctx = makeContext({ workspaceId: "w1", userId: "u1" });
+
+    await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
   });
 });

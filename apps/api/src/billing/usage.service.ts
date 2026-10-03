@@ -31,11 +31,6 @@ export class UsageService {
     return (sub?.planId as PlanId) ?? "free";
   }
 
-  private async addonQuantity(workspaceId: string, addonKey: string): Promise<number> {
-    const rows = await this.prisma.client.workspaceAddon.findMany({ where: { workspaceId, addonKey } });
-    return rows.reduce((sum, r) => sum + r.quantity, 0);
-  }
-
   private addToLimit(base: number | null, extra: number): number | null {
     return base === null ? null : base + extra;
   }
@@ -47,26 +42,30 @@ export class UsageService {
     return last?.balanceAfter ?? PLAN_LIMITS[planId].aiCreditsPerMonth;
   }
 
+  // Everything this needs is independent once the workspace is known, so it is
+  // read in ONE parallel batch (one network round trip) rather than a chain: the
+  // sidebar's credit meter calls this on every page load. The add-on rows are
+  // fetched once and summed here instead of one query per add-on kind.
   async getUsage(workspaceId: string) {
-    const planId = await this.currentPlanId(workspaceId);
-    const limits = PLAN_LIMITS[planId];
-
-    const override = await this.prisma.client.workspaceLimitOverride.findUnique({ where: { workspaceId } });
-    const [contacts, users, instagramAccounts, extraUsers, extraInstagram, extraContacts, aiCreditsRemaining] = await Promise.all([
+    const [subscription, override, addons, contacts, users, instagramAccounts, lastLedger] = await Promise.all([
+      this.prisma.client.subscription.findUnique({ where: { workspaceId } }),
+      this.prisma.client.workspaceLimitOverride.findUnique({ where: { workspaceId } }),
+      this.prisma.client.workspaceAddon.findMany({ where: { workspaceId } }),
       this.prisma.client.lead.count({ where: { workspaceId, mergedIntoId: null } }),
       this.prisma.client.membership.count({ where: { workspaceId, viaAgencyId: null } }), // agency staff never use up the client's seats
       this.prisma.client.instagramAccount.count({ where: { workspaceId, status: "active" } }),
-      this.addonQuantity(workspaceId, "extraUser"),
-      this.addonQuantity(workspaceId, "extraInstagramAccount"),
-      this.addonQuantity(workspaceId, "extra25kContacts"),
-      this.aiCreditBalance(workspaceId, planId)
+      this.prisma.client.creditLedger.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" } })
     ]);
+    const planId = (subscription?.planId as PlanId) ?? "free";
+    const limits = PLAN_LIMITS[planId];
+    const quantityOf = (key: string) => addons.filter((a) => a.addonKey === key).reduce((sum, a) => sum + a.quantity, 0);
+    const aiCreditsRemaining = lastLedger?.balanceAfter ?? limits.aiCreditsPerMonth;
 
     // A super-admin override (owner console) replaces the plan-plus-add-ons figure.
     const effectiveLimits = {
-      contacts: override?.contacts ?? this.addToLimit(limits.contacts, extraContacts * 25_000),
-      users: override?.users ?? this.addToLimit(limits.users, extraUsers),
-      instagramAccounts: override?.instagramAccounts ?? this.addToLimit(limits.instagramAccounts, extraInstagram)
+      contacts: override?.contacts ?? this.addToLimit(limits.contacts, quantityOf("extra25kContacts") * 25_000),
+      users: override?.users ?? this.addToLimit(limits.users, quantityOf("extraUser")),
+      instagramAccounts: override?.instagramAccounts ?? this.addToLimit(limits.instagramAccounts, quantityOf("extraInstagramAccount"))
     };
 
     return {

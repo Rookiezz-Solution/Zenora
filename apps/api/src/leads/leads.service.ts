@@ -74,19 +74,21 @@ export class LeadsService {
     });
   }
 
+  // The lead and each of its relations are independent reads, so they go out
+  // together (one network round trip instead of one per relation). The lead row
+  // is the only one scoped to the workspace; if it isn't found, everything else
+  // is discarded, so nothing from another workspace can leak.
   async getById(workspaceId: string, leadId: string) {
-    const lead = await this.prisma.client.lead.findFirst({
-      where: { id: leadId, workspaceId },
-      include: {
-        identities: true,
-        tags: { include: { tag: true } },
-        notes: { include: { author: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
-        consents: true,
-        fieldValues: { include: { field: true } }
-      }
-    });
+    const [lead, identities, tags, notes, consents, fieldValues] = await Promise.all([
+      this.prisma.client.lead.findFirst({ where: { id: leadId, workspaceId } }),
+      this.prisma.client.leadIdentity.findMany({ where: { leadId } }),
+      this.prisma.client.leadTag.findMany({ where: { leadId }, include: { tag: true } }),
+      this.prisma.client.note.findMany({ where: { leadId }, include: { author: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } }),
+      this.prisma.client.consent.findMany({ where: { leadId } }),
+      this.prisma.client.leadFieldValue.findMany({ where: { leadId }, include: { field: true } })
+    ]);
     if (!lead) throw new NotFoundException("Lead not found");
-    return lead;
+    return { ...lead, identities, tags, notes, consents, fieldValues };
   }
 
   // AI intent bonus on top of the rule-based score (docs/PRD.md section 10:
@@ -148,8 +150,11 @@ export class LeadsService {
       throw new ConflictException({ message: "A lead with this phone or email already exists", duplicate });
     }
     const lead = await this.prisma.client.lead.create({ data: { workspaceId, ...dto } });
-    await this.audit.log({ workspaceId, userId, action: "lead.created", entityType: "lead", entityId: lead.id });
-    await this.routingEngine.applyToNewLead(workspaceId, lead.id);
+    // The audit entry and the routing pass don't depend on each other.
+    await Promise.all([
+      this.audit.log({ workspaceId, userId, action: "lead.created", entityType: "lead", entityId: lead.id }),
+      this.routingEngine.applyToNewLead(workspaceId, lead.id)
+    ]);
     await this.webhooks.emit(workspaceId, "lead.created", leadWebhookData(lead));
     return lead;
   }

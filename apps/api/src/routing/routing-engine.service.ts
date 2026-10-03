@@ -35,10 +35,16 @@ export class RoutingEngineService {
   }
 
   private async run(workspaceId: string, leadId: string): Promise<void> {
-    const lead = await this.prisma.client.lead.findUnique({
-      where: { id: leadId },
-      include: { tags: { include: { tag: true } }, fieldValues: true }
-    });
+    // Everything this pass needs to read is independent, so it is read together
+    // (one network round trip, not five): the lead, the rules, who is available
+    // to take it, and the workspace's SLA length.
+    const [lead, scoringRules, routingRules, members, workspace] = await Promise.all([
+      this.prisma.client.lead.findUnique({ where: { id: leadId }, include: { tags: { include: { tag: true } }, fieldValues: true } }),
+      this.prisma.client.scoringRule.findMany({ where: { workspaceId } }),
+      this.prisma.client.routingRule.findMany({ where: { workspaceId }, orderBy: { order: "asc" } }),
+      this.prisma.client.membership.findMany({ where: { workspaceId, available: true } }),
+      this.prisma.client.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { slaMinutes: true } })
+    ]);
     if (!lead) return;
 
     const context: LeadRoutingContext = {
@@ -47,11 +53,6 @@ export class RoutingEngineService {
       customFieldValues: Object.fromEntries(lead.fieldValues.map((v) => [v.fieldId, String(v.value)]))
     };
 
-    const [scoringRules, routingRules] = await Promise.all([
-      this.prisma.client.scoringRule.findMany({ where: { workspaceId } }),
-      this.prisma.client.routingRule.findMany({ where: { workspaceId }, orderBy: { order: "asc" } })
-    ]);
-
     const score = computeScore(scoringRules as unknown as ScoringRuleInput[], context);
     if (score !== 0) {
       // A brand-new lead has no aiIntentScore yet, so score == ruleScore here.
@@ -59,36 +60,44 @@ export class RoutingEngineService {
     }
 
     const assignTo = matchRoutingRule(routingRules as unknown as RoutingRuleInput[], context);
-    const userId = await this.resolveAssignee(workspaceId, assignTo);
+    const userId = await this.resolveAssignee(workspaceId, assignTo, members);
     if (!userId) {
       this.logger.warn(`No available member to route lead ${leadId} in workspace ${workspaceId}`);
       return;
     }
 
-    await this.assign(workspaceId, leadId, userId, null);
+    await this.assign(workspaceId, leadId, userId, null, workspace.slaMinutes);
   }
 
   // Shared by the initial routing pass and worker-side SLA reassignment.
-  async assign(workspaceId: string, leadId: string, userId: string, reassignedFromId: string | null): Promise<void> {
-    await this.prisma.client.$transaction([
-      this.prisma.client.lead.update({ where: { id: leadId }, data: { ownerId: userId } }),
-      this.prisma.client.assignment.create({ data: { leadId, userId, reassignedFromId } })
+  async assign(workspaceId: string, leadId: string, userId: string, reassignedFromId: string | null, knownSlaMinutes?: number): Promise<void> {
+    const [slaMinutes] = await Promise.all([
+      knownSlaMinutes ?? this.prisma.client.workspace.findUniqueOrThrow({ where: { id: workspaceId } }).then((w) => w.slaMinutes),
+      this.prisma.client.$transaction([
+        this.prisma.client.lead.update({ where: { id: leadId }, data: { ownerId: userId } }),
+        this.prisma.client.assignment.create({ data: { leadId, userId, reassignedFromId } })
+      ])
     ]);
 
-    const workspace = await this.prisma.client.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
-    const slaTimer = await this.prisma.client.slaTimer.create({
-      data: { workspaceId, leadId, dueAt: new Date(Date.now() + workspace.slaMinutes * 60_000) }
-    });
-
-    await this.queue.add("routing", "salesperson_alert", { workspaceId, leadId, userId });
-    await this.queue.add("routing", "sla_check", { slaTimerId: slaTimer.id }, workspace.slaMinutes * 60_000);
+    // The alert doesn't depend on the timer, so they go out together.
+    await Promise.all([
+      this.queue.add("routing", "salesperson_alert", { workspaceId, leadId, userId }),
+      this.prisma.client.slaTimer
+        .create({ data: { workspaceId, leadId, dueAt: new Date(Date.now() + slaMinutes * 60_000) } })
+        .then((timer) => this.queue.add("routing", "sla_check", { slaTimerId: timer.id }, slaMinutes * 60_000))
+    ]);
   }
 
-  private async resolveAssignee(workspaceId: string, assignTo: ReturnType<typeof matchRoutingRule>): Promise<string | null> {
+  private async resolveAssignee(
+    workspaceId: string,
+    assignTo: ReturnType<typeof matchRoutingRule>,
+    availableMembers: { userId: string; teamId: string | null }[]
+  ): Promise<string | null> {
     if (assignTo?.type === "user" && assignTo.targetId) return assignTo.targetId;
 
     const teamId = assignTo?.type === "team" ? assignTo.targetId : undefined;
-    const candidates = await this.availableCandidates(workspaceId, teamId);
+    const members = teamId ? availableMembers.filter((m) => m.teamId === teamId) : availableMembers;
+    const candidates = await this.withOpenLeadCounts(workspaceId, members);
     if (candidates.length === 0) return null;
 
     if (assignTo?.type === "round_robin") {
@@ -99,10 +108,7 @@ export class RoutingEngineService {
     return pickLeastBusy(candidates);
   }
 
-  private async availableCandidates(workspaceId: string, teamId?: string): Promise<RoutingCandidate[]> {
-    const members = await this.prisma.client.membership.findMany({
-      where: { workspaceId, available: true, ...(teamId ? { teamId } : {}) }
-    });
+  private async withOpenLeadCounts(workspaceId: string, members: { userId: string }[]): Promise<RoutingCandidate[]> {
     return Promise.all(
       members.map(async (m) => ({
         userId: m.userId,

@@ -52,9 +52,10 @@ describe("UsageService.getUsage", () => {
     const client = makeClient({
       subscription: { findUnique: vi.fn().mockResolvedValue({ planId: "starter" }) },
       workspaceAddon: {
-        findMany: vi.fn().mockImplementation(({ where }: { where: { addonKey: string } }) =>
-          Promise.resolve(where.addonKey === "extra25kContacts" ? [{ quantity: 2 }] : where.addonKey === "extraUser" ? [{ quantity: 1 }] : [])
-        )
+        findMany: vi.fn().mockResolvedValue([
+          { addonKey: "extra25kContacts", quantity: 2 },
+          { addonKey: "extraUser", quantity: 1 }
+        ])
       }
     });
     const { service } = makeService(client);
@@ -300,6 +301,20 @@ describe("UsageService.debitAiCredits alert thresholds", () => {
     const result = await service.debitAiCredits("ws1", 1, "ai_reply");
 
     expect(result).toEqual({ remaining: 0, allowed: true });
+  });
+});
+
+describe("UsageService.getUsage cost", () => {
+  it("reads everything in one parallel batch: a single add-on query, each table once", async () => {
+    const client = makeClient();
+    const { service } = makeService(client);
+    await service.getUsage("ws1");
+
+    expect(client.workspaceAddon.findMany).toHaveBeenCalledTimes(1);
+    expect(client.subscription.findUnique).toHaveBeenCalledTimes(1);
+    expect(client.workspaceLimitOverride.findUnique).toHaveBeenCalledTimes(1);
+    expect(client.creditLedger.findFirst).toHaveBeenCalledTimes(1);
+    expect(client.lead.count).toHaveBeenCalledTimes(1);
   });
 });
 
