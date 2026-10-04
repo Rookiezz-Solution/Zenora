@@ -12,7 +12,7 @@
 
 **Not verified / open**
 - **Terms and privacy are drafts and have not been reviewed by a lawyer**; each page says so (`LEGAL_REVIEW_PENDING` in `legal-layout.tsx`). Set it to false only after review.
-- The Home dashboard samples at most 2,000 conversation threads for reply times; very busy workspaces get an approximation.
+- The Home dashboard samples at most 300 recent conversation threads for reply times; very busy workspaces get an approximation.
 - Search is substring matching, not ranked full-text search.
 
 ## 2026-10-18 — Plans and pricing editor (super admin)
