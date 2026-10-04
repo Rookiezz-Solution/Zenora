@@ -84,3 +84,12 @@ describe("account pre-hijacking", () => {
     expect(update.sessionVersion).toBeUndefined();
   });
 });
+
+describe("AuthService.signOutEverywhere", () => {
+  it("bumps the session version so every existing token stops working", async () => {
+    const update = vi.fn().mockResolvedValue({});
+    const service = await make({ user: { update } });
+    await service.signOutEverywhere("u1");
+    expect(update).toHaveBeenCalledWith({ where: { id: "u1" }, data: { sessionVersion: { increment: 1 } } });
+  });
+});

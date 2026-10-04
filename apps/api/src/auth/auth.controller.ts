@@ -45,6 +45,14 @@ export class AuthController {
     return { signedOut: true };
   }
 
+  @Post("logout-all")
+  @UseGuards(JwtAuthGuard)
+  async logoutAll(@CurrentUser() userId: string, @Res({ passthrough: true }) res: Response) {
+    await this.authService.signOutEverywhere(userId);
+    res.clearCookie(loadEnv().SESSION_COOKIE_NAME);
+    return { signedOut: true };
+  }
+
   @Post("otp/request")
   async requestOtp(@Req() req: Request, @Body(new ZodValidationPipe(otpRequestSchema)) body: unknown) {
     await authLimits.otpRequest(req.ip ?? "unknown", (body as { target: string }).target);

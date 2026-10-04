@@ -11,6 +11,7 @@ import { processSalespersonAlert, processSlaCheck } from "./processors/routing";
 import { processSequenceStep } from "./processors/sequence";
 import { processWebhookDelivery } from "./processors/webhook-delivery";
 import { processMetaWebhookEvent } from "./processors/webhook-event";
+import { WORKER_HEARTBEAT_EVERY_MS, WORKER_HEARTBEAT_KEY, WORKER_HEARTBEAT_TTL_S } from "@zenora/shared";
 import { QUEUE_NAMES, type QueueName } from "./queues";
 
 const connection = createRedisConnection();
@@ -96,10 +97,16 @@ privacyQueue
   .upsertJobScheduler("subscription-lifecycle-sweep", { every: 24 * 3_600_000 }, { name: "subscription_lifecycle_sweep" })
   .catch((err) => console.error("Could not schedule the subscription lifecycle sweep:", err));
 
+// Lets the API report whether background jobs are being processed (GET /health/ready).
+const heartbeat = () => void connection.set(WORKER_HEARTBEAT_KEY, String(Date.now()), "EX", WORKER_HEARTBEAT_TTL_S).catch(() => undefined);
+heartbeat();
+const heartbeatTimer = setInterval(heartbeat, WORKER_HEARTBEAT_EVERY_MS);
+
 console.log(`Zenora worker listening on queues: ${QUEUE_NAMES.join(", ")}`);
 
 async function shutdown() {
   console.log("Shutting down worker...");
+  clearInterval(heartbeatTimer);
   await Promise.all(workers.map((w) => w.close()));
   await appointmentsQueue.close();
   await privacyQueue.close();

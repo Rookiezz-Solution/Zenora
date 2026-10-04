@@ -120,6 +120,14 @@ export class AuthService {
     return existing.passwordHash ? { passwordHash: null, sessionVersion: { increment: 1 } } : {};
   }
 
+  // Ends every session this person has, on every device: the version in their
+  // session tokens no longer matches. Takes effect within seconds (the guard
+  // re-reads the version at most every 15 s per process).
+  async signOutEverywhere(userId: string): Promise<void> {
+    await this.prisma.client.user.update({ where: { id: userId }, data: { sessionVersion: { increment: 1 } } });
+    forgetSessionVersion(userId);
+  }
+
   async me(userId: string) {
     const user = await this.prisma.client.user.findUniqueOrThrow({ where: { id: userId } });
     return sanitizeUser(user);

@@ -1,5 +1,20 @@
 # Zenora — build progress
 
+## 2026-10-04 — Operations: readiness probe, worker heartbeat, runbook, profile and sign-out
+
+**Done**
+- `GET /health/ready` (database + Redis checks with 2 s timeouts, `503` when either is down) beside the existing liveness `GET /health`; it also reports `worker: up | down | unknown` from a heartbeat the worker writes to Redis every 30 s. A worker outage does not fail readiness (it is a separate process) — it is meant to be alerted on separately.
+- **`docs/DEPLOYMENT.md`**: what runs and the commands, environment (including `TRUST_PROXY`, which is required behind a load balancer), health and suggested alerts, backups and restore (Neon point-in-time restore, an independent `pg_dump` routine, Redis loss behaviour), secret rotation, release order and rollback, common incidents, and the open pre-launch decisions.
+- **Found while writing the runbook:** the sidebar linked to `/profile`, which did not exist, and nowhere in the app could a person sign out. Added the **Profile page** (name, email, **Sign out**, **Sign out of all devices**) and `POST /auth/logout-all`, which bumps the session version so every device is signed out within seconds.
+
+**Verified**: typecheck, lint, build, tests green (shared 197, worker 91, api 448 = 736). Live against real Neon + Upstash: `/health/ready` returned `ok` with database, redis and worker all `up` (the first live probe caught a bug — a lazy no-queue Redis connection reported `down` on the first request — fixed and re-probed); the worker's new subscription-lifecycle job ran on boot and is scheduled 24 h ahead (`getJobSchedulers`); two signed-in devices were both rejected (401) right after `logout-all`, a fresh login still worked, and `logout-all` without a session is 401; in the browser the Profile page rendered and **Sign out** returned to `/login` with the session gone. Test data deleted.
+
+**Not verified / open**
+- Nothing here was run on a real production host; the runbook is written from what the code does. **No restore drill has been done**, so recovery time is unknown.
+- **`TOKEN_ENCRYPTION_KEY` has no rotation tool**: changing it makes every stored channel token and integration credential unreadable (documented in the runbook). A re-encryption script is an open task.
+- No error-tracking or log-shipping vendor is wired in (a choice for the user); no admin screen to sign out someone else (SQL one-liner in the runbook).
+- Profile does not yet let people edit their name or change their password.
+
 ## 2026-10-04 — Hardening: CSP, shared rate limits, bounded lists
 
 **Done**

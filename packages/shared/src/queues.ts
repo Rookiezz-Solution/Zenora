@@ -15,3 +15,9 @@ export const QUEUE_NAMES = [
   "privacy"
 ] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];
+
+// The worker refreshes this Redis key every 30 s (it expires after 2 minutes), so
+// the API's /health/ready can say whether background jobs are being processed.
+export const WORKER_HEARTBEAT_KEY = "zenora:worker:heartbeat";
+export const WORKER_HEARTBEAT_EVERY_MS = 30_000;
+export const WORKER_HEARTBEAT_TTL_S = 120;
