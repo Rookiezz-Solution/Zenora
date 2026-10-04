@@ -22,6 +22,8 @@ export interface CampaignRow {
   costPerLeadMinor: number | null;
   costPerAppointmentMinor: number | null;
   costPerWonMinor: number | null;
+  qualified: number;
+  costPerQualifiedMinor: number | null;
 }
 
 export interface AdsReport {

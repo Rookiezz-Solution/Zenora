@@ -76,6 +76,7 @@ export class WorkspacesService {
         currency: dto.currency,
         timezone: dto.timezone,
         slaMinutes: dto.slaMinutes,
+        qualifiedMinScore: dto.qualifiedMinScore,
         ...(labels ? { labels: labels as Prisma.InputJsonValue } : {})
       }
     });

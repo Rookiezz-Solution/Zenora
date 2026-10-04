@@ -1,5 +1,21 @@
 # Zenora — build progress
 
+## 2026-10-04 — "Qualified" in Ads and sources
+
+The Ads report had no way to say how many leads a campaign brought that were actually worth following up. "Qualified" means different things to different businesses, so the workspace now defines it.
+
+**Done**
+- **A lead counts as qualified** when it is **won**, or is **sitting in a stage you starred** (★ on the Leads board header — open stages only), or its **score has reached a minimum you set** (Settings → Routing, scoring and SLA → "What counts as a qualified lead"; empty = off). With nothing configured only won leads count; a high score alone never qualifies.
+- Ads and sources gains **Qualified** and **Cost / qualified** columns per campaign (null shown as "—" when nothing qualified).
+- Schema: `Stage.countsAsQualified`, `Workspace.qualifiedMinScore` (migration `20261019100000_qualified_leads`). The definition lives once in `@zenora/shared` (`isQualifiedLead`).
+
+**Verified**: typecheck, lint, build, tests green (shared 210, worker 103, api 483 = 796). Live against real Neon + API (one campaign, four ad leads: one won, one in a starred stage, one scoring 70, one scoring 10): nothing configured → 1 qualified (cost ₹4,000); star the stage → 2; min score 70 → 3 (cost ₹1,333.33); un-star with min 70 → 2; turn the minimum off → back to 1; min score 0 → 400. In the browser the Sources table shows the two new columns with the right numbers, the ★ toggles a stage (shown amber, `aria-pressed`) and the new setting is on the routing page. Test data deleted.
+
+**Not verified / open**
+- It is "where the lead is now", not "ever was": a lead that was qualified and later moved to a non-starred open stage or Lost stops counting. A historical "reached a qualified stage" measure would need stage-history storage.
+- Only the Ads and sources report uses it; the main Reports page and the dashboard do not show qualified yet.
+- Neon was intermittently unreachable (`P1001`) during this session; none of it was a code defect, but test scripts needed retries.
+
 ## 2026-10-04 — More automation triggers: stage changed, score reached, OR conditions
 
 The custom trigger builder could start an automation from a keyword or a tag. It can now start from two more things that happen to a lead, and conditions can be "any one" instead of only "all".

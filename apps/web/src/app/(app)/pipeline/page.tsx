@@ -80,6 +80,18 @@ export default function PipelinePage() {
     }
   }
 
+  // Stages marked this way count their leads as "qualified" in Ads and sources.
+  async function toggleQualified(stageId: string, current: boolean) {
+    if (!workspaceId || !pipeline) return;
+    try {
+      await apiFetch(`/pipelines/${workspaceId}/${pipeline.id}/stages/${stageId}`, { method: "PATCH", body: JSON.stringify({ countsAsQualified: !current }) });
+      setError(null);
+      load();
+    } catch (err) {
+      setError((err as ApiError).message ?? "Could not change the stage");
+    }
+  }
+
   async function addStage(e: React.FormEvent) {
     e.preventDefault();
     if (!workspaceId || !pipeline || !newStageName.trim()) return;
@@ -113,11 +125,24 @@ export default function PipelinePage() {
               <h2 className="text-sm font-semibold text-gray-700">
                 {stage.name} <span className="text-gray-400">({stage.leads.length})</span>
               </h2>
-              {stage.requiredFieldIds.length > 0 && (
-                <span className="text-[10px] uppercase text-amber-600" title="Requires fields on entry">
-                  required fields
-                </span>
-              )}
+              <span className="flex items-center gap-2">
+                {stage.requiredFieldIds.length > 0 && (
+                  <span className="text-[10px] uppercase text-amber-600" title="Requires fields on entry">
+                    required fields
+                  </span>
+                )}
+                {stage.type === "open" && (
+                  <button
+                    type="button"
+                    onClick={() => toggleQualified(stage.id, stage.countsAsQualified)}
+                    title={stage.countsAsQualified ? "Leads here count as qualified in Ads and sources (click to turn off)" : "Click to count leads in this stage as qualified in Ads and sources"}
+                    className={`text-sm leading-none ${stage.countsAsQualified ? "text-amber-500" : "text-gray-300 hover:text-gray-400"}`}
+                    aria-pressed={stage.countsAsQualified}
+                  >
+                    ★
+                  </button>
+                )}
+              </span>
             </div>
             <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
               {stage.leads.map((lead) => (

@@ -135,7 +135,8 @@ describe("AdsService.report", () => {
             { id: "l3", adId: null, source: "link_in_bio", stage: null }
           ])
         },
-        appointment: { findMany: vi.fn().mockResolvedValue([{ leadId: "l2" }]) }
+        appointment: { findMany: vi.fn().mockResolvedValue([{ leadId: "l2" }]) },
+        workspace: { findUnique: vi.fn().mockResolvedValue({ qualifiedMinScore: null }) }
       }
     });
 
@@ -146,5 +147,47 @@ describe("AdsService.report", () => {
       { source: "ad", leads: 2 },
       { source: "link_in_bio", leads: 1 }
     ]);
+  });
+
+  it("counts a lead as qualified when it is won, sits in a qualified stage, or reaches the workspace's minimum score", async () => {
+    const lead = (id: string, over: Record<string, unknown>) => ({ id, adId: "ad1", source: "whatsapp", score: 0, stage: null, ...over });
+    const { service, client } = make({
+      client: {
+        adDailyStat: {
+          findMany: vi.fn().mockResolvedValue([{ adId: "ad1", campaignId: "c1", campaignName: "Diwali", spendMinor: 400_000, impressions: 100, clicks: 10, adAccount: { currency: "INR" } }])
+        },
+        lead: {
+          findMany: vi.fn().mockResolvedValue([
+            lead("won", { stage: { type: "won", countsAsQualified: false } }),
+            lead("starred", { stage: { type: "open", countsAsQualified: true } }),
+            lead("hot", { score: 70 }),
+            lead("warm", { score: 69 }),
+            lead("cold", { score: 0 })
+          ])
+        },
+        appointment: { findMany: vi.fn().mockResolvedValue([]) },
+        workspace: { findUnique: vi.fn().mockResolvedValue({ qualifiedMinScore: 70 }) }
+      }
+    });
+
+    const report = await service.report("ws1", 30);
+
+    expect(report.qualifiedMinScore).toBe(70);
+    expect(report.campaigns[0]).toMatchObject({ leads: 5, qualified: 3, costPerQualifiedMinor: 133_333 });
+    expect((client.workspace as { findUnique: ReturnType<typeof vi.fn> }).findUnique).toHaveBeenCalledWith({ where: { id: "ws1" }, select: { qualifiedMinScore: true } });
+  });
+
+  it("without a minimum score, only won leads and starred stages qualify", async () => {
+    const { service } = make({
+      client: {
+        adDailyStat: { findMany: vi.fn().mockResolvedValue([{ adId: "ad1", campaignId: "c1", campaignName: "D", spendMinor: 100_000, impressions: 1, clicks: 1, adAccount: { currency: "INR" } }]) },
+        lead: { findMany: vi.fn().mockResolvedValue([{ id: "x", adId: "ad1", source: "whatsapp", score: 999, stage: null }]) },
+        appointment: { findMany: vi.fn().mockResolvedValue([]) },
+        workspace: { findUnique: vi.fn().mockResolvedValue({ qualifiedMinScore: null }) }
+      }
+    });
+    const report = await service.report("ws1", 30);
+    expect(report.qualifiedMinScore).toBeNull();
+    expect(report.campaigns[0]!.qualified).toBe(0);
   });
 });

@@ -18,7 +18,8 @@ export const createStageSchema = z.object({
   name: z.string().min(1),
   type: stageType.default("open"),
   requiredFieldIds: z.array(z.string()).default([]),
-  slaMinutes: z.number().int().positive().optional()
+  slaMinutes: z.number().int().positive().optional(),
+  countsAsQualified: z.boolean().optional()
 });
 export type CreateStageDto = z.infer<typeof createStageSchema>;
 
@@ -26,7 +27,8 @@ export const updateStageSchema = z.object({
   name: z.string().min(1).optional(),
   type: stageType.optional(),
   requiredFieldIds: z.array(z.string()).optional(),
-  slaMinutes: z.number().int().positive().nullable().optional()
+  slaMinutes: z.number().int().positive().nullable().optional(),
+  countsAsQualified: z.boolean().optional()
 });
 export type UpdateStageDto = z.infer<typeof updateStageSchema>;
 

@@ -69,6 +69,8 @@ export default function RoutingSettingsPage() {
   const [fields, setFields] = useState<CustomField[]>([]);
   const [slaMinutes, setSlaMinutes] = useState(30);
   const [savedSla, setSavedSla] = useState(false);
+  const [qualifiedMinScore, setQualifiedMinScore] = useState("");
+  const [savedQualified, setSavedQualified] = useState(false);
 
   const [newCondition, setNewCondition] = useState<RoutingCondition>(EMPTY_CONDITION);
   const [newAssignType, setNewAssignType] = useState<AssignToType>("least_busy");
@@ -83,7 +85,12 @@ export default function RoutingSettingsPage() {
     apiFetch<ScoringRule[]>(`/routing/${workspaceId}/scoring`).then(setScoringRules).catch(() => setScoringRules([]));
     apiFetch<Member[]>(`/workspaces/${workspaceId}/members`).then(setMembers).catch(() => setMembers([]));
     apiFetch<CustomField[]>(`/workspaces/${workspaceId}/custom-fields`).then(setFields).catch(() => setFields([]));
-    apiFetch<{ slaMinutes: number }>(`/workspaces/${workspaceId}`).then((ws) => setSlaMinutes(ws.slaMinutes)).catch(() => {});
+    apiFetch<{ slaMinutes: number; qualifiedMinScore: number | null }>(`/workspaces/${workspaceId}`)
+      .then((ws) => {
+        setSlaMinutes(ws.slaMinutes);
+        setQualifiedMinScore(ws.qualifiedMinScore ? String(ws.qualifiedMinScore) : "");
+      })
+      .catch(() => {});
   }
   useEffect(load, [workspaceId]);
 
@@ -93,6 +100,15 @@ export default function RoutingSettingsPage() {
     await apiFetch(`/workspaces/${workspaceId}`, { method: "PATCH", body: JSON.stringify({ slaMinutes }) });
     setSavedSla(true);
     setTimeout(() => setSavedSla(false), 2000);
+  }
+
+  async function saveQualified(e: React.FormEvent) {
+    e.preventDefault();
+    if (!workspaceId) return;
+    const n = Number.parseInt(qualifiedMinScore, 10);
+    await apiFetch(`/workspaces/${workspaceId}`, { method: "PATCH", body: JSON.stringify({ qualifiedMinScore: Number.isFinite(n) && n > 0 ? n : null }) });
+    setSavedQualified(true);
+    setTimeout(() => setSavedQualified(false), 2000);
   }
 
   async function toggleAvailable(member: Member) {
@@ -185,6 +201,27 @@ export default function RoutingSettingsPage() {
             Save
           </button>
           {savedSla && <span className="text-xs text-green-600">Saved.</span>}
+        </form>
+      </section>
+
+      <section className="mt-6 rounded-md border border-gray-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-gray-900">What counts as a qualified lead</h2>
+        <p className="mt-1 text-xs text-gray-400">Used for the Qualified columns in Ads and sources. A won lead always counts, and so does any lead in a stage you star on the Leads board.</p>
+        <form onSubmit={saveQualified} className="mt-2 flex items-center gap-2 text-sm">
+          <span className="text-gray-600">Also count leads with a score of at least</span>
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            value={qualifiedMinScore}
+            onChange={(e) => setQualifiedMinScore(e.target.value)}
+            placeholder="off"
+            className="w-20 rounded-md border border-gray-300 px-2 py-1"
+          />
+          <button type="submit" className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white">
+            Save
+          </button>
+          {savedQualified && <span className="text-xs text-green-600">Saved.</span>}
         </form>
       </section>
 

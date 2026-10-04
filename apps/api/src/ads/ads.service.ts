@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { buildAdsReport, toAdStatData, type AdLeadRow, type AdStatRow } from "@zenora/shared";
+import { buildAdsReport, isQualifiedLead, toAdStatData, type AdLeadRow, type AdStatRow } from "@zenora/shared";
 import { MetaGraphClient } from "../channels/meta-graph.client";
 import { decryptToken, encryptToken } from "../common/encryption";
 import { PrismaService } from "../prisma/prisma.service";
@@ -105,16 +105,17 @@ export class AdsService {
 
   async report(workspaceId: string, days: number) {
     const sinceDate = new Date(Date.now() - days * DAY_MS);
-    const [stats, leads] = await Promise.all([
+    const [stats, leads, workspace] = await Promise.all([
       this.prisma.client.adDailyStat.findMany({
         where: { workspaceId, date: { gte: isoDay(sinceDate) } },
         include: { adAccount: { select: { currency: true } } }
       }),
       this.prisma.client.lead.findMany({
         where: { workspaceId, mergedIntoId: null, createdAt: { gte: sinceDate } },
-        select: { id: true, adId: true, source: true, stage: { select: { type: true } } },
+        select: { id: true, adId: true, source: true, score: true, stage: { select: { type: true, countsAsQualified: true } } },
         take: MAX_REPORT_LEADS
-      })
+      }),
+      this.prisma.client.workspace.findUnique({ where: { id: workspaceId }, select: { qualifiedMinScore: true } })
     ]);
 
     const appointments = await this.prisma.client.appointment.findMany({
@@ -136,9 +137,10 @@ export class AdsService {
       adId: l.adId,
       source: l.source,
       won: l.stage?.type === "won",
-      hasAppointment: withAppointment.has(l.id)
+      hasAppointment: withAppointment.has(l.id),
+      qualified: isQualifiedLead({ won: l.stage?.type === "won", stageCountsAsQualified: l.stage?.countsAsQualified ?? false, score: l.score }, workspace?.qualifiedMinScore)
     }));
 
-    return { days, ...buildAdsReport(statRows, leadRows) };
+    return { days, qualifiedMinScore: workspace?.qualifiedMinScore ?? null, ...buildAdsReport(statRows, leadRows) };
   }
 }

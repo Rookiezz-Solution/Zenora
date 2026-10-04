@@ -49,6 +49,15 @@ export interface AdLeadRow {
   source: string | null;
   won: boolean;
   hasAppointment: boolean;
+  qualified?: boolean; // see isQualifiedLead
+}
+
+// What "qualified" means is the workspace's own call: a lead counts when it is
+// sitting in a stage marked as qualified, has been won, or its score has reached
+// the workspace's minimum (when one is set). Won always counts: a sale implies it.
+export function isQualifiedLead(lead: { won: boolean; stageCountsAsQualified: boolean; score: number }, minScore: number | null | undefined): boolean {
+  if (lead.won || lead.stageCountsAsQualified) return true;
+  return typeof minScore === "number" && minScore > 0 && lead.score >= minScore;
 }
 
 export interface CampaignRow {
@@ -60,9 +69,11 @@ export interface CampaignRow {
   clicks: number;
   leads: number;
   appointments: number;
+  qualified: number;
   won: number;
   costPerLeadMinor: number | null;
   costPerAppointmentMinor: number | null;
+  costPerQualifiedMinor: number | null;
   costPerWonMinor: number | null;
 }
 
@@ -90,9 +101,11 @@ export function buildAdsReport(stats: AdStatRow[], leads: AdLeadRow[]) {
         clicks: 0,
         leads: 0,
         appointments: 0,
+        qualified: 0,
         won: 0,
         costPerLeadMinor: null,
         costPerAppointmentMinor: null,
+        costPerQualifiedMinor: null,
         costPerWonMinor: null,
         adIds: new Set<string>()
       };
@@ -117,6 +130,7 @@ export function buildAdsReport(stats: AdStatRow[], leads: AdLeadRow[]) {
     const c = campaigns.get(campaignId)!;
     c.leads += 1;
     if (lead.hasAppointment) c.appointments += 1;
+    if (lead.qualified) c.qualified += 1;
     if (lead.won) c.won += 1;
   }
 
@@ -125,6 +139,7 @@ export function buildAdsReport(stats: AdStatRow[], leads: AdLeadRow[]) {
       ...c,
       costPerLeadMinor: costPer(c.spendMinor, c.leads),
       costPerAppointmentMinor: costPer(c.spendMinor, c.appointments),
+      costPerQualifiedMinor: costPer(c.spendMinor, c.qualified),
       costPerWonMinor: costPer(c.spendMinor, c.won)
     }))
     .sort((a, b) => b.spendMinor - a.spendMinor);

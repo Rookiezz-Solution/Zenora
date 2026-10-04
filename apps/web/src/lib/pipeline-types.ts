@@ -18,6 +18,7 @@ export interface Stage {
   type: "open" | "won" | "lost";
   order: number;
   requiredFieldIds: string[];
+  countsAsQualified: boolean;
   leads: BoardLead[];
 }
 

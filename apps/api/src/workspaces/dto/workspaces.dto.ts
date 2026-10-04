@@ -34,6 +34,8 @@ export const updateWorkspaceSettingsSchema = z.object({
   // Speed rule (docs/PRD.md section 10): respond within N minutes else
   // reassign — read by the routing engine when it starts an SLA timer.
   slaMinutes: z.number().int().positive().optional(),
+  // A lead whose score reaches this counts as "qualified" in the ads report; null turns the score rule off.
+  qualifiedMinScore: z.number().int().min(1).max(1000).nullable().optional(),
   // Partial merge into Workspace.labels — e.g. { lead: "Student" } renames
   // only the "lead" term (docs/PRD.md: rename Lead/Appointment/Salesperson/
   // Won/Pipeline/Interest).

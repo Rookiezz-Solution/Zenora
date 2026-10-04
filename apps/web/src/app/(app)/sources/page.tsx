@@ -213,6 +213,8 @@ function SourcesContent() {
                   <th className="px-3 font-medium">Spend</th>
                   <th className="px-3 font-medium">Leads</th>
                   <th className="px-3 font-medium">Cost / lead</th>
+                  <th className="px-3 font-medium">Qualified</th>
+                  <th className="px-3 font-medium">Cost / qualified</th>
                   <th className="px-3 font-medium">Bookings</th>
                   <th className="px-3 font-medium">Cost / booking</th>
                   <th className="px-3 font-medium">Won</th>
@@ -226,6 +228,8 @@ function SourcesContent() {
                     <td className="px-3">{formatMoney(c.spendMinor, c.currency)}</td>
                     <td className="px-3">{c.leads}</td>
                     <td className="px-3">{formatMoney(c.costPerLeadMinor, c.currency)}</td>
+                    <td className="px-3">{c.qualified}</td>
+                    <td className="px-3">{formatMoney(c.costPerQualifiedMinor, c.currency)}</td>
                     <td className="px-3">{c.appointments}</td>
                     <td className="px-3">{formatMoney(c.costPerAppointmentMinor, c.currency)}</td>
                     <td className="px-3">{c.won}</td>

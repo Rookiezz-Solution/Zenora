@@ -40,6 +40,8 @@ model Workspace {
   labels    Json          @default("{}") // terminology overrides, see @zenora/shared DEFAULT_LABELS
   planId    String        @default("free")
   slaMinutes Int          @default(30) // speed rule: respond within N minutes else reassign (docs/PRD.md section 10)
+  // A lead whose score reaches this counts as "qualified" in the ads report (null = score alone never qualifies).
+  qualifiedMinScore Int?
   billingName    String? // legal/trade name on the GST invoice
   gstin          String?
   billingAddress String?
@@ -526,6 +528,8 @@ model Stage {
   requiredFieldIds String[]  @default([])
   onEnterAutomationId String?
   slaMinutes       Int?
+  // Leads sitting in this stage count as "qualified" in the ads report.
+  countsAsQualified Boolean  @default(false)
 
   pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   leads    Lead[]
