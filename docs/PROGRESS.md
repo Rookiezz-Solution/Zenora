@@ -1,5 +1,25 @@
 # Zenora — build progress
 
+## 2026-10-04 — Email sending (any SMTP), password reset, change password
+
+"Forgot password" used to be a dead end ("reset emails aren't wired up yet"), and sign-in codes could not reach anyone outside development.
+
+**Done**
+- **Email through any SMTP server** (`Mailer`, nodemailer): Amazon SES, ZeptoMail, Brevo or your own. Configured by a super admin at **Integrations → Email (SMTP)** (server, port, SSL, username, password — write-only and encrypted — from address); nothing is sent until then, and the app says so honestly. The server's error text is logged, never shown to the caller. The connection is rebuilt when the settings change.
+- **Sign-in codes by email** now really go out (phone numbers still have no provider and only work in development).
+- **Password reset**: Forgot password → enter email → 6-digit code by email (valid 10 minutes, 5 guesses, single use) → new password → signed in. Setting it **signs out every other device**, replaces any password somebody else registered first, and marks the address verified.
+- **It never reveals who has an account**: an unknown address gets the same answer and takes as long; and if sending fails (mail server down) the answer is *still* the same for everyone — found by testing: it first returned 503 only for real accounts. If email is not set up at all, everyone alike is told it can't be sent. A reset code cannot be used to sign in, and codes for sign-in cannot reset a password.
+- **Change password** on the Profile page (needs the current password when the account has one; accounts that only used Google or a code can set their first one). Signs out the other devices, keeps this one.
+- Rate limits are shared with the existing code limits; new dependency `nodemailer` (no new advisories).
+
+**Verified**: typecheck, lint, build, tests green (shared 210, worker 103, api 508 = 821). Live against real Neon and API, with **a real SMTP conversation to a local test server** (nodemailer is real; only the server is local, since no real mail account exists): reset email for a real account captured with the right From/To/Subject and code; unknown address → same 201, **no email**; phone number → 400; wrong code → 401; too-short password → 400; right code → 201, the **old session → 401** and a new one works, **old password → 401**, new password works, **reusing the code → 401**; the code never appeared in the API log; change password: wrong/missing current → 401, right → 201, this device kept, another device → 401; with the mail server stopped, real and unknown addresses both answer 201 and the failure is logged for the operator. In the browser the forgot-password form moved to the code step. Test data deleted.
+
+**Not verified / open**
+- **No real SMTP provider or domain** was used, so deliverability (SPF/DKIM, spam placement) is untested. A verified sending domain is needed before launch.
+- Only verification and reset codes use email so far; **team invites and billing notices are not emailed yet**, and the sign-up page still does not verify addresses.
+- SMS/WhatsApp codes (phone verification, "alerts at 50/80/100%") still have no provider.
+- There is no throttle on a *successful* repeat request beyond the existing code limits (5 per 15 min per address).
+
 ## 2026-10-04 — "Qualified" in Ads and sources
 
 The Ads report had no way to say how many leads a campaign brought that were actually worth following up. "Qualified" means different things to different businesses, so the workspace now defines it.

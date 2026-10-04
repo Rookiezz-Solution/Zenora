@@ -85,6 +85,20 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
     required: ["ANTHROPIC_API_KEY"]
   },
   {
+    id: "email",
+    title: "Email (SMTP)",
+    description: "Sends verification codes and password-reset emails. Works with any SMTP server (Amazon SES, ZeptoMail, Brevo, your own).",
+    fields: [
+      { key: "SMTP_HOST", label: "SMTP server", secret: false, help: "For example email-smtp.ap-south-1.amazonaws.com" },
+      { key: "SMTP_PORT", label: "Port", secret: false, help: "587 (STARTTLS) or 465 (SSL). Leave empty for 587." },
+      { key: "SMTP_SECURE", label: "Use SSL from the start", secret: false, help: "true or false. Leave empty to use SSL only on port 465." },
+      { key: "SMTP_USER", label: "Username", secret: false },
+      { key: "SMTP_PASS", label: "Password", secret: true },
+      { key: "SMTP_FROM", label: "From address", secret: false, help: 'For example "Zenora <no-reply@yourdomain.com>". The domain must be verified with your provider.' }
+    ],
+    required: ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"]
+  },
+  {
     id: "sms",
     title: "SMS / OTP",
     description: "Login verification codes (MSG91 or similar, DLT registered).",

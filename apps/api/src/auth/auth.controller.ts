@@ -13,7 +13,7 @@ import { loadEnv } from "../config/env";
 import { authLimits } from "./auth-limits";
 import { AuthService } from "./auth.service";
 import { CurrentUser } from "./decorators/current-user.decorator";
-import { loginSchema, otpRequestSchema, otpVerifySchema, signUpSchema } from "./dto/auth.dto";
+import { changePasswordSchema, loginSchema, otpRequestSchema, otpVerifySchema, passwordResetSchema, signUpSchema } from "./dto/auth.dto";
 import { ZodValidationPipe } from "./dto/zod-validation.pipe";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { SESSION_COOKIE_MAX_AGE_MS } from "./jwt.util";
@@ -43,6 +43,25 @@ export class AuthController {
     const { SESSION_COOKIE_NAME } = loadEnv();
     res.clearCookie(SESSION_COOKIE_NAME);
     return { signedOut: true };
+  }
+
+  // A password reset is the second half of an emailed code: the code proves the
+  // address, then the new password is set and the person is signed in.
+  @Post("password/reset")
+  async resetPassword(@Req() req: Request, @Body(new ZodValidationPipe(passwordResetSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
+    await authLimits.otpVerify(req.ip ?? "unknown", (body as { email: string }).email);
+    const result = await this.authService.resetPassword(body as never);
+    setSessionCookie(res, result.token);
+    return { user: result.user };
+  }
+
+  @Post("password/change")
+  @UseGuards(JwtAuthGuard)
+  async changePassword(@CurrentUser() userId: string, @Req() req: Request, @Body(new ZodValidationPipe(changePasswordSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
+    await authLimits.login(req.ip ?? "unknown", userId); // slows down guessing the current password
+    const result = await this.authService.changePassword(userId, body as never);
+    setSessionCookie(res, result.token);
+    return { user: result.user };
   }
 
   @Post("logout-all")

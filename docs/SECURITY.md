@@ -50,8 +50,9 @@ determined attacker can lock a *known* account out for 15 minutes.
 
 ## Known gaps (not fixed here)
 - **The content-security-policy still allows inline scripts** (Next needs them to hydrate; a nonce policy would force every page to render per request). It does block plugins, framing, other base URLs and form targets, and limits scripts, frames and network calls to our API, Razorpay and Meta's SDK. Razorpay checkout and the Meta connect popups have never been run against it with real accounts: if one breaks, set `CSP_REPORT_ONLY=true` to see what is being blocked.
-- **No two-factor authentication**, no email verification flow, no password-reset
-  email (there is no mail provider yet); sessions last 30 days.
+- **No two-factor authentication** and no email verification at sign-up (a password reset
+  does verify the address). Password reset by emailed code is built but needs an SMTP
+  server to be configured; sessions last 30 days.
 - **Rate limits** are counted in Redis when it is reachable, so adding API instances does not multiply them, and fall back to per-process counting if Redis is down (they fail open on purpose: a Redis outage must not lock everyone out of sign-in). The in-process caches (membership roles, session versions) are still per process, with 10-15 s staleness limits.
 - Remaining advisories: `@nestjs/core` 10 (needs the Nest 11 upgrade) and
   `file-type` (only reachable through file uploads, which Zenora doesn't offer).

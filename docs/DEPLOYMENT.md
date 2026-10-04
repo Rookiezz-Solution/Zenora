@@ -32,6 +32,10 @@ Third-party credentials (Google, Meta, Razorpay, Anthropic, SMS) are **entered i
 `/admin/integrations` by a super admin, encrypted with `TOKEN_ENCRYPTION_KEY`; they are not environment variables
 (the env names still work as a fallback). `.env` is never committed.
 
+## Email
+
+Verification codes and password-reset emails go out through **any SMTP server**, configured by a super admin at `/admin/integrations` → *Email (SMTP)* (server, port, username, password, from address; secrets are write-only and encrypted). Nothing is sent until it is configured, and the app says so honestly instead of pretending: password reset then answers "can't be sent yet" for everyone alike. Use a server and a from-address on a domain you have verified with the provider (SPF/DKIM), or messages will land in spam. SMS codes still have no provider; a phone number can only be verified in development.
+
 ## Health and monitoring
 
 - `GET /health` — liveness (process is up; touches nothing else). Use for "restart if it fails".
@@ -96,6 +100,6 @@ stored integration credential and channel token.**
 
 ## Open decisions before launch
 
-Hosting provider and regions · monitoring/error-tracking vendor · backup retention and RPO/RTO · a mail provider
-(invites, password reset, billing notices) · a lawyer review of the draft
+Hosting provider and regions · monitoring/error-tracking vendor · backup retention and RPO/RTO · a mail provider and
+verified sending domain (password reset is built, using SMTP; invites and billing notices are not yet) · a lawyer review of the draft
 terms and privacy policy · an external penetration test.
