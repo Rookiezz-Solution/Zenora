@@ -18,5 +18,7 @@ export interface OwedRow {
 export interface OwedOverview {
   terms: { pct: number; months: number };
   owed: OwedRow[];
+  // Commission already paid on invoices that were refunded afterwards.
+  toRecover: OwedRow[];
   recentPayouts: { id: string; referrerUserId: string; amountInr: number; reference: string; partnerInvoiceRef: string | null; createdAt: string }[];
 }

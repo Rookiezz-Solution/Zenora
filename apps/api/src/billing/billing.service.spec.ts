@@ -5,6 +5,7 @@ import type { PrismaService } from "../prisma/prisma.service";
 import type { ReferralsService } from "../referrals/referrals.service";
 import { BillingService } from "./billing.service";
 import type { RazorpayClient } from "./razorpay.client";
+import type { NotificationsService } from "../notifications/notifications.service";
 import type { UsageService } from "./usage.service";
 
 function makeClient(overrides: Record<string, unknown> = {}) {
@@ -30,9 +31,10 @@ function makeRazorpay(overrides: Partial<Record<keyof RazorpayClient, unknown>> 
 }
 
 function makeService(client: ReturnType<typeof makeClient>, razorpay = makeRazorpay()) {
-  const referrals = { accrueForPayment: vi.fn().mockResolvedValue(undefined) };
+  const referrals = { accrueForPayment: vi.fn().mockResolvedValue(undefined), reverseForRefund: vi.fn().mockResolvedValue("voided") };
   const usage = { resetCreditsToPlan: vi.fn().mockResolvedValue(undefined) };
-  return { service: new BillingService({ client } as unknown as PrismaService, razorpay, referrals as unknown as ReferralsService, usage as unknown as UsageService), razorpay, referrals, usage };
+  const notifications = { create: vi.fn().mockResolvedValue({}) };
+  return { service: new BillingService({ client } as unknown as PrismaService, razorpay, referrals as unknown as ReferralsService, usage as unknown as UsageService, notifications as unknown as NotificationsService), razorpay, referrals, usage, notifications };
 }
 
 describe("BillingService.createCheckoutOrder", () => {

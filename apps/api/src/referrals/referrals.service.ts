@@ -78,6 +78,20 @@ export class ReferralsService {
     }
   }
 
+  // A refunded payment earns no commission. Not yet paid out: the entry is
+  // voided (no money has moved). Already paid out: it cannot be undone from
+  // here, so it is flagged for the owner to recover from the referrer.
+  async reverseForRefund(invoiceId: string): Promise<"voided" | "clawback" | "none"> {
+    const entry = await this.prisma.client.commissionEntry.findUnique({ where: { invoiceId } });
+    if (!entry || entry.status === "void") return "none";
+    if (entry.status === "accrued") {
+      await this.prisma.client.commissionEntry.update({ where: { id: entry.id }, data: { status: "void" } });
+      return "voided";
+    }
+    if (!entry.refundedAt) await this.prisma.client.commissionEntry.update({ where: { id: entry.id }, data: { refundedAt: new Date() } });
+    return "clawback";
+  }
+
   // What a referrer sees about their own programme. Referred businesses show as
   // name and plan only — nothing about their data.
   async overview(userId: string) {
@@ -126,11 +140,39 @@ export class ReferralsService {
     }
     const users = await this.prisma.client.user.findMany({ where: { id: { in: [...byReferrer.keys()] } }, select: { id: true, email: true, name: true } });
     const recent = await this.prisma.client.payout.findMany({ orderBy: { createdAt: "desc" }, take: 20 });
+
+    // Commissions already paid on invoices that were refunded afterwards.
+    const clawRows = await this.prisma.client.commissionEntry.findMany({
+      where: { status: "paid", refundedAt: { not: null }, clawbackRecoveredAt: null },
+      select: { amountInr: true, referral: { select: { referrerUserId: true } } }
+    });
+    const clawByReferrer = new Map<string, { amountInr: number; entries: number }>();
+    for (const r of clawRows) {
+      const cur = clawByReferrer.get(r.referral.referrerUserId) ?? { amountInr: 0, entries: 0 };
+      clawByReferrer.set(r.referral.referrerUserId, { amountInr: cur.amountInr + r.amountInr, entries: cur.entries + 1 });
+    }
+    const clawUsers = await this.prisma.client.user.findMany({ where: { id: { in: [...clawByReferrer.keys()] } }, select: { id: true, email: true, name: true } });
     return {
       terms: { pct: REFERRAL_COMMISSION_PCT, months: REFERRAL_COMMISSION_MONTHS },
       owed: users.map((u) => ({ userId: u.id, email: u.email, name: u.name, ...byReferrer.get(u.id)! })).sort((a, b) => b.amountInr - a.amountInr),
+      toRecover: clawUsers.map((u) => ({ userId: u.id, email: u.email, name: u.name, ...clawByReferrer.get(u.id)! })).sort((a, b) => b.amountInr - a.amountInr),
       recentPayouts: recent
     };
+  }
+
+  // The owner got the money back from the referrer (outside Zenora) and records it.
+  async markClawbackRecovered(adminUserId: string, referrerUserId: string, note: string) {
+    const entries = await this.prisma.client.commissionEntry.findMany({
+      where: { status: "paid", refundedAt: { not: null }, clawbackRecoveredAt: null, referral: { referrerUserId } },
+      select: { id: true, amountInr: true }
+    });
+    if (entries.length === 0) throw new NotFoundException("Nothing to recover from this person");
+    const amountInr = entries.reduce((n, e) => n + e.amountInr, 0);
+    await this.prisma.client.$transaction([
+      this.prisma.client.commissionEntry.updateMany({ where: { id: { in: entries.map((e) => e.id) }, clawbackRecoveredAt: null }, data: { clawbackRecoveredAt: new Date() } }),
+      this.prisma.client.platformAuditLog.create({ data: { userId: adminUserId, action: "commission.clawback_recovered", detail: `₹${amountInr} from ${referrerUserId} (${note})` } })
+    ]);
+    return { recoveredInr: amountInr };
   }
 
   // Records a payment already made to a referrer (outside Zenora) and settles

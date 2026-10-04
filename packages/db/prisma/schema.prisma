@@ -1287,6 +1287,10 @@ model CommissionEntry {
   status     String   @default("accrued") // accrued | paid | void
   payoutId   String?
   createdAt  DateTime @default(now())
+  // The invoice was refunded AFTER this commission had been paid out: the money
+  // is owed back by the referrer until the owner marks it recovered.
+  refundedAt          DateTime?
+  clawbackRecoveredAt DateTime?
 
   referral Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
   payout   Payout?  @relation(fields: [payoutId], references: [id])

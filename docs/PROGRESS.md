@@ -1,5 +1,21 @@
 # Zenora — build progress
 
+## 2026-10-04 — Refunds: invoice status and referral commission
+
+Razorpay refunds were not handled: the invoice stayed "paid" and the referrer kept the commission.
+
+**Done** (Razorpay `refund.processed` webhook)
+- A **full refund** marks the invoice `refunded`, tells the customer in-app, and reverses the referral commission it earned: **not yet paid out → voided** (no money has moved); **already paid out → flagged** (`refundedAt`), because Zenora cannot take paid money back.
+- Admin → Referral payouts has a new **"To recover after refunds"** section per referrer, with **Record recovery** (owner got the money back outside Zenora; audited, `commission.clawback_recovered`). Nothing moves money; it is a ledger, like payouts.
+- **Idempotent** (the same event twice changes nothing) and **partial refunds are only logged**: how much commission or access that should change is a judgement for the owner. The customer's **plan is not changed automatically** by a refund either — end it from the owner console if the refund means that.
+- Schema: `CommissionEntry.refundedAt`, `clawbackRecoveredAt` (migration `20261018100000_commission_clawback`). The webhook setup note (enable `refund.processed` as well as `payment.captured`) is in `docs/DEPLOYMENT.md`.
+
+**Verified**: typecheck, lint, build, tests green (shared 197, worker 91, api 464 = 752). Live against real Neon (real Prisma, real billing and referral services, Razorpay signature stubbed because no credentials exist): seeded three paid invoices with commissions — still-accrued, already-paid-out, partially refunded. Refund events (one delivered twice, one for an unknown payment) left: accrued → `void`; paid → still `paid` but flagged refunded; partial → untouched; two invoices `refunded`, one `paid`; exactly two customer notifications; "owed now" showed only the partially refunded 200, "to recover" showed 200, recording recovery cleared it, and a second attempt was refused. Test rows deleted.
+
+**Not verified / open**
+- **No real Razorpay refund** was made (no credentials): the event shape (`refund.entity.payment_id`, `amount` in paise) is from Razorpay's documentation.
+- The partial-refund policy (and whether a refund should end the plan) is a product decision left open on purpose.
+
 ## 2026-10-04 — Encryption key rotation tool
 
 `TOKEN_ENCRYPTION_KEY` could not be changed without making every stored credential unreadable. `pnpm rotate-key` (`apps/api/src/scripts/rotate-encryption-key.ts`) now re-encrypts all six places that hold encrypted values — Instagram, WhatsApp and ad-account tokens, Google Calendar connections, integration credentials and webhook signing secrets.

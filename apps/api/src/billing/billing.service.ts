@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, UnauthorizedException } from "
 import { computeCheckoutAmount, effectivePlanId, TOPUP_CREDITS, type CheckoutIntent } from "@zenora/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReferralsService } from "../referrals/referrals.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { UsageService } from "./usage.service";
 import { RazorpayClient } from "./razorpay.client";
 import type { ConfirmPaymentDto, CreateCheckoutOrderDto, UpdateBillingProfileDto } from "./dto/billing.dto";
@@ -22,7 +23,8 @@ export class BillingService {
     private readonly prisma: PrismaService,
     private readonly razorpay: RazorpayClient,
     private readonly referrals: ReferralsService,
-    private readonly usage: UsageService
+    private readonly usage: UsageService,
+    private readonly notifications: NotificationsService
   ) {}
 
   async getOverview(workspaceId: string) {
@@ -87,7 +89,11 @@ export class BillingService {
     if (!this.razorpay.verifyWebhookSignature(rawBody, signature)) {
       throw new UnauthorizedException("Invalid webhook signature");
     }
-    const event = JSON.parse(rawBody) as { event: string; payload: { payment?: { entity: RazorpayPaymentEntity } } };
+    const event = JSON.parse(rawBody) as { event: string; payload: { payment?: { entity: RazorpayPaymentEntity }; refund?: { entity: RazorpayRefundEntity } } };
+    if (event.event === "refund.processed" && event.payload.refund) {
+      await this.applyRefund(event.payload.refund.entity);
+      return;
+    }
     if (event.event !== "payment.captured" || !event.payload.payment) return;
 
     const payment = event.payload.payment.entity;
@@ -99,6 +105,34 @@ export class BillingService {
     const intent = JSON.parse(payment.notes.payload ?? "{}") as CheckoutIntent;
     await this.applyPayment(workspaceId, intent, payment.order_id, payment.id, lockedAmount(payment.notes));
     await this.referrals.accrueForPayment(payment.id);
+  }
+
+  // A refund Razorpay has finished processing. A full refund marks the invoice
+  // refunded and takes back the referral commission it earned. Anything partial
+  // is only logged: how much commission or access that should change is a
+  // judgement for the owner, not something to guess at. The customer's plan is
+  // NOT changed automatically either — end it from the owner console if needed.
+  private async applyRefund(refund: RazorpayRefundEntity): Promise<void> {
+    const invoice = await this.prisma.client.invoice.findUnique({ where: { razorpayPaymentId: refund.payment_id } });
+    if (!invoice) {
+      this.logger.warn(`Refund ${refund.id} is for payment ${refund.payment_id}, which has no invoice here — ignoring`);
+      return;
+    }
+    if (invoice.status === "refunded") return; // the same event can arrive more than once
+    const totalPaise = (invoice.amountInr + invoice.gstInr) * 100;
+    if (refund.amount < totalPaise) {
+      this.logger.warn(`Partial refund ${refund.id} (${refund.amount / 100} of ${totalPaise / 100} INR) on invoice ${invoice.id}: left for the owner to handle`);
+      return;
+    }
+    await this.prisma.client.invoice.update({ where: { id: invoice.id }, data: { status: "refunded" } });
+    const commission = await this.referrals.reverseForRefund(invoice.id).catch((err) => {
+      this.logger.error(`Could not reverse the commission for refunded invoice ${invoice.id}: ${err instanceof Error ? err.message : String(err)}`);
+      return "none" as const;
+    });
+    this.logger.log(`Invoice ${invoice.id} refunded (commission: ${commission})`);
+    await this.notifications
+      .create({ workspaceId: invoice.workspaceId, type: "payment_refunded", title: "A refund was issued", body: `₹${invoice.amountInr + invoice.gstInr} for "${invoice.description}" has been refunded.` })
+      .catch(() => undefined);
   }
 
   private async applyPayment(workspaceId: string, intent: CheckoutIntent, orderId: string, paymentId: string, locked: { baseInr: number; gstInr: number } | null = null): Promise<void> {
@@ -202,6 +236,12 @@ export class BillingService {
     const result = await this.prisma.client.subscription.updateMany({ where: { workspaceId }, data: { status: "paused" } });
     if (result.count === 0) throw new BadRequestException("No active subscription to pause");
   }
+}
+
+interface RazorpayRefundEntity {
+  id: string;
+  payment_id: string;
+  amount: number; // paise
 }
 
 interface RazorpayPaymentEntity {

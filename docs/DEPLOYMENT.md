@@ -88,6 +88,7 @@ stored integration credential and channel token.**
 - **Customers say messages stopped arriving:** check the worker heartbeat, then the `webhook-ingress` queue backlog and
   recent `MetaWebhookEvent` rows. Meta retries for a while, and events are stored before they are acknowledged.
 - **Sign-in errors for everyone:** usually Redis or the database; see `/health/ready`. Rate limits fail open if Redis is down.
+- **Razorpay webhook events to enable:** `payment.captured` and `refund.processed`. Without the second, refunds are not reflected (invoice stays "paid", commissions stay).
 - **Payments not applying:** Razorpay's webhook is the source of truth; check its delivery log for non-2xx responses.
   Applying a payment is idempotent, so replaying the event is safe.
 - **Account takeover report:** the person can use Profile → "Sign out of all devices" once back in. If they cannot, bump their session version directly: `UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE email = '…'` (effective within ~15 s on every API instance); there is no admin screen for this yet.

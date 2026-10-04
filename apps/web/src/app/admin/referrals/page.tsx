@@ -12,6 +12,8 @@ export default function AdminReferralsPage() {
   const [paying, setPaying] = useState<OwedRow | null>(null);
   const [reference, setReference] = useState("");
   const [invoiceRef, setInvoiceRef] = useState("");
+  const [recovering, setRecovering] = useState<OwedRow | null>(null);
+  const [recoveryNote, setRecoveryNote] = useState("");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const load = useCallback(() => {
@@ -32,6 +34,21 @@ export default function AdminReferralsPage() {
       load();
     } catch (err) {
       setMessage({ tone: "error", text: (err as ApiError).message ?? "Could not record the payout" });
+    }
+  }
+
+  async function recover(e: React.FormEvent) {
+    e.preventDefault();
+    if (!recovering) return;
+    setMessage(null);
+    try {
+      await apiFetch("/admin/referrals/clawbacks/recovered", { method: "POST", body: JSON.stringify({ referrerUserId: recovering.userId, note: recoveryNote }) });
+      setMessage({ tone: "ok", text: `Recorded ${inr(recovering.amountInr)} recovered from ${recovering.email}.` });
+      setRecovering(null);
+      setRecoveryNote("");
+      load();
+    } catch (err) {
+      setMessage({ tone: "error", text: (err as ApiError).message ?? "Could not record the recovery" });
     }
   }
 
@@ -86,6 +103,44 @@ export default function AdminReferralsPage() {
           </form>
         )}
       </section>
+
+      {data.toRecover.length > 0 && (
+        <section className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4">
+          <h2 className="text-sm font-semibold text-amber-900">To recover after refunds</h2>
+          <p className="mt-1 text-xs text-amber-900">These commissions were already paid, and the customer&apos;s payment was refunded afterwards. Zenora cannot take the money back: recover it yourself, then record it here.</p>
+          <ul className="mt-2 divide-y divide-amber-100 text-sm">
+            {data.toRecover.map((o) => (
+              <li key={o.userId} className="flex items-center justify-between py-2">
+                <span>
+                  {o.name ?? o.email} <span className="text-xs text-amber-800">{o.email} · {o.entries} invoice{o.entries === 1 ? "" : "s"}</span>
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className="font-semibold">{inr(o.amountInr)}</span>
+                  <button type="button" onClick={() => setRecovering(o)} className="text-xs text-brand-700 underline">
+                    Record recovery
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {recovering && (
+            <form onSubmit={recover} className="mt-3 flex flex-col gap-2 rounded-md bg-white p-3">
+              <p className="text-xs text-gray-700">
+                You are recording that you have got back <span className="font-semibold">{inr(recovering.amountInr)}</span> from {recovering.email}.
+              </p>
+              <input required minLength={3} value={recoveryNote} onChange={(e) => setRecoveryNote(e.target.value)} placeholder="How (e.g. bank reference, or netted off their next payout)" className={input} />
+              <div className="flex gap-3">
+                <button type="submit" className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white">
+                  Confirm recovered
+                </button>
+                <button type="button" onClick={() => setRecovering(null)} className="text-xs text-gray-500 underline">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      )}
 
       <section className="mt-4 rounded-md border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">Recent payouts</h2>

@@ -24,6 +24,7 @@ const overridesSchema = z.object({
 });
 const updatePlansSchema = z.object({ overrides: overridesSchema, note: z.string().trim().max(200).optional(), confirmLargePriceChange: z.boolean().optional() });
 const rejectTemplateSchema = z.object({ reason: z.string().trim().min(3).max(200) });
+const clawbackSchema = z.object({ referrerUserId: z.string().min(1), note: z.string().trim().min(3).max(200) });
 const payoutSchema = z.object({ referrerUserId: z.string().min(1), reference: z.string().trim().min(3).max(120), partnerInvoiceRef: z.string().trim().max(60).optional() });
 
 @Controller("admin")
@@ -48,6 +49,12 @@ export class AdminController {
   }
 
   // Records a payment you made outside Zenora; nothing is paid from here.
+  @Post("referrals/clawbacks/recovered")
+  markClawbackRecovered(@CurrentUser() userId: string, @Body(new ZodValidationPipe(clawbackSchema)) body: unknown) {
+    const { referrerUserId, note } = body as z.infer<typeof clawbackSchema>;
+    return this.referrals.markClawbackRecovered(userId, referrerUserId, note);
+  }
+
   @Post("referrals/payouts")
   recordPayout(@CurrentUser() userId: string, @Body(new ZodValidationPipe(payoutSchema)) body: unknown) {
     const { referrerUserId, reference, partnerInvoiceRef } = body as z.infer<typeof payoutSchema>;
