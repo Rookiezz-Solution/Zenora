@@ -9,6 +9,7 @@ import {
   type RoutingRuleInput,
   type ScoringRuleInput
 } from "@zenora/shared";
+import { TriggerEventsService } from "../automations/trigger-events.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { QueueService } from "../queue/queue.service";
 
@@ -23,7 +24,8 @@ export class RoutingEngineService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly queue: QueueService
+    private readonly queue: QueueService,
+    private readonly triggers: TriggerEventsService
   ) {}
 
   async applyToNewLead(workspaceId: string, leadId: string): Promise<void> {
@@ -57,6 +59,7 @@ export class RoutingEngineService {
     if (score !== 0) {
       // A brand-new lead has no aiIntentScore yet, so score == ruleScore here.
       await this.prisma.client.lead.update({ where: { id: leadId }, data: { ruleScore: score, score } });
+      await this.triggers.fireScoreChanged(workspaceId, leadId, lead.score, score).catch(() => undefined);
     }
 
     const assignTo = matchRoutingRule(routingRules as unknown as RoutingRuleInput[], context);

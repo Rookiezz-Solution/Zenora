@@ -4,6 +4,7 @@ import { findMatchingAutomations } from "../automation-engine/trigger-matcher";
 import { publishInboxEvent } from "../realtime";
 import { findOrCreateConversation } from "./conversation";
 import { recordAdReferral } from "./lead-attribution";
+import { fireNewLeadScoreEvent } from "./lead-events";
 import { findOrCreateLeadByIdentity } from "./lead-identity";
 
 interface InstagramWebhookPayload {
@@ -35,9 +36,13 @@ export async function processInstagramPayload(payload: unknown): Promise<void> {
       // Ignore echoes of our own outbound sends (sender === the business account).
       if (!event.message || event.sender.id === entry.id) continue;
 
-      const lead = await findOrCreateLeadByIdentity(account.workspaceId, "ig_scoped_id", event.sender.id);
+      let createdNow = false;
+      const lead = await findOrCreateLeadByIdentity(account.workspaceId, "ig_scoped_id", event.sender.id, {}, () => {
+        createdNow = true;
+      });
       await recordAdReferral(lead.id, event.message.referral ?? event.referral, "instagram");
       const conversation = await findOrCreateConversation(account.workspaceId, lead.id, "instagram");
+      if (createdNow) await fireNewLeadScoreEvent(account.workspaceId, lead.id, conversation.id);
       const message = await prisma.message.upsert({
         where: { externalId: event.message.mid },
         update: {},

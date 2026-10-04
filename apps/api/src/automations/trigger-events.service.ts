@@ -1,27 +1,31 @@
 import { Injectable } from "@nestjs/common";
 import {
+  conditionsPass,
   isTriggerAllowedToFire,
-  matchesCondition,
+  matchesCrmEvent,
   triggerDelayMs,
+  type ConditionMode,
+  type CrmEvent,
+  type CrmEventType,
   type LeadRoutingContext,
   type RoutingCondition,
-  type TagAddedTriggerConfig,
   type TriggerLimits
 } from "@zenora/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { QueueService } from "../queue/queue.service";
 
-interface StoredTagAddedConfig extends TagAddedTriggerConfig {
+type StoredConfig = Record<string, unknown> & {
   conditions?: RoutingCondition[];
+  conditionMode?: ConditionMode;
   limits?: TriggerLimits;
-}
+};
 
 // The API-side twin of apps/worker's message-keyword trigger-matcher — CRM
 // events (docs/PRD.md's custom trigger builder) originate from API actions
-// (LeadsService.addTag) rather than a webhook, so matching happens here
-// instead of the worker. Enqueues the same automation-engine "start" job
-// apps/worker's message processors already use; the worker doesn't care
-// who produced the job.
+// (a tag added, a stage change, a score update) rather than a webhook, so
+// matching happens here instead of the worker. Enqueues the same
+// automation-engine "start" job apps/worker's message processors already use;
+// the worker doesn't care who produced the job.
 @Injectable()
 export class TriggerEventsService {
   constructor(
@@ -29,16 +33,30 @@ export class TriggerEventsService {
     private readonly queue: QueueService
   ) {}
 
-  async fireTagAdded(workspaceId: string, leadId: string, tagName: string): Promise<void> {
+  fireTagAdded(workspaceId: string, leadId: string, tagName: string): Promise<void> {
+    return this.fire(workspaceId, leadId, "tag_added", { tagName });
+  }
+
+  fireStageChanged(workspaceId: string, leadId: string, stageId: string): Promise<void> {
+    return this.fire(workspaceId, leadId, "stage_changed", { stageId });
+  }
+
+  // Raised whenever a lead's score changes; only a rise across a trigger's
+  // threshold starts anything.
+  fireScoreChanged(workspaceId: string, leadId: string, scoreBefore: number, scoreAfter: number): Promise<void> {
+    if (scoreAfter <= scoreBefore) return Promise.resolve();
+    return this.fire(workspaceId, leadId, "score_reached", { scoreBefore, scoreAfter });
+  }
+
+  private async fire(workspaceId: string, leadId: string, type: CrmEventType, event: CrmEvent): Promise<void> {
     const candidates = await this.prisma.client.automation.findMany({
-      where: { workspaceId, status: "live", trigger: { type: "tag_added" } },
+      where: { workspaceId, status: "live", trigger: { type } },
       include: { trigger: true, versions: { where: { publishedAt: { not: null } }, orderBy: { version: "desc" }, take: 1 } }
     });
 
-    const typeMatched = candidates.filter((a) => {
-      const config = a.trigger?.config as unknown as StoredTagAddedConfig | undefined;
-      return config && a.versions[0] && (!config.tagName || config.tagName === tagName);
-    });
+    const configOf = (a: { trigger: { config: unknown } | null }) => a.trigger?.config as unknown as StoredConfig | undefined;
+
+    const typeMatched = candidates.filter((a) => a.versions[0] && matchesCrmEvent(type, configOf(a), event));
     if (typeMatched.length === 0) return;
 
     const lead = await this.prisma.client.lead.findUnique({
@@ -53,8 +71,8 @@ export class TriggerEventsService {
     };
 
     const conditionMatched = typeMatched.filter((a) => {
-      const config = a.trigger?.config as unknown as StoredTagAddedConfig;
-      return !config.conditions || config.conditions.length === 0 || config.conditions.every((c) => matchesCondition(c, context));
+      const config = configOf(a)!;
+      return conditionsPass(config.conditions, config.conditionMode, context);
     });
     if (conditionMatched.length === 0) return;
 
@@ -63,10 +81,7 @@ export class TriggerEventsService {
       select: { automationId: true, status: true }
     });
 
-    const allowed = conditionMatched.filter((a) => {
-      const config = a.trigger?.config as unknown as StoredTagAddedConfig;
-      return isTriggerAllowedToFire(a.id, config.limits, runs);
-    });
+    const allowed = conditionMatched.filter((a) => isTriggerAllowedToFire(a.id, configOf(a)!.limits, runs));
     if (allowed.length === 0) return;
 
     // A flow that sends messages needs a conversation to send through — a
@@ -80,12 +95,11 @@ export class TriggerEventsService {
     if (!conversation) return;
 
     for (const automation of allowed) {
-      const config = automation.trigger?.config as unknown as StoredTagAddedConfig;
       await this.queue.add(
         "automation-engine",
         "start",
         { automationId: automation.id, leadId, conversationId: conversation.id },
-        triggerDelayMs(config.limits)
+        triggerDelayMs(configOf(automation)!.limits)
       );
     }
   }

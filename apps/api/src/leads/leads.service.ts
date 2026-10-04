@@ -127,6 +127,8 @@ export class LeadsService {
       where: { id: leadId },
       data: { aiIntentScore: bonus, aiScoreReasoning: reasoning, score }
     });
+    // A score that rises across a "score reached" trigger's line starts that automation.
+    await this.triggerEvents.fireScoreChanged(workspaceId, leadId, lead.score, score).catch(() => undefined);
 
     return {
       ruleScore: updated.ruleScore,
@@ -369,6 +371,8 @@ export class LeadsService {
       stage: { id: stage.id, name: stage.name, type: stage.type },
       pipelineId: stage.pipelineId
     });
+    // Only a real move starts "moved to a stage" automations; a failure there never fails the move.
+    if (lead.stageId !== stage.id) await this.triggerEvents.fireStageChanged(workspaceId, lead.id, stage.id).catch(() => undefined);
 
     return this.getById(workspaceId, lead.id);
   }

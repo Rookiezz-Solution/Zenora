@@ -1,5 +1,23 @@
 # Zenora — build progress
 
+## 2026-10-04 — More automation triggers: stage changed, score reached, OR conditions
+
+The custom trigger builder could start an automation from a keyword or a tag. It can now start from two more things that happen to a lead, and conditions can be "any one" instead of only "all".
+
+**Done**
+- **Lead moved to a stage** (`stage_changed`): any stage, or one chosen stage (checked to belong to the workspace). Fires only on a real move, not when the lead is already there.
+- **Lead score reaches a level** (`score_reached`, threshold 1–1000): fires **once, at the moment the score rises across the line** — a lead already above it does not fire again, and a falling score never does. Raised by AI intent scoring, by scoring on leads created through forms/booking/API, and by the worker for leads created from a WhatsApp or Instagram message (started once their first conversation exists, because a flow needs a conversation to send through).
+- **"Only if all / any one of these match"**: the extra conditions now combine as AND (default) or OR, on every trigger type including keyword ones.
+- The same once-per-lead and delay limits apply. Matching rules live once in `@zenora/shared` (`matchesCrmEvent`, `conditionsPass`) and are used by both API and worker. The editor has the new options; the API validates everything (threshold range, mode, stage ownership).
+
+**Verified**: typecheck, lint, build, tests green (shared 204, worker 103, api 478 = 785). Live against real Neon, API, worker and Redis: with a live automation set to "moved to *Proposal sent*" and once-per-lead, moving the lead to another stage did nothing, moving it to *Proposal sent* ran the flow (the lead gained the tag), and moving it away and back ran nothing more (exactly one run); a foreign stage id → 400; a "score reaches 20" automation with OR conditions (source = instagram **or** tag = auto-fired, the lead matched only the tag) did not fire for 25→40 or 5→15 but ran when the score went 5→25; threshold 0 → 400. In the browser the editor loaded the saved score trigger with its OR setting. Test data deleted.
+
+**Not verified / open**
+- A real new-lead score trigger from an actual WhatsApp/Instagram message was **not run** (no Meta credentials): the worker hook is covered by unit tests only; the API paths were run live.
+- **Working-hours limit and a scheduled ("every day at 9") trigger are still not built**: the workspace has no working-hours setting yet to define them against.
+- Custom-field-changed events are still not a trigger source.
+- Existing keyword/tag automations are unaffected (no condition mode stored = all).
+
 ## 2026-10-04 — Scheduled ad sync
 
 Ad spend only refreshed when someone pressed "Sync now". It now refreshes itself.

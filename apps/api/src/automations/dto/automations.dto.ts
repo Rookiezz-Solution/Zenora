@@ -110,6 +110,9 @@ const triggerConditionSchema = z.object({
   fieldId: z.string().optional()
 });
 
+const stageChangedConfigSchema = z.object({ stageId: z.string().min(1).nullable() });
+const scoreReachedConfigSchema = z.object({ threshold: z.number().int().min(1).max(1000) });
+
 const triggerLimitsSchema = z.object({
   onceForLead: z.boolean().optional(),
   delayMinutes: z.number().int().positive().optional()
@@ -118,13 +121,17 @@ const triggerLimitsSchema = z.object({
 const triggerTypeAndConfigSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("whatsapp_message_keyword"), config: keywordConfigSchema }),
   z.object({ type: z.literal("instagram_dm_keyword"), config: keywordConfigSchema }),
-  z.object({ type: z.literal("tag_added"), config: tagAddedConfigSchema })
+  z.object({ type: z.literal("tag_added"), config: tagAddedConfigSchema }),
+  z.object({ type: z.literal("stage_changed"), config: stageChangedConfigSchema }),
+  z.object({ type: z.literal("score_reached"), config: scoreReachedConfigSchema })
 ]);
 
 export const setTriggerSchema = z.intersection(
   triggerTypeAndConfigSchema,
   z.object({
     conditions: z.array(triggerConditionSchema).optional(),
+    // How the conditions combine: every one must hold ("all", the default) or just one ("any").
+    conditionMode: z.enum(["all", "any"]).optional(),
     limits: triggerLimitsSchema.optional()
   })
 );
@@ -135,6 +142,7 @@ export const createSavedTriggerSchema = z.intersection(
   z.object({
     name: z.string().min(1),
     conditions: z.array(triggerConditionSchema).optional(),
+    conditionMode: z.enum(["all", "any"]).optional(),
     limits: triggerLimitsSchema.optional()
   })
 );

@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "../prisma/prisma.service";
+import type { TriggerEventsService } from "../automations/trigger-events.service";
 import type { QueueService } from "../queue/queue.service";
 import { RoutingEngineService } from "./routing-engine.service";
 
 function makeClient(overrides: Record<string, unknown> = {}) {
   return {
     lead: {
-      findUnique: vi.fn().mockResolvedValue({ id: "lead1", source: "instagram", tags: [{ tag: { name: "vip" } }], fieldValues: [] }),
+      findUnique: vi.fn().mockResolvedValue({ id: "lead1", source: "instagram", score: 0, tags: [{ tag: { name: "vip" } }], fieldValues: [] }),
       update: vi.fn(),
       count: vi.fn().mockResolvedValue(0)
     },
@@ -25,6 +26,10 @@ function makePrisma(client: ReturnType<typeof makeClient>) {
   return { client } as unknown as PrismaService;
 }
 
+function makeTriggers() {
+  return { fireScoreChanged: vi.fn().mockResolvedValue(undefined) } as unknown as TriggerEventsService;
+}
+
 function makeQueue() {
   return { add: vi.fn() } as unknown as QueueService;
 }
@@ -40,16 +45,28 @@ describe("RoutingEngineService.applyToNewLead", () => {
       membership: { findMany: vi.fn().mockResolvedValue([{ userId: "u1", available: true }]) }
     });
     const queue = makeQueue();
-    const service = new RoutingEngineService(makePrisma(client), queue);
+    const service = new RoutingEngineService(makePrisma(client), queue, makeTriggers());
 
     await service.applyToNewLead("ws1", "lead1");
 
     expect(client.lead.update).toHaveBeenCalledWith({ where: { id: "lead1" }, data: { ruleScore: 25, score: 25 } });
   });
 
+  it("raises the score trigger when scoring lifts a new lead, and never lets a trigger failure stop routing", async () => {
+    const client = makeClient({
+      scoringRule: { findMany: vi.fn().mockResolvedValue([{ condition: { field: "tag", operator: "contains", value: "vip" }, points: 25 }]) },
+      membership: { findMany: vi.fn().mockResolvedValue([{ userId: "u1", available: true }]) }
+    });
+    const triggers = makeTriggers();
+    (triggers.fireScoreChanged as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("queue down"));
+    await new RoutingEngineService(makePrisma(client), makeQueue(), triggers).applyToNewLead("ws1", "lead1");
+    expect(triggers.fireScoreChanged).toHaveBeenCalledWith("ws1", "lead1", 0, 25);
+    expect(client.assignment.create).toHaveBeenCalled(); // routing still happened
+  });
+
   it("does not write a score update when no rule matches", async () => {
     const client = makeClient({ membership: { findMany: vi.fn().mockResolvedValue([{ userId: "u1", available: true }]) } });
-    const service = new RoutingEngineService(makePrisma(client), makeQueue());
+    const service = new RoutingEngineService(makePrisma(client), makeQueue(), makeTriggers());
 
     await service.applyToNewLead("ws1", "lead1");
 
@@ -72,7 +89,7 @@ describe("RoutingEngineService.applyToNewLead", () => {
         )
       }
     });
-    const service = new RoutingEngineService(makePrisma(client), makeQueue());
+    const service = new RoutingEngineService(makePrisma(client), makeQueue(), makeTriggers());
 
     await service.applyToNewLead("ws1", "lead1");
 
@@ -83,7 +100,7 @@ describe("RoutingEngineService.applyToNewLead", () => {
   it("starts an SLA timer and queues the salesperson alert once assigned", async () => {
     const client = makeClient({ membership: { findMany: vi.fn().mockResolvedValue([{ userId: "u1", available: true }]) } });
     const queue = makeQueue();
-    const service = new RoutingEngineService(makePrisma(client), queue);
+    const service = new RoutingEngineService(makePrisma(client), queue, makeTriggers());
 
     await service.applyToNewLead("ws1", "lead1");
 
@@ -96,7 +113,7 @@ describe("RoutingEngineService.applyToNewLead", () => {
 
   it("leaves the lead unassigned without throwing when no member is available", async () => {
     const client = makeClient({ membership: { findMany: vi.fn().mockResolvedValue([]) } });
-    const service = new RoutingEngineService(makePrisma(client), makeQueue());
+    const service = new RoutingEngineService(makePrisma(client), makeQueue(), makeTriggers());
 
     await expect(service.applyToNewLead("ws1", "lead1")).resolves.toBeUndefined();
     expect(client.assignment.create).not.toHaveBeenCalled();
@@ -104,7 +121,7 @@ describe("RoutingEngineService.applyToNewLead", () => {
 
   it("swallows errors so a routing failure never throws out of lead creation", async () => {
     const client = makeClient({ lead: { findUnique: vi.fn().mockRejectedValue(new Error("db down")), update: vi.fn(), count: vi.fn() } });
-    const service = new RoutingEngineService(makePrisma(client), makeQueue());
+    const service = new RoutingEngineService(makePrisma(client), makeQueue(), makeTriggers());
 
     await expect(service.applyToNewLead("ws1", "lead1")).resolves.toBeUndefined();
   });

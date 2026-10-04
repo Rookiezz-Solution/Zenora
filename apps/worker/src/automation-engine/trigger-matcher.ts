@@ -1,8 +1,12 @@
 import { prisma } from "@zenora/db";
 import {
+  conditionsPass,
   isTriggerAllowedToFire,
-  matchesCondition,
+  matchesCrmEvent,
   triggerDelayMs,
+  type ConditionMode,
+  type CrmEvent,
+  type CrmEventType,
   type KeywordTriggerConfig,
   type LeadRoutingContext,
   type RoutingCondition,
@@ -12,6 +16,7 @@ import {
 
 interface StoredTriggerConfig extends KeywordTriggerConfig {
   conditions?: RoutingCondition[];
+  conditionMode?: ConditionMode;
   limits?: TriggerLimits;
 }
 
@@ -64,9 +69,9 @@ export async function findMatchingAutomations(
   const context = needsContext ? await buildLeadContext(leadId) : null;
 
   const conditionMatched = keywordMatched.filter((a) => {
-    const conditions = configOf(a).conditions;
+    const { conditions, conditionMode } = configOf(a);
     if (!conditions || conditions.length === 0) return true;
-    return context !== null && conditions.every((c) => matchesCondition(c, context));
+    return context !== null && conditionsPass(conditions, conditionMode, context);
   });
   if (conditionMatched.length === 0) return [];
 
@@ -78,4 +83,29 @@ export async function findMatchingAutomations(
   return conditionMatched
     .filter((a) => isTriggerAllowedToFire(a.id, configOf(a).limits, runs))
     .map((a) => ({ ...a, delayMs: triggerDelayMs(configOf(a).limits) }));
+}
+
+// Automations started by something that happened to a lead (a score reaching a
+// level), found the same way as for a message: the trigger matches the event,
+// its extra conditions hold, and its limits allow another run. The API has a
+// twin of this for the events it raises (apps/api trigger-events.service.ts).
+export async function findCrmEventAutomations(workspaceId: string, leadId: string, type: CrmEventType, event: CrmEvent) {
+  const candidates = await prisma.automation.findMany({
+    where: { workspaceId, status: "live", trigger: { type } },
+    include: { trigger: true, versions: { where: { publishedAt: { not: null } }, orderBy: { version: "desc" }, take: 1 } }
+  });
+  const configOf = (a: { trigger: { config: unknown } | null }) => a.trigger?.config as unknown as StoredTriggerConfig | undefined;
+
+  const typeMatched = candidates.filter((a) => a.versions[0] && matchesCrmEvent(type, configOf(a) as unknown as Record<string, unknown>, event));
+  if (typeMatched.length === 0) return [];
+
+  const context = await buildLeadContext(leadId);
+  const conditionMatched = typeMatched.filter((a) => conditionsPass(configOf(a)!.conditions, configOf(a)!.conditionMode, context));
+  if (conditionMatched.length === 0) return [];
+
+  const runs = await prisma.automationRun.findMany({
+    where: { automationId: { in: conditionMatched.map((m) => m.id) }, leadId },
+    select: { automationId: true, status: true }
+  });
+  return conditionMatched.filter((a) => isTriggerAllowedToFire(a.id, configOf(a)!.limits, runs)).map((a) => ({ ...a, delayMs: triggerDelayMs(configOf(a)!.limits) }));
 }

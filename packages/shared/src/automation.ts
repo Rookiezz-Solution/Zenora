@@ -99,7 +99,7 @@ export interface FlowGraph {
   blocks: Record<string, FlowBlock>;
 }
 
-export const TRIGGER_TYPES = ["instagram_dm_keyword", "whatsapp_message_keyword", "tag_added"] as const;
+export const TRIGGER_TYPES = ["instagram_dm_keyword", "whatsapp_message_keyword", "tag_added", "stage_changed", "score_reached"] as const;
 export type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 export const KEYWORD_MATCH_TYPES = ["contains", "exact", "any"] as const;

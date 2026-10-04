@@ -122,10 +122,11 @@ export class AutomationsService {
 
   async setTrigger(workspaceId: string, id: string, userId: string, dto: SetTriggerDto) {
     const automation = await this.ensure(workspaceId, id);
+    await this.assertStageInWorkspace(workspaceId, dto);
     // conditions/limits (docs/PRD.md's custom trigger builder) live inside
     // the same Trigger.config JSON blob as the type-specific config, since
     // the schema only has one config column.
-    const config = { ...dto.config, conditions: dto.conditions, limits: dto.limits } as Prisma.InputJsonValue;
+    const config = { ...dto.config, conditions: dto.conditions, conditionMode: dto.conditionMode, limits: dto.limits } as Prisma.InputJsonValue;
     const trigger = automation.triggerId
       ? await this.prisma.client.trigger.update({ where: { id: automation.triggerId }, data: { type: dto.type, config } })
       : await this.prisma.client.trigger.create({ data: { type: dto.type, config } });
@@ -140,8 +141,18 @@ export class AutomationsService {
     return this.prisma.client.savedTrigger.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" } });
   }
 
-  createSavedTrigger(workspaceId: string, dto: CreateSavedTriggerDto) {
-    const config = { ...dto.config, conditions: dto.conditions, limits: dto.limits } as Prisma.InputJsonValue;
+  // A "moved to this stage" trigger may only name a stage of this workspace.
+  private async assertStageInWorkspace(workspaceId: string, dto: { type: string; config: unknown }) {
+    if (dto.type !== "stage_changed") return;
+    const stageId = (dto.config as { stageId: string | null }).stageId;
+    if (!stageId) return;
+    const stage = await this.prisma.client.stage.findFirst({ where: { id: stageId, pipeline: { workspaceId } }, select: { id: true } });
+    if (!stage) throw new BadRequestException("That stage does not belong to this workspace");
+  }
+
+  async createSavedTrigger(workspaceId: string, dto: CreateSavedTriggerDto) {
+    await this.assertStageInWorkspace(workspaceId, dto);
+    const config = { ...dto.config, conditions: dto.conditions, conditionMode: dto.conditionMode, limits: dto.limits } as Prisma.InputJsonValue;
     return this.prisma.client.savedTrigger.create({ data: { workspaceId, name: dto.name, type: dto.type, config } });
   }
 

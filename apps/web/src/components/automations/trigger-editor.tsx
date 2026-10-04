@@ -5,6 +5,8 @@ import type { CustomField } from "@/lib/pipeline-types";
 import {
   TRIGGER_LABELS,
   fromStored,
+  isEventTrigger,
+  type ConditionMode,
   type KeywordMatch,
   type SavedTrigger,
   type TriggerCondition,
@@ -18,6 +20,7 @@ export function TriggerEditor({
   value,
   onChange,
   customFields,
+  stages,
   savedTriggers,
   onSave,
   onSaveAs,
@@ -26,6 +29,7 @@ export function TriggerEditor({
   value: TriggerDefinition;
   onChange: (next: TriggerDefinition) => void;
   customFields: CustomField[];
+  stages: { id: string; name: string }[];
   savedTriggers: SavedTrigger[];
   onSave: () => void;
   onSaveAs: (name: string) => void;
@@ -33,7 +37,7 @@ export function TriggerEditor({
 }) {
   const [savedName, setSavedName] = useState("");
   const [pickedSavedId, setPickedSavedId] = useState("");
-  const isKeyword = value.type !== "tag_added";
+  const isKeyword = !isEventTrigger(value.type);
 
   function patch(partial: Partial<TriggerDefinition>) {
     onChange({ ...value, ...partial });
@@ -118,6 +122,27 @@ export function TriggerEditor({
               <option value="any">any message</option>
             </select>
           </>
+        ) : value.type === "stage_changed" ? (
+          <select value={value.stageId} onChange={(e) => patch({ stageId: e.target.value })} className="rounded-md border border-gray-300 px-2 py-1.5">
+            <option value="">any stage</option>
+            {stages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        ) : value.type === "score_reached" ? (
+          <>
+            <input
+              type="number"
+              min={1}
+              max={1000}
+              value={value.scoreThreshold}
+              onChange={(e) => patch({ scoreThreshold: e.target.value })}
+              className="w-24 rounded-md border border-gray-300 px-2 py-1.5"
+            />
+            <span className="text-xs text-gray-500">points (starts once, when the score rises to this level)</span>
+          </>
         ) : (
           <input
             value={value.tagName}
@@ -129,7 +154,14 @@ export function TriggerEditor({
       </div>
 
       <div>
-        <p className="text-xs font-medium text-gray-700">Only if all of these match the lead</p>
+        <p className="flex flex-wrap items-center gap-1 text-xs font-medium text-gray-700">
+          Only if
+          <select value={value.conditionMode} onChange={(e) => patch({ conditionMode: e.target.value as ConditionMode })} className="rounded-md border border-gray-300 px-1 py-0.5 text-xs">
+            <option value="all">all</option>
+            <option value="any">any one</option>
+          </select>
+          of these match the lead
+        </p>
         <div className="mt-1 space-y-2">
           {value.conditions.map((c, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">

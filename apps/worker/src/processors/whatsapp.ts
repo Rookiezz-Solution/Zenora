@@ -4,6 +4,7 @@ import { findMatchingAutomations } from "../automation-engine/trigger-matcher";
 import { publishInboxEvent } from "../realtime";
 import { findOrCreateConversation } from "./conversation";
 import { recordAdReferral } from "./lead-attribution";
+import { fireNewLeadScoreEvent } from "./lead-events";
 import { findOrCreateLeadByIdentity } from "./lead-identity";
 
 interface MessagesValue {
@@ -55,12 +56,19 @@ async function processMessages(value: MessagesValue) {
 
   for (const message of value.messages ?? []) {
     const contact = contactsByWaId.get(message.from);
-    const lead = await findOrCreateLeadByIdentity(number.workspaceId, "wa_phone", message.from, {
-      name: contact?.profile?.name,
-      phone: message.from
-    });
+    let createdNow = false;
+    const lead = await findOrCreateLeadByIdentity(
+      number.workspaceId,
+      "wa_phone",
+      message.from,
+      { name: contact?.profile?.name, phone: message.from },
+      () => {
+        createdNow = true;
+      }
+    );
     await recordAdReferral(lead.id, message.referral, "whatsapp");
     const conversation = await findOrCreateConversation(number.workspaceId, lead.id, "whatsapp");
+    if (createdNow) await fireNewLeadScoreEvent(number.workspaceId, lead.id, conversation.id);
     const created = await prisma.message.upsert({
       where: { externalId: message.id },
       update: {},

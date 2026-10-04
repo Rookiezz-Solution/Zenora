@@ -12,7 +12,9 @@ export async function findOrCreateLeadByIdentity(
   workspaceId: string,
   type: "ig_scoped_id" | "wa_phone",
   value: string,
-  attrs: { name?: string; phone?: string } = {}
+  attrs: { name?: string; phone?: string } = {},
+  // Called only when this message created the lead (not for a returning one).
+  onCreated?: () => void
 ) {
   const existing = await prisma.leadIdentity.findUnique({
     where: { type_value: { type, value } },
@@ -33,5 +35,6 @@ export async function findOrCreateLeadByIdentity(
   // one whose identity we already knew (docs/ROADMAP.md Phase 1 item 8).
   await applyToNewLead(workspaceId, lead.id);
   await emitWebhookEvent(workspaceId, "lead.created", leadWebhookData(lead));
+  onCreated?.();
   return lead;
 }

@@ -22,7 +22,7 @@ function makeUsage() {
 }
 
 function makeTriggerEvents() {
-  return { fireTagAdded: vi.fn().mockResolvedValue(undefined) } as unknown as TriggerEventsService;
+  return { fireTagAdded: vi.fn().mockResolvedValue(undefined), fireStageChanged: vi.fn().mockResolvedValue(undefined), fireScoreChanged: vi.fn().mockResolvedValue(undefined) } as unknown as TriggerEventsService;
 }
 
 function makeAi() {
@@ -414,5 +414,57 @@ describe("LeadsService.recordConsent", () => {
     const { service, create } = make(null);
     await expect(service.recordConsent("ws1", "elsewhere", "u1", { type: "marketing", granted: true, source: "x y" })).rejects.toThrow("Lead not found");
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe("LeadsService CRM-event triggers", () => {
+  const webhooks = () => ({ emit: vi.fn() }) as unknown as WebhooksService;
+
+  function stagePrisma(currentStageId: string | null) {
+    const tx = { lead: { update: vi.fn() }, leadFieldValue: { upsert: vi.fn() } };
+    const client = {
+      lead: { findFirst: vi.fn().mockResolvedValue({ id: "lead-1", workspaceId: "ws1", stageId: currentStageId }), findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "lead-1" }) },
+      leadIdentity: { findMany: vi.fn().mockResolvedValue([]) },
+      leadTag: { findMany: vi.fn().mockResolvedValue([]) },
+      note: { findMany: vi.fn().mockResolvedValue([]) },
+      consent: { findMany: vi.fn().mockResolvedValue([]) },
+      leadFieldValue: { findMany: vi.fn().mockResolvedValue([]) },
+      stage: { findFirst: vi.fn().mockResolvedValue({ id: "stage-2", name: "Proposal", type: "open", pipelineId: "pipe-1", requiredFieldIds: [], pipeline: { id: "pipe-1" } }) },
+      $transaction: vi.fn().mockImplementation((cb: (tx: unknown) => unknown) => cb(tx))
+    };
+    return { client } as unknown as PrismaService;
+  }
+
+  it("starts 'moved to a stage' automations when a lead really moves", async () => {
+    const triggers = makeTriggerEvents();
+    const service = new LeadsService(stagePrisma("stage-1"), makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), triggers, webhooks());
+    await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-2" });
+    expect(triggers.fireStageChanged).toHaveBeenCalledWith("ws1", "lead-1", "stage-2");
+  });
+
+  it("does not, when the lead is already in that stage", async () => {
+    const triggers = makeTriggerEvents();
+    const service = new LeadsService(stagePrisma("stage-2"), makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), triggers, webhooks());
+    await service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-2" });
+    expect(triggers.fireStageChanged).not.toHaveBeenCalled();
+  });
+
+  it("never fails the move because a trigger failed", async () => {
+    const triggers = makeTriggerEvents();
+    (triggers.fireStageChanged as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("queue down"));
+    const service = new LeadsService(stagePrisma("stage-1"), makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), triggers, webhooks());
+    await expect(service.moveStage("ws1", "lead-1", "user1", { stageId: "stage-2" })).resolves.toBeDefined();
+  });
+
+  it("raises the score trigger with the old and new score after AI scoring", async () => {
+    const lead = { id: "lead1", workspaceId: "ws1", ruleScore: 20, aiIntentScore: 0, score: 20 };
+    const client = {
+      lead: { findFirst: vi.fn().mockResolvedValue(lead), update: vi.fn().mockImplementation(({ data }: { data: object }) => Promise.resolve({ ...lead, ...data })) },
+      message: { findMany: vi.fn().mockResolvedValue([{ direction: "inbound", body: "What is the price?" }]) }
+    };
+    const triggers = makeTriggerEvents();
+    const service = new LeadsService({ client } as unknown as PrismaService, makeAudit(), makeRoutingEngine(), makeUsage(), makeAi(), triggers, webhooks());
+    await service.scoreIntent("ws1", "lead1");
+    expect(triggers.fireScoreChanged).toHaveBeenCalledWith("ws1", "lead1", 20, 30);
   });
 });

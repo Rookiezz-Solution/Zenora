@@ -185,6 +185,7 @@ export default function AutomationEditorPage() {
                 value={trigger}
                 onChange={setTrigger}
                 customFields={customFields}
+                stages={stages}
                 savedTriggers={savedTriggers}
                 onSave={saveTrigger}
                 onSaveAs={saveTriggerAs}
