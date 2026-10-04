@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { assertMember } from "../common/workspace-refs";
 import { Prisma } from "@zenora/db";
 import { validateFlowGraph, type FlowBlock, type FlowGraph } from "@zenora/shared";
 import { AuditService } from "../audit/audit.service";
@@ -102,6 +103,9 @@ export class AutomationsService {
   // published a version is immutable, so further edits start a new one.
   async saveDraft(workspaceId: string, id: string, dto: SaveDraftDto) {
     const automation = await this.getById(workspaceId, id);
+    // An "assign" step may only hand a lead to someone in this workspace.
+    const assignees = Object.values(dto.graph.blocks).flatMap((b) => (b.type === "assign" && b.userId ? [b.userId] : []));
+    for (const userId of new Set(assignees)) await assertMember(this.prisma, workspaceId, userId);
     if (automation.draft && !automation.draft.publishedAt) {
       await this.prisma.client.automationVersion.update({
         where: { id: automation.draft.id },

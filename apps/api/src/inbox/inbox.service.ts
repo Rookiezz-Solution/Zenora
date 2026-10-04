@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { assertMember } from "../common/workspace-refs";
 import { AiClient } from "../ai/ai.client";
 import { UsageService } from "../billing/usage.service";
 import { decryptToken } from "../common/encryption";
@@ -187,6 +188,7 @@ export class InboxService {
   }
 
   async assign(workspaceId: string, conversationId: string, dto: AssignConversationDto) {
+    await assertMember(this.prisma, workspaceId, dto.userId);
     const result = await this.prisma.client.conversation.updateMany({
       where: { id: conversationId, workspaceId },
       data: { assignedToId: dto.userId }

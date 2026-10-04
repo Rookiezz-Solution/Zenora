@@ -9,6 +9,9 @@ vi.mock("bcryptjs", async (importOriginal) => {
   return { ...real, default: real, compare: vi.fn(real.compare) };
 });
 
+// Real bcrypt (cost 12) is deliberately used for timing parity, which is slow on a busy machine.
+vi.setConfig({ testTimeout: 30_000 });
+
 beforeAll(() => {
   process.env.AUTH_SECRET = "test-secret-at-least-16-chars";
   process.env.TOKEN_ENCRYPTION_KEY = "a1".repeat(32);

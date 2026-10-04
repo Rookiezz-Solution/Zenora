@@ -30,6 +30,7 @@ penetration test by a third party is still needed before launch.
 | 11 | Medium | **Vulnerable dependencies**: 42 advisories (2 critical, 16 high) — Next.js 14 (RCE in image optimisation, DoS, SSRF) and transitive `multer`, `postcss`, `qs`, `body-parser`. | Next.js upgraded to 15.5.27; patched versions forced through `overrides` in `pnpm-workspace.yaml`. **42 → 3 moderate.** |
 | 12 | Low | Missing security headers. | `nosniff`, frame denial, referrer and permissions policies on the API and web app; `X-Powered-By` removed. |
 | 13 | Low | Per-IP limits would key on the proxy's address behind a load balancer. | `TRUST_PROXY` (number of proxies) is honoured; unset by default so addresses can't be spoofed. |
+| 14 | Medium | **Foreign ids in request bodies.** A task could name a lead from another workspace and the task list then returned that lead's name and phone; assignees, routing-rule targets and automation assign steps accepted users or teams from any workspace. | `common/workspace-refs.ts` confirms the member, lead or team belongs to the workspace in the URL before anything is written. |
 
 Side effect to know about: existing sessions are signed out once on deploy
 (session tokens changed shape), and the account-based login limit means a
@@ -54,10 +55,6 @@ determined attacker can lock a *known* account out for 15 minutes.
 - **Rate limits are per process.** Move to Redis before running more than one API instance.
 - Remaining advisories: `@nestjs/core` 10 (needs the Nest 11 upgrade) and
   `file-type` (only reachable through file uploads, which Zenora doesn't offer).
-- Authorisation of foreign ids inside bodies is not uniformly checked (e.g.
-  assigning a conversation to a user id). The caller can only name ids they
-  already know and the effect stays within their own workspace, but they should
-  be validated as workspace members.
 - No automated DAST/SAST in CI, no secrets scanning, no dependency-update bot.
 - Third-party credentials (Meta, Google, Razorpay, Anthropic) have never been
   exercised for real, so those integrations are unreviewed against live behaviour.

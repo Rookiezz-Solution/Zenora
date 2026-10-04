@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { assertLeadInWorkspace, assertMember } from "../common/workspace-refs";
 import { PrismaService } from "../prisma/prisma.service";
 import type { CreateTaskDto, ListTasksQuery, UpdateTaskDto } from "./dto/tasks.dto";
 
@@ -20,7 +21,8 @@ export class TasksService {
     });
   }
 
-  create(workspaceId: string, dto: CreateTaskDto) {
+  async create(workspaceId: string, dto: CreateTaskDto) {
+    await Promise.all([assertLeadInWorkspace(this.prisma, workspaceId, dto.leadId), assertMember(this.prisma, workspaceId, dto.assignedToId)]);
     return this.prisma.client.task.create({
       data: {
         workspaceId,
@@ -33,6 +35,7 @@ export class TasksService {
   }
 
   async update(workspaceId: string, id: string, dto: UpdateTaskDto) {
+    await assertMember(this.prisma, workspaceId, dto.assignedToId);
     const result = await this.prisma.client.task.updateMany({
       where: { id, workspaceId },
       data: {

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { assertMember, assertTeamInWorkspace } from "../common/workspace-refs";
 import { Prisma } from "@zenora/db";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
@@ -17,7 +18,14 @@ export class RoutingRulesService {
     return this.prisma.client.routingRule.findMany({ where: { workspaceId }, orderBy: { order: "asc" } });
   }
 
+  // A rule may only send leads to someone, or a team, in this workspace.
+  private async assertAssignTarget(workspaceId: string, assignTo: { type: string; targetId?: string } | undefined) {
+    if (assignTo?.type === "user") await assertMember(this.prisma, workspaceId, assignTo.targetId);
+    if (assignTo?.type === "team") await assertTeamInWorkspace(this.prisma, workspaceId, assignTo.targetId);
+  }
+
   async createRoutingRule(workspaceId: string, dto: CreateRoutingRuleDto) {
+    await this.assertAssignTarget(workspaceId, dto.assignTo);
     const count = await this.prisma.client.routingRule.count({ where: { workspaceId } });
     return this.prisma.client.routingRule.create({
       data: {
@@ -30,6 +38,7 @@ export class RoutingRulesService {
   }
 
   async updateRoutingRule(workspaceId: string, id: string, dto: UpdateRoutingRuleDto) {
+    await this.assertAssignTarget(workspaceId, dto.assignTo);
     const result = await this.prisma.client.routingRule.updateMany({
       where: { id, workspaceId },
       data: {

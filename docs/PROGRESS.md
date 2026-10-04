@@ -1,5 +1,15 @@
 # Zenora — build progress
 
+## 2026-10-15 — Hardening: foreign ids in request bodies
+
+The roadmap is complete; this closes the first item on the open list in `docs/SECURITY.md`.
+
+**Found and fixed**: a request body can name other records by id, and several endpoints trusted it. The worst was a **real cross-workspace leak**: a task could be created with a `leadId` from *another* workspace, and the task list then returned that lead's name and phone. Also unchecked: task assignees, conversation assignees, routing-rule targets (user or team) and "assign" steps in an automation draft, all of which accepted users or teams from any workspace. A small shared helper (`common/workspace-refs.ts`: `assertMember`, `assertLeadInWorkspace`, `assertTeamInWorkspace`) now confirms each belongs to the workspace in the URL before anything is written; `null` still means "unassign". Already correct and left alone: broadcast template, lead stage move, stage reordering, appointment host, reminder template.
+
+**Also**: the auth spec uses real bcrypt (cost 12, deliberately, for timing parity) and timed out once under full-suite CPU load; its timeout is now realistic.
+
+**Verified**: typecheck, lint, build, tests (api 357) green. Live (real Neon + API): an "attacker" in one workspace creating a task for a lead id from another workspace → 400 and nothing of the victim appears in their task list; assigning a task to the other workspace's user → 400; creating an unassigned task and one assigned to their own user → 201. Test data deleted.
+
 ## 2026-10-14 — Phase 2 leftover: audience sync (as a consent-filtered customer list)
 
 **Default chosen, deliberately narrower than "sync"**: Meta's API for pushing customer lists needs the `ads_management` permission, which can change and create a business's ads. Zenora tells users it asks for **read-only** access (`ads_read`), so I did not widen that. Instead Zenora produces the file Meta's own **Customer list** upload accepts, and the owner uploads it in Ads Manager. **Nothing is sent to Meta from Zenora.**
