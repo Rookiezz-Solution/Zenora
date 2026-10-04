@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { canChangeMemberRole, canInviteWithRole } from "@zenora/shared";
+import { TRIAL_DAYS, TRIAL_PLAN, canChangeMemberRole, canInviteWithRole } from "@zenora/shared";
 import { forgetMembership } from "../auth/guards/permissions.guard";
 import * as crypto from "node:crypto";
 import { Prisma } from "@zenora/db";
@@ -27,12 +27,18 @@ export class WorkspacesService {
   ) {}
 
   async create(userId: string, dto: CreateWorkspaceDto) {
+    // The 14-day trial goes to a person's first workspace only, so opening more
+    // workspaces is not a way to keep restarting it.
+    const ownedBefore = await this.prisma.client.membership.count({ where: { userId, role: "owner" } });
+    const trial = ownedBefore === 0;
     const workspace = await this.prisma.client.workspace.create({
       data: {
         name: dto.name,
         mode: dto.mode,
         industry: dto.industry,
-        memberships: { create: { userId, role: "owner" } }
+        ...(trial ? { planId: TRIAL_PLAN } : {}),
+        memberships: { create: { userId, role: "owner" } },
+        ...(trial ? { subscription: { create: { planId: TRIAL_PLAN, status: "trialing", trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000) } } } : {})
       }
     });
     await this.referrals.attribute(workspace.id, userId, dto.ref);

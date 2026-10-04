@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
-import { computeCheckoutAmount, TOPUP_CREDITS, type CheckoutIntent } from "@zenora/shared";
+import { computeCheckoutAmount, effectivePlanId, TOPUP_CREDITS, type CheckoutIntent } from "@zenora/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReferralsService } from "../referrals/referrals.service";
+import { UsageService } from "./usage.service";
 import { RazorpayClient } from "./razorpay.client";
 import type { ConfirmPaymentDto, CreateCheckoutOrderDto, UpdateBillingProfileDto } from "./dto/billing.dto";
 
@@ -20,7 +21,8 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly razorpay: RazorpayClient,
-    private readonly referrals: ReferralsService
+    private readonly referrals: ReferralsService,
+    private readonly usage: UsageService
   ) {}
 
   async getOverview(workspaceId: string) {
@@ -109,11 +111,17 @@ export class BillingService {
     const now = new Date();
 
     if (intent.kind === "plan") {
-      const periodEnd = new Date(now.getTime() + (intent.billingCycle === "yearly" ? 365 : 30) * DAY_MS);
+      const existing = await this.prisma.client.subscription.findUnique({ where: { workspaceId } });
+      const previousPlan = effectivePlanId(existing, now);
+      // Paying again for the plan you are already on adds to the time left
+      // instead of throwing it away; a new plan starts from today.
+      const runsUntil = previousPlan === intent.planId && existing?.status !== "trialing" ? existing?.currentPeriodEnd : null;
+      const start = runsUntil && runsUntil.getTime() > now.getTime() ? runsUntil : now;
+      const periodEnd = new Date(start.getTime() + (intent.billingCycle === "yearly" ? 365 : 30) * DAY_MS);
       await this.prisma.client.$transaction([
         this.prisma.client.subscription.upsert({
           where: { workspaceId },
-          update: { planId: intent.planId, status: "active", billingCycle: intent.billingCycle, currentPeriodEnd: periodEnd },
+          update: { planId: intent.planId, status: "active", billingCycle: intent.billingCycle, currentPeriodEnd: periodEnd, trialEndsAt: null },
           create: { workspaceId, planId: intent.planId, status: "active", billingCycle: intent.billingCycle, currentPeriodEnd: periodEnd }
         }),
         this.prisma.client.workspace.update({ where: { id: workspaceId }, data: { planId: intent.planId } }),
@@ -131,6 +139,10 @@ export class BillingService {
           }
         })
       ]);
+      if (previousPlan !== intent.planId) {
+        // The invoice is already written, so a failure here must not make the payment look failed.
+        await this.usage.resetCreditsToPlan(workspaceId).catch((err) => this.logger.warn(`Could not reset AI credits after a plan change: ${err instanceof Error ? err.message : String(err)}`));
+      }
       return;
     }
 

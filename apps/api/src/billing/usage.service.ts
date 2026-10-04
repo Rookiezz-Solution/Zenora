@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@zenora/db";
-import { CREDIT_WEIGHTS, USAGE_ALERT_THRESHOLDS, getPlanConfig, type PlanId } from "@zenora/shared";
+import { CREDIT_CARRY_DAYS, CREDIT_WEIGHTS, USAGE_ALERT_THRESHOLDS, effectivePlanId, getPlanConfig, resetCreditBalance, type PlanId } from "@zenora/shared";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -27,8 +27,7 @@ export class UsageService {
   ) {}
 
   private async currentPlanId(workspaceId: string): Promise<PlanId> {
-    const sub = await this.prisma.client.subscription.findUnique({ where: { workspaceId } });
-    return (sub?.planId as PlanId) ?? "free";
+    return effectivePlanId(await this.prisma.client.subscription.findUnique({ where: { workspaceId } }));
   }
 
   private addToLimit(base: number | null, extra: number): number | null {
@@ -56,7 +55,7 @@ export class UsageService {
       this.prisma.client.instagramAccount.count({ where: { workspaceId, status: "active" } }),
       this.prisma.client.creditLedger.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" } })
     ]);
-    const planId = (subscription?.planId as PlanId) ?? "free";
+    const planId = effectivePlanId(subscription);
     const limits = getPlanConfig().plans[planId];
     const quantityOf = (key: string) => addons.filter((a) => a.addonKey === key).reduce((sum, a) => sum + a.quantity, 0);
     const aiCreditsRemaining = lastLedger?.balanceAfter ?? limits.aiCreditsPerMonth;
@@ -97,11 +96,33 @@ export class UsageService {
   // Just the figures the dashboard shows: two reads instead of all of getUsage.
   async aiCreditsSummary(workspaceId: string) {
     const [subscription, lastLedger] = await Promise.all([
-      this.prisma.client.subscription.findUnique({ where: { workspaceId }, select: { planId: true } }),
+      this.prisma.client.subscription.findUnique({ where: { workspaceId } }),
       this.prisma.client.creditLedger.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { balanceAfter: true } })
     ]);
-    const monthly = getPlanConfig().plans[(subscription?.planId as PlanId) ?? "free"].aiCreditsPerMonth;
-    return { remaining: lastLedger?.balanceAfter ?? monthly, monthly };
+    const planId = effectivePlanId(subscription);
+    const monthly = getPlanConfig().plans[planId].aiCreditsPerMonth;
+    return {
+      remaining: lastLedger?.balanceAfter ?? monthly,
+      monthly,
+      plan: { id: planId, status: subscription?.status ?? "active", trialEndsAt: subscription?.trialEndsAt ?? null, currentPeriodEnd: subscription?.currentPeriodEnd ?? null }
+    };
+  }
+
+  // After a plan is bought or changed: take the balance to the new plan's
+  // allotment plus any credits bought and still unspent, so an upgrade is felt
+  // at once rather than at the next month. A workspace that has never used AI
+  // has no ledger and is granted the new plan's allotment on its first spend.
+  async resetCreditsToPlan(workspaceId: string, reason = "plan_change"): Promise<void> {
+    const planId = await this.currentPlanId(workspaceId);
+    const last = await this.prisma.client.creditLedger.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" } });
+    if (!last) return;
+    const since = new Date(Date.now() - CREDIT_CARRY_DAYS * 86_400_000);
+    const bought = await this.prisma.client.creditLedger.aggregate({
+      where: { workspaceId, delta: { gt: 0 }, reason: { in: ["topup", "admin_grant"] }, createdAt: { gte: since } },
+      _sum: { delta: true }
+    });
+    const balanceAfter = resetCreditBalance(last.balanceAfter, getPlanConfig().plans[planId].aiCreditsPerMonth, bought._sum.delta ?? 0);
+    await this.prisma.client.creditLedger.create({ data: { workspaceId, delta: balanceAfter - last.balanceAfter, reason, balanceAfter } });
   }
 
   async checkAiCredits(workspaceId: string): Promise<AiCreditCheck> {

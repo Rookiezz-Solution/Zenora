@@ -1,5 +1,28 @@
 # Zenora — build progress
 
+## 2026-10-04 — Trial, renewals and the monthly AI-credit reset
+
+Until now credits were granted once and never replenished, there was no trial, and a cancelled or lapsed plan kept its paid limits. Payments are still one-off checkouts (no recurring-billing engine), so a paid plan runs to its end date and must be paid again.
+
+**Done**
+- **14-day Growth trial** for a person's **first** workspace only (`Subscription` `trialing`, `trialEndsAt`). Later workspaces start on Free, so opening more is not a way to restart it.
+- **Limits follow the dates, not the worker** (`effectivePlanId`): cancelled → Free at once (this was a real gap: `usage` read `subscription.planId` regardless of status); trial over → Free; a paid plan keeps working **5 days** after its end date, then Free.
+- **Daily lifecycle sweep** (worker, `subscription-lifecycle.ts`, reads the super admin's plan overrides itself): ends expired trials, reminds 3 days before a paid period ends (once per 4 days), marks `past_due` at the end date, drops a lapsed plan to Free; each step writes an in-app notification.
+- **Monthly AI-credit reset** (same sweep, calendar month UTC): balance becomes the plan's allotment **plus bought/granted credits from the last 60 days that are still unspent** (the allotment is treated as spent first). Unused allotment does not roll over. A zero-delta ledger row marks the month done, so it is safe to re-run. Workspaces that never used AI have no ledger and get the plan's allotment on first spend as before.
+- **Credits follow the plan:** buying a different plan resets to the new plan's allotment immediately (previously an upgrade after any AI use kept the old balance). Trial end and lapse apply the same rule with the Free allotment, so trial credits do not outlive the trial.
+- **Renewals:** paying again for the plan you are on **adds** 30/365 days to the time left instead of discarding it; a new plan starts from today; paying ends the trial.
+- **Home banner** with the trial countdown / renewal warning (`planNotice`) and a "Choose a plan" link.
+
+**Verified**: typecheck, lint, build, tests green (shared 197, worker 91, api 408 = 696). Live against real Neon: a new user's first workspace came out Growth/trialing with a trial end 14 days ahead and 3,000 credits, the second Free; seeding an expired trial (2,000 left, 1,000 bought) and a lapsed Starter (140 left) and running the real sweep gave Free on both rows, balances 1,050 and 50, the right notifications, and a second run did nothing; backdating the markers and re-running exercised the monthly-reset SQL (2 workspaces reset, third run 0). Test data deleted.
+
+**Not verified / open**
+- The scheduler itself (BullMQ job every 24 h) was not left running to see it fire; the same function was run directly. It uses the same `upsertJobScheduler` pattern as the other sweeps.
+- **No real payment** was made, so renewal extension and the plan-change credit reset are covered by unit tests with mocked Razorpay.
+- Deleting an account and signing up again gives a new trial (no record of past trials is kept). A verified-phone-per-trial rule would close that.
+- Reminders are in-app only; email/WhatsApp delivery needs a provider.
+- A cancelled subscription still downgrades immediately (no run-to-period-end); credits are not reset on cancel until the next month's sweep.
+- The reset month is UTC, not IST.
+
 ## 2026-10-04 — Home dashboard, global search, help, legal drafts, pricing page, landing
 
 **Done**

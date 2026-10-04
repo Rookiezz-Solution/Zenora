@@ -5,6 +5,7 @@ import type { PrismaService } from "../prisma/prisma.service";
 import type { ReferralsService } from "../referrals/referrals.service";
 import { BillingService } from "./billing.service";
 import type { RazorpayClient } from "./razorpay.client";
+import type { UsageService } from "./usage.service";
 
 function makeClient(overrides: Record<string, unknown> = {}) {
   return {
@@ -30,7 +31,8 @@ function makeRazorpay(overrides: Partial<Record<keyof RazorpayClient, unknown>> 
 
 function makeService(client: ReturnType<typeof makeClient>, razorpay = makeRazorpay()) {
   const referrals = { accrueForPayment: vi.fn().mockResolvedValue(undefined) };
-  return { service: new BillingService({ client } as unknown as PrismaService, razorpay, referrals as unknown as ReferralsService), razorpay, referrals };
+  const usage = { resetCreditsToPlan: vi.fn().mockResolvedValue(undefined) };
+  return { service: new BillingService({ client } as unknown as PrismaService, razorpay, referrals as unknown as ReferralsService, usage as unknown as UsageService), razorpay, referrals, usage };
 }
 
 describe("BillingService.createCheckoutOrder", () => {
@@ -204,5 +206,48 @@ describe("BillingService price locking", () => {
     const { service } = makeService(client, razorpay);
     await service.confirmPayment("ws1", { razorpayOrderId: "o1", razorpayPaymentId: "p10", razorpaySignature: "sig" });
     expect(client.invoice.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ amountInr: 3999 }) }));
+  });
+});
+
+describe("BillingService plan changes and renewals", () => {
+  const order = (planId: string) => ({ getOrder: vi.fn().mockResolvedValue({ id: "o1", notes: { workspaceId: "ws1", kind: "plan", payload: JSON.stringify({ kind: "plan", planId, billingCycle: "monthly" }) } }) });
+  const day = 86_400_000;
+
+  it("resets AI credits to the new plan when the plan changes", async () => {
+    const { service, usage } = makeService(makeClient(), makeRazorpay(order("growth")));
+    await service.confirmPayment("ws1", { razorpayOrderId: "o1", razorpayPaymentId: "pc1", razorpaySignature: "sig" });
+    expect(usage.resetCreditsToPlan).toHaveBeenCalledWith("ws1");
+  });
+
+  it("adds a renewal on the same plan to the time left, and leaves the credits alone", async () => {
+    const client = makeClient();
+    const endsIn10 = new Date(Date.now() + 10 * day);
+    client.subscription.findUnique.mockResolvedValue({ planId: "growth", status: "active", currentPeriodEnd: endsIn10 });
+    const { service, usage } = makeService(client, makeRazorpay(order("growth")));
+    await service.confirmPayment("ws1", { razorpayOrderId: "o1", razorpayPaymentId: "pc2", razorpaySignature: "sig" });
+    const update = client.subscription.upsert.mock.calls[0]![0].update;
+    expect(update.currentPeriodEnd.getTime()).toBe(endsIn10.getTime() + 30 * day);
+    expect(usage.resetCreditsToPlan).not.toHaveBeenCalled();
+  });
+
+  it("starts the period from today for a lapsed plan, and ends the trial when paying", async () => {
+    const client = makeClient();
+    client.subscription.findUnique.mockResolvedValue({ planId: "growth", status: "trialing", trialEndsAt: new Date(Date.now() + 5 * day), currentPeriodEnd: null });
+    const { service, usage } = makeService(client, makeRazorpay(order("growth")));
+    const before = Date.now();
+    await service.confirmPayment("ws1", { razorpayOrderId: "o1", razorpayPaymentId: "pc3", razorpaySignature: "sig" });
+    const update = client.subscription.upsert.mock.calls[0]![0].update;
+    expect(update.trialEndsAt).toBeNull();
+    expect(update.currentPeriodEnd.getTime()).toBeGreaterThanOrEqual(before + 30 * day);
+    expect(update.currentPeriodEnd.getTime()).toBeLessThan(before + 31 * day);
+    expect(usage.resetCreditsToPlan).not.toHaveBeenCalled(); // already on Growth during the trial
+  });
+
+  it("still records the payment when the credit reset fails", async () => {
+    const client = makeClient();
+    const { service, usage } = makeService(client, makeRazorpay(order("pro")));
+    usage.resetCreditsToPlan.mockRejectedValue(new Error("db down"));
+    await expect(service.confirmPayment("ws1", { razorpayOrderId: "o1", razorpayPaymentId: "pc4", razorpaySignature: "sig" })).resolves.toEqual({ status: "paid" });
+    expect(client.invoice.create).toHaveBeenCalled();
   });
 });

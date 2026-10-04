@@ -17,6 +17,7 @@ function make(client: Record<string, unknown> = {}) {
     },
     invite: { findUnique: vi.fn(), create: vi.fn().mockResolvedValue({ id: "inv1" }) },
     user: { findUnique: vi.fn() },
+    workspace: { create: vi.fn().mockResolvedValue({ id: "ws-new" }) },
     $transaction: vi.fn().mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx)),
     ...client
   };
@@ -117,5 +118,28 @@ describe("WorkspacesService.acceptInvite", () => {
     await expect(used.service.acceptInvite("token", "u9")).rejects.toThrow(ForbiddenException);
     const expired = make({ invite: { findUnique: vi.fn().mockResolvedValue({ ...pending, expiresAt: new Date(Date.now() - 1000) }) } });
     await expect(expired.service.acceptInvite("token", "u9")).rejects.toThrow(ForbiddenException);
+  });
+});
+
+describe("WorkspacesService.create trial", () => {
+  const dto = { name: "Clinic", mode: "business", industry: "clinic" } as never;
+
+  it("gives a person's first workspace a 14-day Growth trial", async () => {
+    const { service, client } = make({ membership: { count: vi.fn().mockResolvedValue(0) } });
+    await service.create("u1", dto);
+    const data = (client.workspace.create as ReturnType<typeof vi.fn>).mock.calls[0]![0].data;
+    expect(data.planId).toBe("growth");
+    expect(data.subscription.create).toMatchObject({ planId: "growth", status: "trialing" });
+    const days = (data.subscription.create.trialEndsAt.getTime() - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(13.9);
+    expect(days).toBeLessThanOrEqual(14);
+  });
+
+  it("gives later workspaces no trial", async () => {
+    const { service, client } = make({ membership: { count: vi.fn().mockResolvedValue(1) } });
+    await service.create("u1", dto);
+    const data = (client.workspace.create as ReturnType<typeof vi.fn>).mock.calls[0]![0].data;
+    expect(data.planId).toBeUndefined();
+    expect(data.subscription).toBeUndefined();
   });
 });

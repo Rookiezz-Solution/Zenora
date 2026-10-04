@@ -20,6 +20,6 @@ Yearly = 2 months free. 14-day Growth trial. Add-ons: extra user ₹399/mo, extr
 - Contacts: 10% grace for a week, then block imports/broadcasts; never block inbound lead capture.
 - Users / Instagram accounts: hard limit with add-seat / upgrade prompt.
 - Free: one workspace per verified phone; no WhatsApp or AI calls.
-- Alerts at 50/80/100% (app + WhatsApp). Monthly reset; top-ups last until end of next billing month; annual plans get monthly allotments.
+- Alerts at 50/80/100% (app + WhatsApp). Monthly reset (built: allotment + unspent bought credits from the last 60 days); top-ups last until end of next billing month; annual plans get monthly allotments.
 - Guardrails: max AI replies per chat then hand over; skip calls < 30 s; meeting bot only for lead-linked meetings; cache repeated FAQ answers.
 - Target: variable cost ≤ ~30% of plan price. Owner console flags workspaces above that.

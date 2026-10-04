@@ -6,6 +6,7 @@ import { processKnowledgeSource } from "./processors/knowledge";
 import { processReminderSweep } from "./processors/reminders";
 import { processRetentionSweep } from "./processors/retention";
 import { processWorkspaceDeletions } from "./processors/workspace-deletion";
+import { processSubscriptionLifecycle } from "./processors/subscription-lifecycle";
 import { processSalespersonAlert, processSlaCheck } from "./processors/routing";
 import { processSequenceStep } from "./processors/sequence";
 import { processWebhookDelivery } from "./processors/webhook-delivery";
@@ -58,6 +59,7 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
   privacy: async (job) => {
     if (job.name === "retention_sweep") await processRetentionSweep();
     else if (job.name === "workspace_deletion_sweep") await processWorkspaceDeletions();
+    else if (job.name === "subscription_lifecycle_sweep") console.log("subscription lifecycle:", await processSubscriptionLifecycle());
   },
   appointments: async (job) => {
     if (job.name === "reminder_sweep") await processReminderSweep();
@@ -88,6 +90,11 @@ privacyQueue
 privacyQueue
   .upsertJobScheduler("workspace-deletion-sweep", { every: 3_600_000 }, { name: "workspace_deletion_sweep" })
   .catch((err) => console.error("Could not schedule the workspace deletion sweep:", err));
+
+// Daily: trials, renewals, and the monthly AI-credit reset.
+privacyQueue
+  .upsertJobScheduler("subscription-lifecycle-sweep", { every: 24 * 3_600_000 }, { name: "subscription_lifecycle_sweep" })
+  .catch((err) => console.error("Could not schedule the subscription lifecycle sweep:", err));
 
 console.log(`Zenora worker listening on queues: ${QUEUE_NAMES.join(", ")}`);
 

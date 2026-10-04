@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatDuration } from "@zenora/shared";
+import { formatDuration, planNotice } from "@zenora/shared";
 import { apiFetch } from "@/lib/api";
 import { sourceLabel } from "@/lib/ads-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
@@ -19,7 +19,7 @@ interface Summary {
   pipeline: { id: string; name: string; type: string; leads: number }[];
   whatsappSpendInr: number;
   broadcastsSent: number;
-  aiCredits: { remaining: number; monthly: number };
+  aiCredits: { remaining: number; monthly: number; plan: { id: string; status: string; trialEndsAt: string | null; currentPeriodEnd: string | null } };
 }
 
 function Tile({ label, value, hint, href, tone }: { label: string; value: string; hint?: string; href?: string; tone?: "warn" | "good" }) {
@@ -60,6 +60,7 @@ export default function DashboardPage() {
   const maxStage = Math.max(1, ...(data?.pipeline.map((s) => s.leads) ?? [0]));
   const totalSources = Math.max(1, data?.sources.reduce((n, s) => n + s.leads, 0) ?? 0);
   const change = data?.newLeads.changePct;
+  const notice = data ? planNotice(data.aiCredits.plan) : null;
 
   return (
     <div className="max-w-5xl">
@@ -73,6 +74,14 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+      {notice && (
+        <div className={`mt-3 flex items-center justify-between rounded-md border px-3 py-2 text-sm ${notice.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-brand-200 bg-brand-50 text-brand-700"}`}>
+          <span>{notice.text}</span>
+          <Link href="/settings/billing" className="font-medium underline">
+            Choose a plan
+          </Link>
+        </div>
+      )}
 
       {failed && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">Could not load your dashboard. Try refreshing.</p>}
       {!data && !failed && <p className="mt-4 text-sm text-gray-400">Loading…</p>}
