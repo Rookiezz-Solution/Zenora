@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
@@ -55,11 +55,21 @@ export class PipelinesService {
 
   async removeStage(workspaceId: string, pipelineId: string, stageId: string) {
     await this.ensureStage(workspaceId, pipelineId, stageId);
+    // Deleting a stage that still holds leads would silently drop them out of the
+    // pipeline, so the person moves them somewhere first.
+    const leads = await this.prisma.client.lead.count({ where: { stageId, mergedIntoId: null } });
+    if (leads > 0) throw new ConflictException(`Move the ${leads} lead${leads === 1 ? "" : "s"} in this stage to another stage first`);
     await this.prisma.client.stage.delete({ where: { id: stageId } });
   }
 
   async reorderStages(workspaceId: string, pipelineId: string, dto: ReorderStagesDto) {
     await this.ensurePipeline(workspaceId, pipelineId);
+    // The new order must name every stage of this pipeline exactly once.
+    const existing = await this.prisma.client.stage.findMany({ where: { pipelineId }, select: { id: true } });
+    const given = new Set(dto.stageIds);
+    if (given.size !== dto.stageIds.length || given.size !== existing.length || existing.some((s) => !given.has(s.id))) {
+      throw new BadRequestException("List every stage of this pipeline exactly once");
+    }
     await this.prisma.client.$transaction(
       dto.stageIds.map((stageId, index) =>
         this.prisma.client.stage.updateMany({ where: { id: stageId, pipelineId }, data: { order: index } })

@@ -1,5 +1,19 @@
 # Zenora — build progress
 
+## 2026-10-04 — Stage management on the Leads board
+
+An audit of API routes against the web app (243 routes; most "unmatched" ones are external callbacks, webhooks, the public API or dynamically built paths) found one real gap: **stages could be added but never renamed, reordered or deleted** from the UI, although the API supported it.
+
+**Done**
+- Each stage header on the Leads board has a **⋯ menu**: Rename (inline), Move left / Move right, Delete stage.
+- **Deleting a stage that still holds leads is refused** (409 "Move the N leads in this stage to another stage first") — previously the API would have silently dropped those leads out of the pipeline.
+- **Reordering must name every stage of the pipeline exactly once** (400 otherwise).
+
+**Verified**: typecheck, lint, build, tests green (shared 217, worker 103, api 522 = 842). Live against real Neon + API + web: rename and reorder worked and the board order followed; a partial order → 400; deleting a stage holding a lead → 409, and succeeding once the lead was moved; in the browser the menu showed Rename / Move left / Move right (disabled on the last stage) / Delete, and Move left reordered the columns. Test data deleted.
+
+**Not verified / open**
+- Pipelines themselves (rename, delete, several pipelines) still have no UI; the app works with one pipeline. Quick replies can be created from the inbox but not edited or deleted from the UI.
+
 ## 2026-10-04 — Team management and invitations that work
 
 Found while checking the help text: the web app had **no team page and no page to accept an invitation**. Onboarding created invites that nobody was told about, and an invited person had no way to join through the UI. The help page also claimed "Settings shows your team and roles", which was not true.

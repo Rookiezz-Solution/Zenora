@@ -27,6 +27,8 @@ export default function PipelinePage() {
   const [lostReason, setLostReason] = useState("");
   const [newStageName, setNewStageName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 
   async function load() {
     if (!workspaceId) return;
@@ -80,6 +82,40 @@ export default function PipelinePage() {
     }
   }
 
+  async function stageAction(run: () => Promise<unknown>, fallback: string) {
+    setMenuFor(null);
+    try {
+      await run();
+      setError(null);
+      await load();
+    } catch (err) {
+      setError((err as ApiError).message ?? fallback);
+    }
+  }
+
+  function renameStage() {
+    if (!workspaceId || !pipeline || !renaming || !renaming.name.trim()) return setRenaming(null);
+    const { id, name } = renaming;
+    setRenaming(null);
+    return stageAction(() => apiFetch(`/pipelines/${workspaceId}/${pipeline.id}/stages/${id}`, { method: "PATCH", body: JSON.stringify({ name: name.trim() }) }), "Could not rename the stage");
+  }
+
+  function moveStageBy(stageId: string, delta: -1 | 1) {
+    if (!workspaceId || !pipeline) return;
+    const ids = pipeline.stages.map((s) => s.id);
+    const from = ids.indexOf(stageId);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+    return stageAction(() => apiFetch(`/pipelines/${workspaceId}/${pipeline.id}/stages/reorder`, { method: "PATCH", body: JSON.stringify({ stageIds: ids }) }), "Could not reorder the stages");
+  }
+
+  function deleteStage(stage: { id: string; name: string }) {
+    if (!workspaceId || !pipeline) return;
+    if (!confirm(`Delete the stage "${stage.name}"? This cannot be undone.`)) return setMenuFor(null);
+    return stageAction(() => apiFetch(`/pipelines/${workspaceId}/${pipeline.id}/stages/${stage.id}`, { method: "DELETE" }), "Could not delete the stage");
+  }
+
   // Stages marked this way count their leads as "qualified" in Ads and sources.
   async function toggleQualified(stageId: string, current: boolean) {
     if (!workspaceId || !pipeline) return;
@@ -122,9 +158,23 @@ export default function PipelinePage() {
             className="flex w-64 shrink-0 flex-col rounded-md bg-gray-100"
           >
             <div className="flex items-center justify-between px-3 py-2">
-              <h2 className="text-sm font-semibold text-gray-700">
-                {stage.name} <span className="text-gray-400">({stage.leads.length})</span>
-              </h2>
+              {renaming?.id === stage.id ? (
+                <input
+                  autoFocus
+                  value={renaming.name}
+                  onChange={(e) => setRenaming({ id: stage.id, name: e.target.value })}
+                  onBlur={renameStage}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") renameStage();
+                    if (e.key === "Escape") setRenaming(null);
+                  }}
+                  className="w-32 rounded border border-gray-300 px-1 py-0.5 text-sm"
+                />
+              ) : (
+                <h2 className="text-sm font-semibold text-gray-700">
+                  {stage.name} <span className="text-gray-400">({stage.leads.length})</span>
+                </h2>
+              )}
               <span className="flex items-center gap-2">
                 {stage.requiredFieldIds.length > 0 && (
                   <span className="text-[10px] uppercase text-amber-600" title="Requires fields on entry">
@@ -142,6 +192,27 @@ export default function PipelinePage() {
                     ★
                   </button>
                 )}
+                <span className="relative">
+                  <button type="button" onClick={() => setMenuFor(menuFor === stage.id ? null : stage.id)} aria-label={`Options for ${stage.name}`} className="px-1 text-sm leading-none text-gray-400 hover:text-gray-600">
+                    ⋯
+                  </button>
+                  {menuFor === stage.id && (
+                    <div className="absolute right-0 z-10 mt-1 w-36 rounded-md border border-gray-200 bg-white py-1 text-xs shadow-md">
+                      <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-gray-50" onClick={() => { setRenaming({ id: stage.id, name: stage.name }); setMenuFor(null); }}>
+                        Rename
+                      </button>
+                      <button type="button" disabled={pipeline.stages[0]?.id === stage.id} className="block w-full px-3 py-1.5 text-left hover:bg-gray-50 disabled:opacity-40" onClick={() => moveStageBy(stage.id, -1)}>
+                        Move left
+                      </button>
+                      <button type="button" disabled={pipeline.stages[pipeline.stages.length - 1]?.id === stage.id} className="block w-full px-3 py-1.5 text-left hover:bg-gray-50 disabled:opacity-40" onClick={() => moveStageBy(stage.id, 1)}>
+                        Move right
+                      </button>
+                      <button type="button" className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-gray-50" onClick={() => deleteStage(stage)}>
+                        Delete stage
+                      </button>
+                    </div>
+                  )}
+                </span>
               </span>
             </div>
             <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">

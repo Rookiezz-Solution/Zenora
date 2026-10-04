@@ -51,6 +51,7 @@ describe("PipelinesService.addStage", () => {
 describe("PipelinesService.reorderStages", () => {
   it("sets each stage's order to its index in the given list, scoped to the pipeline", async () => {
     const prisma = makePrisma();
+    (prisma.client.stage.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "a" }, { id: "b" }, { id: "c" }]);
     const service = new PipelinesService(prisma, makeAudit());
 
     await service.reorderStages("ws1", "pipe-1", { stageIds: ["c", "a", "b"] });
@@ -67,5 +68,49 @@ describe("PipelinesService.reorderStages", () => {
       where: { id: "b", pipelineId: "pipe-1" },
       data: { order: 2 }
     });
+  });
+});
+
+describe("PipelinesService.reorderStages validation", () => {
+  const setup = (existing: string[]) => {
+    const prisma = makePrisma();
+    (prisma.client.stage.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(existing.map((id) => ({ id })));
+    return { prisma, service: new PipelinesService(prisma, makeAudit()) };
+  };
+
+  it("refuses an order that leaves a stage out, repeats one, or names a stage from elsewhere", async () => {
+    for (const stageIds of [["a", "b"], ["a", "b", "b"], ["a", "b", "x"], ["a", "b", "c", "d"]]) {
+      const { prisma, service } = setup(["a", "b", "c"]);
+      await expect(service.reorderStages("ws1", "pipe-1", { stageIds })).rejects.toThrow("exactly once");
+      expect(prisma.client.stage.updateMany).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("PipelinesService.removeStage", () => {
+  function setup(leadCount: number) {
+    const client = {
+      pipeline: { findFirst: vi.fn().mockResolvedValue({ id: "pipe-1", workspaceId: "ws1" }) },
+      stage: { findFirst: vi.fn().mockResolvedValue({ id: "s1", pipelineId: "pipe-1" }), delete: vi.fn() },
+      lead: { count: vi.fn().mockResolvedValue(leadCount) }
+    };
+    return { client, service: new PipelinesService({ client } as unknown as PrismaService, makeAudit()) };
+  }
+
+  it("deletes an empty stage", async () => {
+    const { client, service } = setup(0);
+    await service.removeStage("ws1", "pipe-1", "s1");
+    expect(client.stage.delete).toHaveBeenCalledWith({ where: { id: "s1" } });
+  });
+
+  it("refuses while leads are still in it, saying how many, so none silently fall out of the pipeline", async () => {
+    const { client, service } = setup(3);
+    await expect(service.removeStage("ws1", "pipe-1", "s1")).rejects.toThrow("Move the 3 leads in this stage to another stage first");
+    expect(client.stage.delete).not.toHaveBeenCalled();
+    expect(client.lead.count).toHaveBeenCalledWith({ where: { stageId: "s1", mergedIntoId: null } });
+  });
+
+  it("uses the singular for one lead", async () => {
+    await expect(setup(1).service.removeStage("ws1", "pipe-1", "s1")).rejects.toThrow("Move the 1 lead in this stage");
   });
 });
