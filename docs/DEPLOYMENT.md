@@ -67,7 +67,7 @@ Postgres is the system of record. Everything else can be rebuilt.
 | Secret | Rotating it |
 |---|---|
 | `AUTH_SECRET` | Signs sessions and OAuth state. Changing it signs **everyone out**; safe, nothing is lost. |
-| `TOKEN_ENCRYPTION_KEY` | Encrypts channel tokens, calendar tokens and integration secrets at rest. **There is no re-encryption tool**: changing the key makes every stored token unreadable and users must reconnect their channels, and the super admin must re-enter integration credentials. Writing a key-rotation script is an open task; do not rotate until it exists unless the key is compromised. |
+| `TOKEN_ENCRYPTION_KEY` | Encrypts channel tokens, calendar tokens, ad tokens, integration credentials and webhook secrets at rest. **Do not just change it** — every stored value would become unreadable. Use the rotation tool: `OLD_TOKEN_ENCRYPTION_KEY=<current> NEW_TOKEN_ENCRYPTION_KEY=$(openssl rand -hex 32) pnpm rotate-key` is a dry run that reports counts and changes nothing; add `--apply` to rotate. It is one transaction (all or nothing), refuses to run if any value opens with neither key, is safe to re-run, and reads everything back with the new key before it reports success. Then set `TOKEN_ENCRYPTION_KEY` to the new key for the API **and** the worker, restart both, and keep the old key until you have checked the app. Take a database backup first. |
 | Razorpay / Meta / Google / Anthropic keys | Replace in `/admin/integrations`; takes effect within seconds. |
 | `SUPER_ADMIN_EMAILS` | Env only (so it cannot be edited from the UI); redeploy to change. |
 
@@ -96,5 +96,5 @@ stored integration credential and channel token.**
 ## Open decisions before launch
 
 Hosting provider and regions · monitoring/error-tracking vendor · backup retention and RPO/RTO · a mail provider
-(invites, password reset, billing notices) · a TOKEN_ENCRYPTION_KEY rotation tool · a lawyer review of the draft
+(invites, password reset, billing notices) · a lawyer review of the draft
 terms and privacy policy · an external penetration test.

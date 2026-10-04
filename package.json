@@ -15,7 +15,8 @@
     "db:migrate": "dotenv -e .env -- pnpm --filter @zenora/db migrate",
     "db:migrate:deploy": "dotenv -e .env -- pnpm --filter @zenora/db migrate:deploy",
     "db:seed": "dotenv -e .env -- pnpm --filter @zenora/db seed",
-    "db:studio": "dotenv -e .env -- pnpm --filter @zenora/db studio"
+    "db:studio": "dotenv -e .env -- pnpm --filter @zenora/db studio",
+    "rotate-key": "dotenv -e .env -- node apps/api/dist/scripts/rotate-encryption-key.js"
   },
   "devDependencies": {
     "dotenv-cli": "^7.4.2",

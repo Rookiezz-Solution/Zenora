@@ -1,5 +1,20 @@
 # Zenora — build progress
 
+## 2026-10-04 — Encryption key rotation tool
+
+`TOKEN_ENCRYPTION_KEY` could not be changed without making every stored credential unreadable. `pnpm rotate-key` (`apps/api/src/scripts/rotate-encryption-key.ts`) now re-encrypts all six places that hold encrypted values — Instagram, WhatsApp and ad-account tokens, Google Calendar connections, integration credentials and webhook signing secrets.
+
+- **Dry run by default** (counts, changes nothing); `--apply` rotates. One transaction, so all or nothing.
+- **Refuses to run** (and changes nothing) if any value opens with neither the old nor the new key — it names the row. Values already on the new key are skipped, so re-running is harmless.
+- Reads every value back and opens it with the new key before reporting success.
+- Procedure (backup first, then set the new key on the API **and** worker and restart) is in `docs/DEPLOYMENT.md`.
+
+**Verified**: typecheck, lint, build, tests green (shared 197, worker 91, api 453 = 741; new: planner and key-parsing tests). Live against real Neon with one seeded value in each of the six places: the dry run reported 1 each and left the data identical; `--apply` old→new rotated 6 values, all opened with the new key and none with the old; running the same command again reported them as already rotated; a value planted under a third key made it refuse, naming the row, with nothing changed; rotating back (new→old) left all six opening with the app's real key (`decryptToken`). Seeded rows deleted.
+
+**Not verified / open**
+- It does not pause the app while it runs. Between `--apply` and the restart with the new key, a running API/worker still holds the old key and cannot open the rotated values: do both in one quick step (or briefly stop traffic).
+- Any new column that stores an encrypted value must be added to the `TARGETS` list in the script (the six current ones are all of them today).
+
 ## 2026-10-04 — Operations: readiness probe, worker heartbeat, runbook, profile and sign-out
 
 **Done**
