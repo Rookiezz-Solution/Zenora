@@ -27,3 +27,4 @@ export * from "./dashboard";
 export * from "./subscription-lifecycle";
 export * from "./meta-insights";
 export * from "./trigger-events";
+export * from "./next-url";

@@ -78,3 +78,15 @@ export function canInviteWithRole(actorRole: WorkspaceRole, role: WorkspaceRole)
   if (role === "owner" && actorRole !== "owner") return { ok: false, reason: "Only an owner can invite another owner" };
   return { ok: true };
 }
+
+// Taking someone out of a workspace (or leaving it). Only owners and admins may,
+// only an owner may remove an owner, and the last owner can never go, so a
+// workspace is never left with nobody in charge of billing.
+export function canRemoveMember(input: { actorRole: WorkspaceRole; targetRole: WorkspaceRole; isSelf: boolean; ownerCount: number }): RoleDecision {
+  const { actorRole, targetRole, isSelf, ownerCount } = input;
+  if (actorRole !== "owner" && actorRole !== "admin") return { ok: false, reason: "You can't remove people" };
+  if (targetRole === "owner" && ownerCount <= 1) return { ok: false, reason: "A workspace needs at least one owner" };
+  if (targetRole === "owner" && actorRole !== "owner") return { ok: false, reason: "Only an owner can remove an owner" };
+  void isSelf; // an owner or admin may remove themselves, subject to the rules above
+  return { ok: true };
+}

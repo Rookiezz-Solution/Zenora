@@ -3,6 +3,7 @@ import type { AuditService } from "../audit/audit.service";
 import type { UsageService } from "../billing/usage.service";
 import { updateStageSchema, createStageSchema } from "../pipelines/dto/pipelines.dto";
 import type { PrismaService } from "../prisma/prisma.service";
+import type { Mailer } from "../mail/mailer.service";
 import type { ReferralsService } from "../referrals/referrals.service";
 import { updateWorkspaceSettingsSchema } from "./dto/workspaces.dto";
 import { WorkspacesService } from "./workspaces.service";
@@ -19,7 +20,7 @@ describe("what counts as qualified: settings", () => {
   it("stores it on the workspace, and leaves it alone when the request does not mention it", async () => {
     const update = vi.fn().mockResolvedValue({ id: "ws1" });
     const client = { workspace: { findUnique: vi.fn().mockResolvedValue({ id: "ws1", labels: {} }), update } };
-    const service = new WorkspacesService({ client } as unknown as PrismaService, { log: vi.fn() } as unknown as AuditService, {} as UsageService, {} as ReferralsService);
+    const service = new WorkspacesService({ client } as unknown as PrismaService, { log: vi.fn() } as unknown as AuditService, {} as UsageService, {} as ReferralsService, {} as Mailer);
 
     await service.updateSettings("ws1", "u1", { qualifiedMinScore: 60 });
     expect(update.mock.calls[0]![0].data.qualifiedMinScore).toBe(60);

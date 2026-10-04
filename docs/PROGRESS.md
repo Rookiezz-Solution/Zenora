@@ -1,5 +1,24 @@
 # Zenora — build progress
 
+## 2026-10-04 — Team management and invitations that work
+
+Found while checking the help text: the web app had **no team page and no page to accept an invitation**. Onboarding created invites that nobody was told about, and an invited person had no way to join through the UI. The help page also claimed "Settings shows your team and roles", which was not true.
+
+**Done**
+- **Settings → Team** (new tab): members with role and (agency) badge; owners and admins can **change roles** (only the choices the rules allow are offered), **remove** people, and **leave**; **invite** by email with a role; **pending invitations** with *Copy link* and *Cancel*. What each person sees follows the same rules the API enforces (owner/admin only; only an owner touches owners; never the last owner).
+- **Invitation emails**: when email is set up, the invitee gets a message with a link; the Team page says whether it was emailed, otherwise to copy the link. A failed send never blocks the invite.
+- **`/invite/<token>` accept page**: shows the workspace and role; if signed out offers *Create an account* / *I already have an account* and brings the person **straight back** after sign-in (new `?next=` on login and signup, restricted to paths on this site); if signed in as a different address it says so and offers to sign out; otherwise **Join**. The link still only works for the address it was sent to.
+- **Removal** ends access on the very next request and returns the person's leads to **unassigned**. **Revoke** cancels a pending link. New API: list/revoke invites, remove member, public invite info (rate-limited, reveals nothing without the token).
+- The "who may remove whom" rule is one shared function (`canRemoveMember`), and the safe-redirect check lives in shared too (`safeNext`) so both are unit-tested.
+
+**Verified**: typecheck, lint, build, tests green (shared 217, worker 103, api 518 = 838). Live against real Neon, API and web, with email through the local SMTP test server: invite response `emailed: true` and the captured email had the right To/Subject and an `/invite/<token>` link; public info valid, and `{valid:false}` for a bad token; a non-manager cannot list invites (403); accept → 201 and the invite is used up (second accept 403); owner made the guest a manager (200), a manager demoting or removing the owner → 403, the only owner leaving → 403 "needs at least one owner"; removing the guest → 200 and **their next request is 403**, their lead's owner became null; revoke → the link stops working, revoking again → 404. In the browser a signed-out visitor saw the invite, went through login with `next`, landed back on the invite, clicked **Join** and arrived on the dashboard; the Team page showed a manager's read-only view and the owner's view with the invite form. Test data deleted.
+
+**Not verified / open**
+- Real email deliverability (see the email entry above). Without email set up the inviter must send the link themselves.
+- The invite email link is long; some mail clients wrap it, which is normal for SMTP.
+- No "resend invitation" button (cancel and invite again); no bulk invite.
+- Agency-linked staff appear in the member list with an *agency* badge; removing them here removes their access to this workspace but does not end the agency link.
+
 ## 2026-10-04 — Email sending (any SMTP), password reset, change password
 
 "Forgot password" used to be a dead end ("reset emails aren't wired up yet"), and sign-in codes could not reach anyone outside development.

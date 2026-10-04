@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AuditService } from "../audit/audit.service";
 import type { UsageService } from "../billing/usage.service";
 import type { PrismaService } from "../prisma/prisma.service";
+import type { Mailer } from "../mail/mailer.service";
 import type { ReferralsService } from "../referrals/referrals.service";
 import { WorkspacesService } from "./workspaces.service";
 
@@ -22,7 +23,7 @@ function make(client: Record<string, unknown> = {}) {
     ...client
   };
   const usage = { checkUserLimit: vi.fn().mockResolvedValue({ allowed: true }) };
-  const service = new WorkspacesService({ client: full } as unknown as PrismaService, { log: vi.fn() } as unknown as AuditService, usage as unknown as UsageService, { attribute: vi.fn() } as unknown as ReferralsService);
+  const service = new WorkspacesService({ client: full } as unknown as PrismaService, { log: vi.fn() } as unknown as AuditService, usage as unknown as UsageService, { attribute: vi.fn() } as unknown as ReferralsService, { isConfigured: vi.fn().mockReturnValue(false), send: vi.fn() } as unknown as Mailer);
   return { service, client: full, tx };
 }
 

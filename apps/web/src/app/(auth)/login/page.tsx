@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch } from "@/lib/api";
+import { safeNext, withNext } from "@/lib/next-url";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +12,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [next, setNext] = useState<string | null>(null); // where to go afterwards, e.g. back to an invitation
+  useEffect(() => setNext(safeNext(window.location.search)), []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -18,7 +21,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
-      router.push("/dashboard");
+      router.push(next ?? "/dashboard");
     } catch (err) {
       setError((err as { message?: string }).message ?? "Could not log in");
     } finally {
@@ -57,7 +60,7 @@ export default function LoginPage() {
       </form>
       <div className="flex justify-between text-sm text-gray-500">
         <Link href="/forgot-password">Forgot password?</Link>
-        <Link href="/signup">Create account</Link>
+        <Link href={withNext("/signup", next)}>Create account</Link>
       </div>
     </main>
   );

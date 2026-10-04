@@ -1,10 +1,12 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { TRIAL_DAYS, TRIAL_PLAN, canChangeMemberRole, canInviteWithRole } from "@zenora/shared";
+import { TRIAL_DAYS, TRIAL_PLAN, canChangeMemberRole, canInviteWithRole, canRemoveMember } from "@zenora/shared";
 import { forgetMembership } from "../auth/guards/permissions.guard";
 import * as crypto from "node:crypto";
 import { Prisma } from "@zenora/db";
 import { AuditService } from "../audit/audit.service";
 import { UsageService } from "../billing/usage.service";
+import { loadEnv } from "../config/env";
+import { Mailer } from "../mail/mailer.service";
 import { ReferralsService } from "../referrals/referrals.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
@@ -23,7 +25,8 @@ export class WorkspacesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly usage: UsageService,
-    private readonly referrals: ReferralsService
+    private readonly referrals: ReferralsService,
+    private readonly mailer: Mailer
   ) {}
 
   async create(userId: string, dto: CreateWorkspaceDto) {
@@ -132,8 +135,72 @@ export class WorkspacesService {
       entityId: invite.id,
       metadata: { email: dto.email, role: dto.role }
     });
-    // TODO(Phase 1): send the invite email/WhatsApp message with invite.token.
-    return invite;
+    // Best effort: when email is set up the person is told; otherwise (or if
+    // sending fails) the inviter can still copy the link from the Team page.
+    const emailed = await this.emailInvite(workspaceId, invitedById, invite.email, invite.token);
+    return { ...invite, emailed };
+  }
+
+  private async emailInvite(workspaceId: string, invitedById: string, email: string, token: string): Promise<boolean> {
+    if (!this.mailer.isConfigured()) return false;
+    try {
+      const [workspace, inviter] = await Promise.all([
+        this.prisma.client.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),
+        this.prisma.client.user.findUnique({ where: { id: invitedById }, select: { name: true, email: true } })
+      ]);
+      const who = inviter?.name || inviter?.email || "Someone";
+      const where = workspace?.name ?? "their workspace";
+      await this.mailer.send({
+        to: email,
+        subject: `${who} invited you to ${where} on Zenora`,
+        text: `${who} invited you to join ${where} on Zenora.\n\nAccept the invitation: ${loadEnv().APP_URL}/invite/${token}\n\nUse this email address (${email}) to sign in or create your account. The link works for ${INVITE_TTL_DAYS} days. If you weren't expecting this, you can ignore the email.`
+      });
+      return true;
+    } catch {
+      return false; // the Mailer has already logged why
+    }
+  }
+
+  listInvites(workspaceId: string) {
+    return this.prisma.client.invite.findMany({
+      where: { workspaceId, status: "pending", expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+      take: 200
+    });
+  }
+
+  async revokeInvite(workspaceId: string, inviteId: string, userId: string) {
+    const result = await this.prisma.client.invite.updateMany({ where: { id: inviteId, workspaceId, status: "pending" }, data: { status: "revoked" } });
+    if (result.count === 0) throw new NotFoundException("Invite not found");
+    await this.audit.log({ workspaceId, userId, action: "member.invite_revoked", entityType: "invite", entityId: inviteId });
+    return { ok: true };
+  }
+
+  // What the invite page shows before the person has signed in. The link is a
+  // secret only its recipient has, and it is only good for the address it was
+  // sent to, so naming the workspace and role here gives nothing away.
+  async inviteInfo(token: string) {
+    const invite = await this.prisma.client.invite.findUnique({ where: { token }, include: { workspace: { select: { name: true } } } });
+    if (!invite || invite.status !== "pending" || invite.expiresAt < new Date()) return { valid: false as const };
+    return { valid: true as const, workspaceName: invite.workspace.name, role: invite.role, email: invite.email };
+  }
+
+  async removeMember(workspaceId: string, membershipId: string, actingUserId: string) {
+    const target = await this.prisma.client.membership.findFirst({ where: { id: membershipId, workspaceId } });
+    if (!target) throw new NotFoundException("Member not found");
+    const actor = await this.ensureMember(workspaceId, actingUserId);
+    const ownerCount = await this.prisma.client.membership.count({ where: { workspaceId, role: "owner" } });
+    const decision = canRemoveMember({ actorRole: actor.role, targetRole: target.role, isSelf: target.userId === actingUserId, ownerCount });
+    if (!decision.ok) throw new ForbiddenException(decision.reason);
+
+    await this.prisma.client.$transaction([
+      // Their leads go back to unassigned rather than staying with someone who can no longer see them.
+      this.prisma.client.lead.updateMany({ where: { workspaceId, ownerId: target.userId }, data: { ownerId: null } }),
+      this.prisma.client.membership.delete({ where: { id: membershipId } })
+    ]);
+    forgetMembership(workspaceId, target.userId); // access ends on the very next request
+    await this.audit.log({ workspaceId, userId: actingUserId, action: "member.removed", entityType: "membership", entityId: membershipId, metadata: { role: target.role } });
+    return { ok: true };
   }
 
   async acceptInvite(token: string, userId: string) {

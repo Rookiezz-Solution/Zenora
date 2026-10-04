@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch } from "@/lib/api";
+import { safeNext, withNext } from "@/lib/next-url";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -12,6 +13,8 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [next, setNext] = useState<string | null>(null); // e.g. back to an invitation
+  useEffect(() => setNext(safeNext(window.location.search)), []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -19,7 +22,7 @@ export default function SignUpPage() {
     setLoading(true);
     try {
       await apiFetch("/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password }) });
-      router.push("/onboarding");
+      router.push(next ?? "/onboarding");
     } catch (err) {
       setError((err as { message?: string }).message ?? "Could not sign up");
     } finally {
@@ -77,7 +80,7 @@ export default function SignUpPage() {
       </p>
       <p className="text-sm text-gray-500">
         Already have an account?{" "}
-        <Link href="/login" className="text-brand-700">
+        <Link href={withNext("/login", next)} className="text-brand-700">
           Log in
         </Link>
       </p>
