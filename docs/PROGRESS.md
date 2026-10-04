@@ -1,5 +1,17 @@
 # Zenora — build progress
 
+## 2026-10-04 — Render free-tier deployment files
+
+**Done**
+- `render.yaml` (Render Blueprint): three free web services (`zenora-api`, `zenora-worker`, `zenora-web`) and a shared env group; secrets (`DATABASE_URL`, `REDIS_URL`, `TOKEN_ENCRYPTION_KEY`, `SUPER_ADMIN_EMAILS`) are asked for at deploy time and never stored in the repo. The API build also runs the database migrations. Step-by-step guide and the honest free-tier limits are in `docs/RENDER.md`.
+- Code changes the platform needed: the API listens on the host's `PORT`; the worker answers `/health` on `PORT` when set (Render's free tier has no background workers); a `SESSION_COOKIE_SAMESITE=none` option for when the web app and API are on different sites (`*.onrender.com`), with the cookie set and cleared by one helper that keeps the attributes consistent.
+
+**Verified**: typecheck, lint, build, tests green (shared 217, worker 105, api 526 = 848). From a **fresh clone**, the blueprint's install, build (API, worker, web) and migration commands all succeeded; then the three start commands were run the way Render runs them (PORT set, `NODE_ENV=production`): API `/health` and `/health/ready` ok (database up, redis up, worker up), worker `/health` ok, web 200 with the production CSP and HSTS, and login set `HttpOnly; Secure; SameSite=None`. `render.yaml` parses and lists the expected services, health checks and variables. Test user deleted.
+
+**Not verified / open**
+- **Never deployed to Render itself** (no account here): the Linux build image, free-tier build memory, sleeping behaviour and the cross-site cookie in Safari are untested. The service URLs assume the names are free.
+- The free tier is for testing only (services and the worker sleep; limited hours). Real customers need paid instances, paid database backups, a custom domain and an SMTP provider (see the guide).
+
 ## 2026-10-04 — Stage management on the Leads board
 
 An audit of API routes against the web app (243 routes; most "unmatched" ones are external callbacks, webhooks, the public API or dynamically built paths) found one real gap: **stages could be added but never renamed, reordered or deleted** from the UI, although the API supported it.
