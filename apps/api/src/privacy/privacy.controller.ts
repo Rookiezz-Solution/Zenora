@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Header, Param, Post, Put, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Param, Post, Put, Res, UseGuards } from "@nestjs/common";
+import type { Response } from "express";
 import { MESSAGE_RETENTION_OPTIONS_DAYS } from "@zenora/shared";
 import { z } from "zod";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -7,6 +8,7 @@ import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../auth/guards/permissions.guard";
 import { PrivacyService } from "./privacy.service";
+import { WorkspaceExportService } from "./workspace-export.service";
 
 const retentionSchema = z.object({ messageRetentionDays: z.union([z.null(), z.number().int()]) });
 // Erasing someone is irreversible, so the caller must say so explicitly.
@@ -19,7 +21,18 @@ const eraseSchema = z.object({ confirm: z.literal(true) });
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermission("settings.manage")
 export class PrivacyController {
-  constructor(private readonly privacy: PrivacyService) {}
+  constructor(
+    private readonly privacy: PrivacyService,
+    private readonly workspaceExport: WorkspaceExportService
+  ) {}
+
+  // Everything the business has put into Zenora, as one file. Owner only.
+  @Get("export")
+  @RequirePermission("workspace.manage")
+  async exportEverything(@Param("workspaceId") workspaceId: string, @CurrentUser() userId: string, @Res() res: Response) {
+    await this.workspaceExport.stream(workspaceId, userId, res);
+  }
+
 
   // Owner only (workspace.manage): this removes the whole business's data.
   @Get("deletion")

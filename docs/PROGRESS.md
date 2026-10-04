@@ -1,5 +1,18 @@
 # Zenora — build progress
 
+## 2026-10-17 — "Download everything" (workspace data export)
+
+Completes the privacy set: per-person export/erase, retention, workspace and account deletion — and now the **owner's own copy of everything** (data portability, and an exit path before deleting a workspace).
+
+**Done** (Settings → Privacy → Download everything; owner only)
+- One JSON file with members (name, email, role), pipelines and stages, tags, custom fields, **leads** (identities, tags, notes, consent history, custom-field values), **conversations with every message**, tasks, bookings, automations (latest version), sequences, WhatsApp templates, broadcasts, flow templates, knowledge sources and FAQs, and invoices.
+- **Streamed in 500-row pages** so a large workspace never sits in memory; a read failing part-way **aborts the connection** rather than ending a truncated file that looks complete.
+- **Never included**: channel / calendar / ad-account tokens, API key hashes, webhook signing secrets, password hashes. One export per workspace per ten minutes; `no-store`; audit-logged by section counts only.
+
+**Verified**: typecheck, lint, build, tests green (api +7). Live (real Neon + API) with secrets deliberately present — a WhatsApp number with an access-token cipher, an API key and a webhook secret: a non-member got 403; the owner's download was `200`, an attachment, valid JSON with all expected sections (3 leads, the tag, the 2-message conversation, the task); **none** of the seeded token, the webhook secret, the API key prefix or any `…Cipher` / `keyHash` / `passwordHash` text appeared; members expose only id, role, date and name+email; a second download straight away → 429. Test data deleted.
+
+**Open**: contacts' own files/media are not included (only their URLs); the browser buffers the file before saving, so very large workspaces want a background job that emails a link (no email provider yet); the import side (loading an export into a new workspace) doesn't exist.
+
 ## 2026-10-16 — Workspace deletion and "delete my account"
 
 Closes the gap I flagged in the privacy work. Decided on the merits, with GST in mind: **deleting a workspace must not destroy tax records**, and **a referrer must not lose commission they already earned** because a customer left.

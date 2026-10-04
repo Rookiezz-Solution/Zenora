@@ -95,6 +95,26 @@ export default function PrivacyPage() {
       setTyped("");
     });
 
+  const [exporting, setExporting] = useState(false);
+  async function downloadEverything() {
+    setExporting(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}/privacy/${workspaceId}/export`, { credentials: "include" });
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { message?: string }).message ?? "Could not prepare the download");
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `zenora-export-${workspaceId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setMessage({ tone: "error", text: (err as Error).message });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const scheduleDeletion = () =>
     run(async () => {
       setDeletion(await apiFetch(`/privacy/${workspaceId}/deletion`, { method: "POST", body: JSON.stringify({ confirmName: confirmWs }) }));
@@ -191,7 +211,17 @@ export default function PrivacyPage() {
         )}
       </section>
 
-      <section className="mt-8 rounded-md border border-red-200 bg-white p-4">
+      <section className="mt-6 rounded-md border border-gray-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-gray-900">Download everything</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          One file with your contacts, conversations, notes, tasks, bookings, automations, templates and invoices. Passwords, access tokens and keys are never included. Only an owner can download it, once every ten minutes.
+        </p>
+        <button type="button" onClick={downloadEverything} disabled={exporting} className="mt-3 rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+          {exporting ? "Preparing…" : "Download everything"}
+        </button>
+      </section>
+
+      <section className="mt-4 rounded-md border border-red-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-red-800">Delete this workspace</h2>
         {deletion?.scheduledFor ? (
           <>
