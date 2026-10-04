@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, type ApiError } from "@/lib/api";
 import type { WaTemplate } from "@/lib/broadcast-types";
+import { SlotPicker } from "@/components/slot-picker";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -92,6 +93,8 @@ export default function CalendarPage() {
   const [reminderHours, setReminderHours] = useState<number | null>(null);
   const [reminderTemplateId, setReminderTemplateId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
+  const [savingMove, setSavingMove] = useState(false);
 
   const [name, setName] = useState("");
   const [hostUserId, setHostUserId] = useState("");
@@ -108,6 +111,32 @@ export default function CalendarPage() {
     apiFetch<AppointmentType[]>(`/calendar/${workspaceId}/types`).then(setTypes).catch(() => setTypes([]));
   }
   useEffect(load, [workspaceId]);
+
+  async function cancelAppointment(a: Appointment) {
+    if (!workspaceId || !confirm(`Cancel ${a.guestName}'s booking on ${new Date(a.startsAt).toLocaleString()}? It is removed from your Google Calendar. The guest is not told automatically.`)) return;
+    try {
+      await apiFetch(`/calendar/${workspaceId}/appointments/${a.id}/cancel`, { method: "POST" });
+      setMessage("Booking cancelled.");
+      load();
+    } catch (err) {
+      setMessage((err as ApiError).message ?? "Could not cancel the booking.");
+    }
+  }
+
+  async function moveAppointment(a: Appointment, date: string, startsAt: string) {
+    if (!workspaceId) return;
+    setSavingMove(true);
+    try {
+      await apiFetch(`/calendar/${workspaceId}/appointments/${a.id}/reschedule`, { method: "POST", body: JSON.stringify({ date, startsAt }) });
+      setMessage("Booking moved. A new reminder will be sent for the new time.");
+      setMoving(null);
+      load();
+    } catch (err) {
+      setMessage((err as ApiError).message ?? "Could not move the booking.");
+    } finally {
+      setSavingMove(false);
+    }
+  }
   useEffect(() => {
     if (!workspaceId) return;
     apiFetch<Member[]>(`/workspaces/${workspaceId}/members`)
@@ -208,7 +237,8 @@ export default function CalendarPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{day}</p>
             <ul className="mt-1 divide-y divide-gray-100">
               {items.map((a) => (
-                <li key={a.id} className="flex justify-between py-1.5 text-sm">
+                <li key={a.id} className="py-1.5 text-sm">
+                  <div className="flex flex-wrap justify-between gap-2">
                   <span>
                     {new Date(a.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {a.appointmentType.name}
                   </span>
@@ -220,7 +250,19 @@ export default function CalendarPage() {
                         Reminder failed
                       </span>
                     )}
+                    <button type="button" onClick={() => setMoving(moving === a.id ? null : a.id)} className="ml-3 text-xs text-brand-700 underline">
+                      Move
+                    </button>
+                    <button type="button" onClick={() => cancelAppointment(a)} className="ml-2 text-xs text-red-600 underline">
+                      Cancel
+                    </button>
                   </span>
+                  </div>
+                  {moving === a.id && (
+                    <div className="mt-2">
+                      <SlotPicker slotsPath={`/calendar/${workspaceId}/appointments/${a.id}/slots`} onPick={(d, s) => moveAppointment(a, d, s)} onCancel={() => setMoving(null)} busy={savingMove} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

@@ -1,5 +1,22 @@
 # Zenora — build progress
 
+## 2026-10-04 — Booking cancel and reschedule
+
+**Done**
+- **Guests can change their own booking.** The confirmation screen now gives a private link (`/book/manage/<key>`) to move it to another free time or cancel it. The key is an HMAC of the appointment id (no new column), works only while the booking is booked and in the future, and is rate-limited per address. Forged keys get a 404 without a database lookup.
+- **Staff can move or cancel** any upcoming booking from Calendar (`POST /calendar/:ws/appointments/:id/cancel|reschedule`, `GET …/slots`; needs `leads.write`; the appointment must belong to the workspace). Staff cancelling does not message the guest — the confirmation dialog says so.
+- A move re-checks availability exactly like a new booking (the booking's own slot counts as free), refuses a taken slot, and **resets the reminder** so a fresh WhatsApp reminder goes out for the new time. The Google Calendar event is updated or deleted (best-effort — a Google failure never blocks the change).
+- Webhooks: new `appointment.rescheduled` and `appointment.cancelled` events (with `previousStartsAt`, who did it). Guest-initiated changes also notify the team in-app.
+- Fixed while testing: the sidebar footer hard-coded "Free plan" and "Your name"; it now shows the real name and the current plan (e.g. "Growth plan" during the trial), sharing one usage request with the credit meter.
+
+**Verified**: typecheck, lint, build, tests green (shared 197, worker 91, api 427 = 715). Live against real Neon + API + web: booked as a guest, viewed by key, a forged key → 404, own slot offered back on the manage page but busy on the public page, guest moved it, staff moved it, moving into a taken slot → 400, guest cancel → ok, cancel again → 400, unauthenticated staff cancel → 401, the team notification was written; in the browser the guest page moved a booking (10:30 on the new date) and the staff calendar's Move picker opened and Cancel removed the booking. Test data deleted.
+
+**Not verified / open**
+- **No real Google Calendar** (no credentials): event update/delete are covered by unit tests with mocked HTTP only. If Google is connected, the booking's own old event still shows as busy when moving to an overlapping time.
+- The WhatsApp reminder template cannot carry the manage link (templates are fixed text); the link exists only on the confirmation screen, so a guest who loses it must ask the business.
+- Guests are not messaged automatically when staff move or cancel a booking (that would be sending customer messages; the team can message from the inbox).
+- Two guests racing for the same slot remains a small known window.
+
 ## 2026-10-04 — Trial, renewals and the monthly AI-credit reset
 
 Until now credits were granted once and never replenished, there was no trial, and a cancelled or lapsed plan kept its paid limits. Payments are still one-off checkouts (no recurring-billing engine), so a paid plan runs to its end date and must be paid again.

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, type ApiError } from "@/lib/api";
@@ -30,6 +31,7 @@ export default function BookingPage() {
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "done">("idle");
+  const [manageKey, setManageKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,10 +59,11 @@ export default function BookingPage() {
     setStatus("sending");
     setError(null);
     try {
-      await apiFetch(`/public/booking/${typeId}/book`, {
+      const res = await apiFetch<{ manageKey?: string }>(`/public/booking/${typeId}/book`, {
         method: "POST",
         body: JSON.stringify({ date, startsAt: new Date(picked).toISOString(), name, phone, consent })
       });
+      setManageKey(res.manageKey ?? null);
       setStatus("done");
     } catch (err) {
       setError((err as ApiError).message ?? "Something went wrong");
@@ -78,6 +81,15 @@ export default function BookingPage() {
         <p className="mt-2 text-sm text-gray-600">
           {type.name} with {type.businessName} on {new Date(picked!).toLocaleDateString([], { timeZone: type.timezone })} at {fmt(picked!)}. We&apos;ll be in touch to confirm.
         </p>
+        {manageKey && (
+          <p className="mt-4 text-sm text-gray-600">
+            Need to change it?{" "}
+            <Link href={`/book/manage/${manageKey}`} className="font-medium text-brand-700 underline">
+              Move or cancel this booking
+            </Link>
+            . Save this link: it is the only way to change the booking yourself.
+          </p>
+        )}
       </main>
     );
   }

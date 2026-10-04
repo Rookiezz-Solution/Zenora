@@ -36,3 +36,6 @@ export const bookSchema = z.object({
   consent: z.literal(true)
 });
 export type BookDto = z.infer<typeof bookSchema>;
+
+export const rescheduleSchema = z.object({ date: dateString, startsAt: z.string().datetime() });
+export type RescheduleDto = z.infer<typeof rescheduleSchema>;

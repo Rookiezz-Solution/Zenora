@@ -7,7 +7,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../auth/guards/permissions.guard";
 import { beginOAuth, completeOAuth } from "../common/oauth-state";
 import { loadEnv } from "../config/env";
-import { appointmentTypeSchema, bookSchema, slotsQuerySchema, updateAppointmentTypeSchema } from "./calendar.dto";
+import { appointmentTypeSchema, bookSchema, rescheduleSchema, slotsQuerySchema, updateAppointmentTypeSchema } from "./calendar.dto";
 import { CalendarService } from "./calendar.service";
 import { GoogleCalendarClient } from "./google-calendar.client";
 
@@ -45,6 +45,23 @@ export class CalendarController {
     const start = from ? new Date(from) : new Date();
     const span = Math.min(Math.max(Number(days) || 14, 1), 62);
     return this.calendar.listAppointments(workspaceId, start, new Date(start.getTime() + span * DAY_MS));
+  }
+
+  @Get("appointments/:id/slots")
+  appointmentSlots(@Param("workspaceId") workspaceId: string, @Param("id") id: string, @Query(new ZodValidationPipe(slotsQuerySchema)) query: unknown) {
+    return this.calendar.appointmentSlots(workspaceId, id, (query as { date: string }).date);
+  }
+
+  @Post("appointments/:id/cancel")
+  @RequirePermission("leads.write")
+  cancelAppointment(@Param("workspaceId") workspaceId: string, @Param("id") id: string) {
+    return this.calendar.cancelAppointment(workspaceId, id, "staff");
+  }
+
+  @Post("appointments/:id/reschedule")
+  @RequirePermission("leads.write")
+  rescheduleAppointment(@Param("workspaceId") workspaceId: string, @Param("id") id: string, @Body(new ZodValidationPipe(rescheduleSchema)) body: unknown) {
+    return this.calendar.rescheduleAppointment(workspaceId, id, body as never, "staff");
   }
 
   @Get("types")
@@ -112,5 +129,31 @@ export class PublicBookingController {
   @Post("book")
   book(@Param("typeId") typeId: string, @Req() req: Request, @Body(new ZodValidationPipe(bookSchema)) body: unknown) {
     return this.calendar.book(typeId, req.ip ?? "unknown", body as never);
+  }
+}
+
+// A guest's own private link (shown on the confirmation screen) to change or cancel one booking.
+@Controller("public/booking-manage/:key")
+export class PublicBookingManageController {
+  constructor(private readonly calendar: CalendarService) {}
+
+  @Get()
+  view(@Param("key") key: string, @Req() req: Request) {
+    return this.calendar.manageView(key, req.ip ?? "unknown");
+  }
+
+  @Get("slots")
+  slots(@Param("key") key: string, @Req() req: Request, @Query(new ZodValidationPipe(slotsQuerySchema)) query: unknown) {
+    return this.calendar.manageSlots(key, req.ip ?? "unknown", (query as { date: string }).date);
+  }
+
+  @Post("cancel")
+  cancel(@Param("key") key: string, @Req() req: Request) {
+    return this.calendar.manageCancel(key, req.ip ?? "unknown");
+  }
+
+  @Post("reschedule")
+  reschedule(@Param("key") key: string, @Req() req: Request, @Body(new ZodValidationPipe(rescheduleSchema)) body: unknown) {
+    return this.calendar.manageReschedule(key, req.ip ?? "unknown", body as never);
   }
 }

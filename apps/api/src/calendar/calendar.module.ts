@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { RoutingModule } from "../routing/routing.module";
-import { CalendarController, GoogleCalendarCallbackController, PublicBookingController } from "./calendar.controller";
+import { CalendarController, GoogleCalendarCallbackController, PublicBookingController, PublicBookingManageController } from "./calendar.controller";
 import { CalendarService } from "./calendar.service";
 import { GoogleCalendarClient } from "./google-calendar.client";
 
@@ -9,7 +9,7 @@ import { GoogleCalendarClient } from "./google-calendar.client";
   imports: [RoutingModule, NotificationsModule],
   // The callback controller is listed first so "calendar/google/callback" is
   // never matched as "calendar/:workspaceId/<something>".
-  controllers: [GoogleCalendarCallbackController, CalendarController, PublicBookingController],
+  controllers: [GoogleCalendarCallbackController, CalendarController, PublicBookingController, PublicBookingManageController],
   providers: [CalendarService, GoogleCalendarClient]
 })
 export class CalendarModule {}

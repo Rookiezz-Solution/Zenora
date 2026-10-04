@@ -6,7 +6,20 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { UsageOverview } from "@/lib/billing-types";
 import { SearchTrigger } from "@/components/search-palette";
+import { PLAN_LABELS } from "@zenora/shared";
 import { switchWorkspace, useCurrentWorkspace } from "@/lib/use-workspace";
+
+// The credit meter and the profile footer both need the usage figures, so one
+// request is shared between them rather than made twice on every page.
+const usageCache = new Map<string, { at: number; promise: Promise<UsageOverview> }>();
+function fetchUsage(workspaceId: string): Promise<UsageOverview> {
+  const hit = usageCache.get(workspaceId);
+  if (hit && Date.now() - hit.at < 5_000) return hit.promise;
+  const promise = apiFetch<UsageOverview>(`/billing/${workspaceId}/usage`);
+  usageCache.set(workspaceId, { at: Date.now(), promise });
+  promise.catch(() => usageCache.delete(workspaceId));
+  return promise;
+}
 
 // Nav order matches design/screens (Dashboard.dc.html / workspace shell) and
 // docs/PRD.md section 3. Icons come later with the shadcn/ui pass — labels
@@ -107,7 +120,7 @@ function AiCreditsMeter() {
 
   useEffect(() => {
     if (!workspaceId) return;
-    apiFetch<UsageOverview>(`/billing/${workspaceId}/usage`).then(setUsage).catch(() => setUsage(null));
+    fetchUsage(workspaceId).then(setUsage).catch(() => setUsage(null));
   }, [workspaceId]);
 
   const used = usage ? usage.limits.aiCreditsPerMonth - usage.usage.aiCreditsRemaining : null;
@@ -120,10 +133,19 @@ function AiCreditsMeter() {
 }
 
 function FooterLinks() {
+  const { workspaceId } = useCurrentWorkspace();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [me, setMe] = useState<{ name: string | null; email: string } | null>(null);
+  const [planLabel, setPlanLabel] = useState<string | null>(null);
   useEffect(() => {
     apiFetch<{ isSuperAdmin: boolean }>("/admin/me").then((r) => setIsSuperAdmin(r.isSuperAdmin)).catch(() => setIsSuperAdmin(false));
+    apiFetch<{ name: string | null; email: string }>("/auth/me").then(setMe).catch(() => setMe(null));
   }, []);
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetchUsage(workspaceId).then((u) => setPlanLabel(`${PLAN_LABELS[u.planId]} plan`)).catch(() => setPlanLabel(null));
+  }, [workspaceId]);
+  const displayName = me?.name?.trim() || me?.email || "Your profile";
 
   return (
     <div className="border-t border-gray-200 px-2 py-2 text-sm">
@@ -140,11 +162,11 @@ function FooterLinks() {
       </Link>
       <Link href="/profile" className="mt-1 flex items-center gap-2 rounded-md px-3 py-2 hover:bg-gray-50">
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-          U
+          {displayName.charAt(0).toUpperCase()}
         </span>
         <span className="flex flex-col">
-          <span className="text-sm font-medium text-gray-900">Your name</span>
-          <span className="text-xs text-gray-500">Free plan</span>
+          <span className="max-w-[10rem] truncate text-sm font-medium text-gray-900">{displayName}</span>
+          {planLabel && <span className="text-xs text-gray-500">{planLabel}</span>}
         </span>
       </Link>
     </div>

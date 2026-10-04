@@ -19,7 +19,8 @@ import { RateLimiter } from "../common/rate-limiter";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoutingEngineService } from "../routing/routing-engine.service";
-import type { AppointmentTypeDto, BookDto, UpdateAppointmentTypeDto } from "./calendar.dto";
+import { appointmentManageKey, parseAppointmentManageKey } from "../common/appointment-token";
+import type { AppointmentTypeDto, BookDto, RescheduleDto, UpdateAppointmentTypeDto } from "./calendar.dto";
 import { GoogleCalendarClient } from "./google-calendar.client";
 
 const MAX_DAYS_AHEAD = 60;
@@ -29,6 +30,7 @@ const DAY_MS = 86_400_000;
 export class CalendarService {
   private readonly logger = new Logger(CalendarService.name);
   private readonly bookLimiter = new RateLimiter(5, 10 * 60_000);
+  private readonly manageLimiter = new RateLimiter(20, 10 * 60_000);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -211,7 +213,122 @@ export class CalendarService {
       })
       .catch(() => undefined);
 
+    return { ok: true, startsAt: startsAt.toISOString(), manageKey: appointmentManageKey(appointment.id) };
+  }
+
+  // --- Changing a booking: staff (signed in) or the guest (their private link) ---
+
+  async cancelAppointment(workspaceId: string, id: string, by: "staff" | "guest" = "staff") {
+    const appt = await this.bookedAppointment(id, workspaceId);
+    await this.prisma.client.appointment.update({ where: { id }, data: { status: "cancelled" } });
+    if (appt.googleEventId) await this.removeFromGoogleCalendar(appt.workspaceId, appt.hostUserId, appt.googleEventId);
+    await this.webhooks.emit(appt.workspaceId, "appointment.cancelled", this.appointmentPayload(appt, { cancelledBy: by }));
+    if (by === "guest") {
+      await this.notifications
+        .create({ workspaceId: appt.workspaceId, type: "appointment_cancelled", title: `Booking cancelled: ${appt.appointmentType.name}`, body: `${appt.guestName} cancelled ${appt.startsAt.toISOString()}` })
+        .catch(() => undefined);
+    }
+    return { ok: true };
+  }
+
+  async rescheduleAppointment(workspaceId: string, id: string, dto: RescheduleDto, by: "staff" | "guest" = "staff") {
+    const appt = await this.bookedAppointment(id, workspaceId);
+    const type = await this.activeType(appt.appointmentTypeId);
+    this.assertBookableDate(dto.date, type.workspace.timezone);
+    const startsAtMs = Date.parse(dto.startsAt);
+    // The booking itself does not count as busy, so it can be moved a little.
+    const input = await this.slotInput(type, dto.date, id);
+    if (!isSlotAvailable(startsAtMs, input)) throw new BadRequestException("That time is no longer available — please pick another");
+
+    const startsAt = new Date(startsAtMs);
+    const endsAt = new Date(startsAtMs + type.durationMin * 60_000);
+    // A fresh reminder is owed for the new time, even if one was sent for the old one.
+    const updated = await this.prisma.client.appointment.update({
+      where: { id },
+      data: { startsAt, endsAt, reminderStatus: null, reminderSentAt: null, reminderError: null },
+      include: { appointmentType: { select: { name: true } } }
+    });
+    if (appt.googleEventId) await this.moveInGoogleCalendar(appt.workspaceId, appt.hostUserId, appt.googleEventId, startsAt, endsAt);
+    await this.webhooks.emit(appt.workspaceId, "appointment.rescheduled", { ...this.appointmentPayload(updated), previousStartsAt: appt.startsAt.toISOString(), rescheduledBy: by });
+    if (by === "guest") {
+      await this.notifications
+        .create({ workspaceId: appt.workspaceId, type: "appointment_rescheduled", title: `Booking moved: ${appt.appointmentType.name}`, body: `${appt.guestName} moved it to ${startsAt.toISOString()}` })
+        .catch(() => undefined);
+    }
     return { ok: true, startsAt: startsAt.toISOString() };
+  }
+
+  // The guest page: what they booked, and whether it can still be changed.
+  async manageView(key: string, ip: string) {
+    const appt = await this.appointmentFromKey(key, ip);
+    const type = await this.prisma.client.appointmentType.findUnique({ where: { id: appt.appointmentTypeId }, include: { workspace: { select: { name: true, timezone: true } } } });
+    return {
+      typeId: appt.appointmentTypeId,
+      name: appt.appointmentType.name,
+      businessName: type?.workspace.name ?? "",
+      timezone: type?.workspace.timezone ?? "UTC",
+      durationMin: type?.durationMin ?? 0,
+      startsAt: appt.startsAt.toISOString(),
+      status: appt.status,
+      canChange: appt.status === "booked" && appt.startsAt.getTime() > Date.now(),
+      canReschedule: Boolean(type?.active)
+    };
+  }
+
+  // Times this booking could move to (its own slot counts as free).
+  async appointmentSlots(workspaceId: string, id: string, date: string) {
+    const appt = await this.bookedAppointment(id, workspaceId);
+    const type = await this.activeType(appt.appointmentTypeId);
+    this.assertBookableDate(date, type.workspace.timezone);
+    return { timezone: type.workspace.timezone, slots: computeSlots(await this.slotInput(type, date, id)) };
+  }
+
+  async manageSlots(key: string, ip: string, date: string) {
+    const appt = await this.appointmentFromKey(key, ip);
+    if (appt.status !== "booked") throw new BadRequestException("This booking is no longer active");
+    const type = await this.activeType(appt.appointmentTypeId);
+    this.assertBookableDate(date, type.workspace.timezone);
+    return { timezone: type.workspace.timezone, slots: computeSlots(await this.slotInput(type, date, appt.id)) };
+  }
+
+  async manageCancel(key: string, ip: string) {
+    const appt = await this.appointmentFromKey(key, ip);
+    return this.cancelAppointment(appt.workspaceId, appt.id, "guest");
+  }
+
+  async manageReschedule(key: string, ip: string, dto: RescheduleDto) {
+    const appt = await this.appointmentFromKey(key, ip);
+    return this.rescheduleAppointment(appt.workspaceId, appt.id, dto, "guest");
+  }
+
+  private async appointmentFromKey(key: string, ip: string) {
+    this.manageLimiter.consume(ip);
+    const id = parseAppointmentManageKey(key);
+    const appt = id ? await this.prisma.client.appointment.findUnique({ where: { id }, include: { appointmentType: { select: { name: true } } } }) : null;
+    if (!appt) throw new NotFoundException("Booking not found");
+    return appt;
+  }
+
+  // Must exist in this workspace, still be booked and not already have happened.
+  private async bookedAppointment(id: string, workspaceId: string) {
+    const appt = await this.prisma.client.appointment.findFirst({ where: { id, workspaceId }, include: { appointmentType: { select: { name: true } } } });
+    if (!appt) throw new NotFoundException("Appointment not found");
+    if (appt.status !== "booked") throw new BadRequestException("This booking is already cancelled");
+    if (appt.startsAt.getTime() <= Date.now()) throw new BadRequestException("This booking has already taken place");
+    return appt;
+  }
+
+  private appointmentPayload(appt: { id: string; leadId: string | null; appointmentTypeId: string; appointmentType: { name: string }; startsAt: Date; endsAt: Date; guestName: string; guestPhone: string }, extra: Record<string, unknown> = {}) {
+    return {
+      id: appt.id,
+      leadId: appt.leadId,
+      appointmentType: { id: appt.appointmentTypeId, name: appt.appointmentType.name },
+      startsAt: appt.startsAt.toISOString(),
+      endsAt: appt.endsAt.toISOString(),
+      guestName: appt.guestName,
+      guestPhone: appt.guestPhone,
+      ...extra
+    };
   }
 
   // --- internals -----------------------------------------------------------
@@ -232,7 +349,7 @@ export class CalendarService {
     if (dayStart > now + MAX_DAYS_AHEAD * DAY_MS) throw new BadRequestException(`Bookings open up to ${MAX_DAYS_AHEAD} days ahead`);
   }
 
-  private async slotInput(type: Awaited<ReturnType<CalendarService["activeType"]>>, date: string): Promise<SlotInput> {
+  private async slotInput(type: Awaited<ReturnType<CalendarService["activeType"]>>, date: string, excludeAppointmentId?: string): Promise<SlotInput> {
     const tz = type.workspace.timezone;
     const bufferMs = type.bufferMin * 60_000;
     const dayStart = zonedTimeToUtc(date, "00:00", tz);
@@ -240,7 +357,7 @@ export class CalendarService {
     const to = new Date(dayStart + DAY_MS + bufferMs);
 
     const booked = await this.prisma.client.appointment.findMany({
-      where: { hostUserId: type.hostUserId, status: "booked", startsAt: { lt: to }, endsAt: { gt: from } },
+      where: { hostUserId: type.hostUserId, status: "booked", startsAt: { lt: to }, endsAt: { gt: from }, ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}) },
       select: { startsAt: true, endsAt: true }
     });
     const busy: Interval[] = booked.map((a) => ({ start: a.startsAt.getTime(), end: a.endsAt.getTime() }));
@@ -284,6 +401,24 @@ export class CalendarService {
     } catch (err) {
       this.logger.warn(`Could not add the booking to Google Calendar: ${err instanceof Error ? err.message : String(err)}`);
       return null;
+    }
+  }
+
+  private async removeFromGoogleCalendar(workspaceId: string, userId: string, eventId: string) {
+    try {
+      const token = await this.accessToken(workspaceId, userId);
+      if (token) await this.google.deleteEvent(token, eventId);
+    } catch (err) {
+      this.logger.warn(`Could not remove the booking from Google Calendar: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  private async moveInGoogleCalendar(workspaceId: string, userId: string, eventId: string, startsAt: Date, endsAt: Date) {
+    try {
+      const token = await this.accessToken(workspaceId, userId);
+      if (token) await this.google.updateEvent(token, eventId, { startsAt, endsAt });
+    } catch (err) {
+      this.logger.warn(`Could not move the booking in Google Calendar: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

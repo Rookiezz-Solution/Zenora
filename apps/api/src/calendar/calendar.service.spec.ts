@@ -1,12 +1,18 @@
 import { BadRequestException, HttpException, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { zonedTimeToUtc } from "@zenora/shared";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { WebhooksService } from "../developers/webhooks.service";
 import type { NotificationsService } from "../notifications/notifications.service";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { RoutingEngineService } from "../routing/routing-engine.service";
 import { CalendarService } from "./calendar.service";
 import type { GoogleCalendarClient } from "./google-calendar.client";
+
+beforeAll(() => {
+  process.env.AUTH_SECRET = "test-secret-at-least-16-chars";
+  process.env.TOKEN_ENCRYPTION_KEY = "a1".repeat(32);
+  process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
+});
 
 const TZ = "Asia/Kolkata";
 

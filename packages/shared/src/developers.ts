@@ -9,13 +9,15 @@ export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 
 export const API_KEY_PREFIX = "znr_live_";
 
-export const WEBHOOK_EVENTS = ["lead.created", "lead.stage_changed", "appointment.booked"] as const;
+export const WEBHOOK_EVENTS = ["lead.created", "lead.stage_changed", "appointment.booked", "appointment.rescheduled", "appointment.cancelled"] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = {
   "lead.created": "A new lead is created",
   "lead.stage_changed": "A lead moves to another pipeline stage",
-  "appointment.booked": "A guest books an appointment"
+  "appointment.booked": "A guest books an appointment",
+  "appointment.rescheduled": "An appointment is moved to another time",
+  "appointment.cancelled": "An appointment is cancelled"
 };
 
 // First attempt is immediate; these are the waits before each retry.

@@ -75,4 +75,27 @@ describe("GoogleCalendarClient", () => {
     respond({ error: "forbidden" }, false);
     await expect(client.createEvent("tok", event)).rejects.toThrow("event creation failed");
   });
+
+  it("patches an event with the new times", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await makeClient();
+    await client.updateEvent("tok", "evt/1", { startsAt: new Date("2026-10-05T05:00:00Z"), endsAt: new Date("2026-10-05T05:30:00Z") });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url).endsWith("/events/evt%2F1")).toBe(true);
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body).start.dateTime).toBe("2026-10-05T05:00:00.000Z");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    await expect(client.updateEvent("tok", "e", { startsAt: new Date(), endsAt: new Date() })).rejects.toThrow("event update failed");
+  });
+
+  it("deletes an event, treating one that is already gone as success", async () => {
+    const client = await makeClient();
+    for (const status of [204, 404, 410]) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: status === 204, status }));
+      await expect(client.deleteEvent("tok", "evt1")).resolves.toBeUndefined();
+    }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403 }));
+    await expect(client.deleteEvent("tok", "evt1")).rejects.toThrow("event delete failed");
+  });
 });
