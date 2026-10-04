@@ -29,8 +29,8 @@ const DAY_MS = 86_400_000;
 @Injectable()
 export class CalendarService {
   private readonly logger = new Logger(CalendarService.name);
-  private readonly bookLimiter = new RateLimiter(5, 10 * 60_000);
-  private readonly manageLimiter = new RateLimiter(20, 10 * 60_000);
+  private readonly bookLimiter = new RateLimiter(5, 10 * 60_000, "booking");
+  private readonly manageLimiter = new RateLimiter(20, 10 * 60_000, "booking-manage");
 
   constructor(
     private readonly prisma: PrismaService,
@@ -146,7 +146,7 @@ export class CalendarService {
   }
 
   async book(id: string, ip: string, dto: BookDto) {
-    this.bookLimiter.consume(`${ip}:${id}`);
+    await this.bookLimiter.consume(`${ip}:${id}`);
     const type = await this.activeType(id);
     this.assertBookableDate(dto.date, type.workspace.timezone);
     const phone = normalizePhone(dto.phone);
@@ -302,7 +302,7 @@ export class CalendarService {
   }
 
   private async appointmentFromKey(key: string, ip: string) {
-    this.manageLimiter.consume(ip);
+    await this.manageLimiter.consume(ip);
     const id = parseAppointmentManageKey(key);
     const appt = id ? await this.prisma.client.appointment.findUnique({ where: { id }, include: { appointmentType: { select: { name: true } } } }) : null;
     if (!appt) throw new NotFoundException("Booking not found");

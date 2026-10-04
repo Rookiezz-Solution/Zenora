@@ -124,11 +124,10 @@ describe("ReportsService.lostReasons", () => {
   it("groups by reason and defaults blank reasons to a catch-all bucket", async () => {
     const client = makeClient({
       lead: {
-        findMany: vi.fn().mockResolvedValue([
-          { lostReason: "Too expensive" },
-          { lostReason: "Too expensive" },
-          { lostReason: null },
-          { lostReason: "  " }
+        groupBy: vi.fn().mockResolvedValue([
+          { lostReason: "Too expensive", _count: { _all: 2 } },
+          { lostReason: null, _count: { _all: 1 } },
+          { lostReason: "  ", _count: { _all: 1 } }
         ])
       }
     });

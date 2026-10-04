@@ -41,3 +41,8 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # Reported, not blocking: a newly published advisory should not stop every merge.
+      - name: Dependency advisories
+        run: pnpm audit --prod --audit-level=high
+        continue-on-error: true

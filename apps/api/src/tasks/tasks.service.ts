@@ -3,6 +3,8 @@ import { assertLeadInWorkspace, assertMember } from "../common/workspace-refs";
 import { PrismaService } from "../prisma/prisma.service";
 import type { CreateTaskDto, ListTasksQuery, UpdateTaskDto } from "./dto/tasks.dto";
 
+const MAX_TASKS = 500;
+
 @Injectable()
 export class TasksService {
   constructor(private readonly prisma: PrismaService) {}
@@ -17,7 +19,8 @@ export class TasksService {
         ...(query.completed === "false" ? { completedAt: null } : {})
       },
       include: { lead: { select: { id: true, name: true, phone: true } } },
-      orderBy: [{ completedAt: "asc" }, { dueAt: "asc" }]
+      orderBy: [{ completedAt: "asc" }, { dueAt: "asc" }],
+      take: MAX_TASKS // open tasks sort first, so a very old backlog of completed ones is what falls off
     });
   }
 

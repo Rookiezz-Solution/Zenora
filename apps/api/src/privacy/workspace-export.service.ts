@@ -15,7 +15,7 @@ const PAGE = 500;
 @Injectable()
 export class WorkspaceExportService {
   // Building the file is heavy; one per workspace every ten minutes is plenty.
-  private readonly limiter = new RateLimiter(1, 10 * 60_000);
+  private readonly limiter = new RateLimiter(1, 10 * 60_000, "workspace-export");
   private readonly logger = new Logger(WorkspaceExportService.name);
 
   constructor(
@@ -24,7 +24,7 @@ export class WorkspaceExportService {
   ) {}
 
   async stream(workspaceId: string, userId: string, res: Response): Promise<void> {
-    this.limiter.consume(workspaceId);
+    await this.limiter.consume(workspaceId);
 
     const workspace = await this.prisma.client.workspace.findUniqueOrThrow({
       where: { id: workspaceId },

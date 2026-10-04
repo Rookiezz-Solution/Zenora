@@ -1,5 +1,21 @@
 # Zenora — build progress
 
+## 2026-10-04 — Hardening: CSP, shared rate limits, bounded lists
+
+**Done**
+- **Content-Security-Policy** on the web app (`next.config.mjs`): no plugins, no framing, no other base URL, forms post only to us, and scripts/frames/network calls limited to our API, Razorpay checkout and Meta's JS SDK. Scripts still allow `'unsafe-inline'` (Next needs it to hydrate), so this is not a defence against injected inline script — documented in `docs/SECURITY.md`. `CSP_REPORT_ONLY=true` switches it to log-only. HSTS in production on both web and API; the API sends `default-src 'none'`.
+- **Rate limits now hold across API instances.** Every named limiter (login, sign-up, OTP, booking, guest manage link, API keys, link-in-bio, export) also counts in Redis (`RedisRateLimitStore`, fixed window); the local sliding window stays as a floor. Redis problems fail open (and are logged), so an outage cannot lock people out. `consume` is now async and every call site awaits it.
+- **Bounded list reads:** tasks 500, broadcasts 200, each part of a lead's timeline 500 (newest first), duplicate suggestions 50; "lost reasons" is a database `groupBy`. Nothing that grows with a customer's data is read unbounded by these endpoints any more. The full history is still in "download everything".
+- CI reports dependency advisories (`pnpm audit`, non-blocking).
+
+**Verified**: typecheck, lint, build, tests green (shared 197, worker 91, api 441 = 729). Live: in the browser the CSP is sent, `/pricing` loads and calls the API with no violations, and a fetch to `example.com` is blocked by `connect-src`. With **two real API processes against real Upstash**, 4 failed logins to each for the same account were allowed and the 9th (to either) got 429 — neither process alone had counted 8, so this is the shared count working. Test keys removed from Redis.
+
+**Not verified / open**
+- **Razorpay checkout and the Meta connect popups were not run against the CSP** (no real accounts); their origins are allowed from the vendors' documentation. Use `CSP_REPORT_ONLY=true` first if either misbehaves.
+- The caps silently drop the oldest rows beyond them (tasks beyond 500 completed/open, etc.); there is no "load more" yet. Cursor pagination in the UI is the proper fix if a customer reaches them.
+- `teamPerformance` and a few other reports still read every lead into memory; fine to tens of thousands of leads, needs SQL aggregation beyond that.
+- Session-version and membership-role caches remain per process (bounded staleness 10–15 s).
+
 ## 2026-10-04 — Booking cancel and reschedule
 
 **Done**

@@ -23,7 +23,8 @@ export class BroadcastsService {
     return this.prisma.client.broadcast.findMany({
       where: { workspaceId },
       include: { template: { select: { name: true, category: true } }, _count: { select: { recipients: true } } },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: 200 // newest first; older broadcasts stay in the "download everything" export
     });
   }
 

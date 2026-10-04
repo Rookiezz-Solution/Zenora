@@ -23,6 +23,7 @@ import { LinkInBioModule } from "./link-in-bio/link-in-bio.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PipelinesModule } from "./pipelines/pipelines.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { RateLimitModule } from "./common/rate-limit.module";
 import { ReferralsModule } from "./referrals/referrals.module";
 import { PrivacyModule } from "./privacy/privacy.module";
 import { QueueModule } from "./queue/queue.module";
@@ -39,6 +40,7 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
 @Module({
   imports: [
     PrismaModule,
+    RateLimitModule,
     AuditModule,
     QueueModule,
     RealtimeModule,

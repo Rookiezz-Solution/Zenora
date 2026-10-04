@@ -124,15 +124,17 @@ export class ReportsService {
   }
 
   async lostReasons(workspaceId: string) {
-    const leads = await this.prisma.client.lead.findMany({
+    // Counted by the database, so the number of lost leads does not matter.
+    const grouped = await this.prisma.client.lead.groupBy({
+      by: ["lostReason"],
       where: { workspaceId, mergedIntoId: null, stage: { type: "lost" } },
-      select: { lostReason: true }
+      _count: { _all: true }
     });
 
     const counts = new Map<string, number>();
-    for (const lead of leads) {
-      const reason = lead.lostReason?.trim() || "No reason given";
-      counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    for (const row of grouped) {
+      const reason = row.lostReason?.trim() || "No reason given";
+      counts.set(reason, (counts.get(reason) ?? 0) + row._count._all);
     }
 
     return [...counts.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count);

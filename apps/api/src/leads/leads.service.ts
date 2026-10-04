@@ -20,6 +20,9 @@ import type {
   UpdateLeadDto
 } from "./dto/leads.dto";
 
+// A lead's timeline shows its newest activity; older items are still in the data export.
+const TIMELINE_CAP = 500;
+
 @Injectable()
 export class LeadsService {
   constructor(
@@ -219,15 +222,20 @@ export class LeadsService {
     await this.ensureLead(workspaceId, leadId);
 
     const [notes, messages, tasks] = await Promise.all([
+      // Newest first and capped, so one very long conversation cannot make this page unbounded.
       this.prisma.client.note.findMany({
         where: { leadId },
-        include: { author: { select: { id: true, name: true } } }
+        include: { author: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "desc" },
+        take: TIMELINE_CAP
       }),
       this.prisma.client.message.findMany({
         where: { conversation: { leadId } },
-        include: { conversation: { select: { channel: true } } }
+        include: { conversation: { select: { channel: true } } },
+        orderBy: { createdAt: "desc" },
+        take: TIMELINE_CAP
       }),
-      this.prisma.client.task.findMany({ where: { leadId } })
+      this.prisma.client.task.findMany({ where: { leadId }, orderBy: { createdAt: "desc" }, take: TIMELINE_CAP })
     ]);
 
     // Unified timeline (docs/PRD.md's "messages, bot steps, routing, calls,
@@ -252,7 +260,8 @@ export class LeadsService {
         id: { not: leadId },
         mergedIntoId: null,
         OR: [...(lead.phone ? [{ phone: lead.phone }] : []), ...(lead.email ? [{ email: lead.email }] : [])]
-      }
+      },
+      take: 50
     });
   }
 

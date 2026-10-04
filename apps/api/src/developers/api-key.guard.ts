@@ -17,7 +17,7 @@ export const RequireScope = (scope: ApiKeyScope) => SetMetadata(SCOPE_KEY, scope
 // can only ever touch its own workspace.
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  private readonly limiter = new RateLimiter(120, 60_000);
+  private readonly limiter = new RateLimiter(120, 60_000, "api-key");
 
   constructor(
     private readonly keys: ApiKeysService,
@@ -31,7 +31,7 @@ export class ApiKeyGuard implements CanActivate {
     const key = raw ? await this.keys.authenticate(raw) : null;
     if (!key) throw new UnauthorizedException("Missing or invalid API key");
 
-    this.limiter.consume(key.id);
+    await this.limiter.consume(key.id);
 
     const required = this.reflector.get<ApiKeyScope | undefined>(SCOPE_KEY, context.getHandler());
     if (required && !key.scopes.includes(required)) throw new ForbiddenException(`This API key does not have the ${required} scope`);

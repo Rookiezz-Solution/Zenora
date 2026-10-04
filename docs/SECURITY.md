@@ -49,12 +49,12 @@ determined attacker can lock a *known* account out for 15 minutes.
   only the app origin.
 
 ## Known gaps (not fixed here)
-- **No content-security-policy** (Next's inline scripts need nonces). Do this next.
+- **The content-security-policy still allows inline scripts** (Next needs them to hydrate; a nonce policy would force every page to render per request). It does block plugins, framing, other base URLs and form targets, and limits scripts, frames and network calls to our API, Razorpay and Meta's SDK. Razorpay checkout and the Meta connect popups have never been run against it with real accounts: if one breaks, set `CSP_REPORT_ONLY=true` to see what is being blocked.
 - **No two-factor authentication**, no email verification flow, no password-reset
   email (there is no mail provider yet); sessions last 30 days.
-- **Rate limits are per process.** Move to Redis before running more than one API instance.
+- **Rate limits** are counted in Redis when it is reachable, so adding API instances does not multiply them, and fall back to per-process counting if Redis is down (they fail open on purpose: a Redis outage must not lock everyone out of sign-in). The in-process caches (membership roles, session versions) are still per process, with 10-15 s staleness limits.
 - Remaining advisories: `@nestjs/core` 10 (needs the Nest 11 upgrade) and
   `file-type` (only reachable through file uploads, which Zenora doesn't offer).
-- No automated DAST/SAST in CI, no secrets scanning, no dependency-update bot.
+- CI now reports dependency advisories (non-blocking). No automated DAST/SAST, no secrets scanning, no dependency-update bot.
 - Third-party credentials (Meta, Google, Razorpay, Anthropic) have never been
   exercised for real, so those integrations are unreviewed against live behaviour.

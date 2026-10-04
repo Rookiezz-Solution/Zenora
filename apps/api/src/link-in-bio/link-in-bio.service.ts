@@ -10,7 +10,7 @@ import type { CallbackRequestDto, UpsertLinkInBioDto } from "./link-in-bio.dto";
 
 @Injectable()
 export class LinkInBioService {
-  private readonly limiter = new RateLimiter(5, 10 * 60_000);
+  private readonly limiter = new RateLimiter(5, 10 * 60_000, "link-in-bio-callback");
 
   constructor(
     private readonly prisma: PrismaService,
@@ -51,7 +51,7 @@ export class LinkInBioService {
   // and the response is identical either way so a visitor can't probe which
   // numbers the business already has.
   async submitCallback(slug: string, ip: string, dto: CallbackRequestDto) {
-    this.limiter.consume(`${ip}:${slug}`);
+    await this.limiter.consume(`${ip}:${slug}`);
 
     const page = await this.prisma.client.linkInBioPage.findUnique({ where: { slug } });
     if (!page || !page.published) throw new NotFoundException("Page not found");
