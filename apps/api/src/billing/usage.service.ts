@@ -94,6 +94,16 @@ export class UsageService {
     return { balance: balanceAfter };
   }
 
+  // Just the figures the dashboard shows: two reads instead of all of getUsage.
+  async aiCreditsSummary(workspaceId: string) {
+    const [subscription, lastLedger] = await Promise.all([
+      this.prisma.client.subscription.findUnique({ where: { workspaceId }, select: { planId: true } }),
+      this.prisma.client.creditLedger.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { balanceAfter: true } })
+    ]);
+    const monthly = getPlanConfig().plans[(subscription?.planId as PlanId) ?? "free"].aiCreditsPerMonth;
+    return { remaining: lastLedger?.balanceAfter ?? monthly, monthly };
+  }
+
   async checkAiCredits(workspaceId: string): Promise<AiCreditCheck> {
     const planId = await this.currentPlanId(workspaceId);
     const limit = getPlanConfig().plans[planId].aiCreditsPerMonth;

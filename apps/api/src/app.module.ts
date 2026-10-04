@@ -12,6 +12,7 @@ import { BroadcastsModule } from "./broadcasts/broadcasts.module";
 import { CalendarModule } from "./calendar/calendar.module";
 import { ChannelsModule } from "./channels/channels.module";
 import { DevelopersModule } from "./developers/developers.module";
+import { DashboardModule } from "./dashboard/dashboard.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { FlowTemplatesModule } from "./flow-templates/flow-templates.module";
 import { HealthController } from "./health/health.controller";
@@ -29,6 +30,7 @@ import { QuickRepliesModule } from "./quick-replies/quick-replies.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { ReportsModule } from "./reports/reports.module";
 import { RoutingModule } from "./routing/routing.module";
+import { SearchModule } from "./search/search.module";
 import { SequencesModule } from "./sequences/sequences.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { TemplatesModule } from "./templates/templates.module";
@@ -64,6 +66,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     AdminModule,
     AdsModule,
     AgenciesModule,
+    SearchModule,
+    DashboardModule,
     AccountModule,
     AudiencesModule,
     ReferralsModule,

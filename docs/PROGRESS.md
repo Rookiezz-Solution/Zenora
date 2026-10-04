@@ -1,5 +1,20 @@
 # Zenora — build progress
 
+## 2026-10-04 — Home dashboard, global search, help, legal drafts, pricing page, landing
+
+**Done**
+- **Home dashboard** (`GET /dashboard/:workspaceId?days=7|30`, `reports.read`): new leads vs the previous period of the same length, won, median speed to first reply (answered threads only), threads waiting on us, tasks (open/overdue/due today), bookings in the next 7 days, WhatsApp spend estimate, pipeline snapshot, lead sources, AI credits. Two waves of a few queries each (not one burst), all workspace-scoped, merged duplicates excluded. Pure maths (`firstResponseMinutes`, `median`, `percentChange`, …) lives in `packages/shared/src/dashboard.ts`.
+- **Global search** (Ctrl/Cmd+K, `GET /search/:workspaceId?q=`, `leads.read`): leads (name, email, phone digits, tag), automations, flow templates, tasks, notes; min 2 characters, 5 per group, keyboard navigation.
+- **Help** page (getting started + FAQ), **pricing** page (reads `/public/plans`, so it can't disagree with checkout), **landing** page, **terms** and **privacy**.
+- Support address comes from `NEXT_PUBLIC_SUPPORT_EMAIL` (documented in `.env.example`); when unset the pages say to contact the account manager.
+
+**Verified**: typecheck, lint, build, tests green (shared 184, worker 84, api 397 = 665). Live in the browser against real Neon + API + web: Home showed the seeded figures (3 new leads, +200%, 6 min median reply, 1 waiting, 1 overdue, sources, 50 AI credits); Ctrl K found a contact and a task for "asha"; /pricing, /help, /terms, / render with live prices. Test data deleted.
+
+**Not verified / open**
+- **Terms and privacy are drafts and have not been reviewed by a lawyer**; each page says so (`LEGAL_REVIEW_PENDING` in `legal-layout.tsx`). Set it to false only after review.
+- The Home dashboard samples at most 2,000 conversation threads for reply times; very busy workspaces get an approximation.
+- Search is substring matching, not ranked full-text search.
+
 ## 2026-10-18 — Plans and pricing editor (super admin)
 
 Built last because it changes what customers pay, so the safeguards are the point: **a mistake here must not touch money already taken or leave a customer stranded.**

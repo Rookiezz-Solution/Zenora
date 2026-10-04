@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { UsageOverview } from "@/lib/billing-types";
+import { SearchTrigger } from "@/components/search-palette";
 import { switchWorkspace, useCurrentWorkspace } from "@/lib/use-workspace";
 
 // Nav order matches design/screens (Dashboard.dc.html / workspace shell) and
@@ -99,17 +100,6 @@ function WorkspaceSwitcher() {
   );
 }
 
-function SearchTrigger() {
-  return (
-    <button
-      type="button"
-      className="mx-3 mt-3 flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-500 hover:border-gray-300"
-    >
-      <span>Search leads, chats, automations</span>
-      <kbd className="rounded border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-xs">Ctrl K</kbd>
-    </button>
-  );
-}
 
 function AiCreditsMeter() {
   const { workspaceId } = useCurrentWorkspace();
