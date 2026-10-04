@@ -6,9 +6,10 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { AudienceFilter, Broadcast, WaTemplate } from "@/lib/broadcast-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 export default function NewBroadcastPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const router = useRouter();
   const [templates, setTemplates] = useState<WaTemplate[]>([]);
   const [templateId, setTemplateId] = useState("");
@@ -76,7 +77,7 @@ export default function NewBroadcastPage() {
     }
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-xl">

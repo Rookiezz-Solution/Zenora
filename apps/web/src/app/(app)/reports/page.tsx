@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import type { Pipeline } from "@/lib/pipeline-types";
 import type { BotDropoff, LostReasonRow, PipelineFunnel, TeamPerformanceRow } from "@/lib/report-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
   if (rows.length === 0) return;
@@ -33,7 +34,7 @@ function ExportButton({ label, rows, filename }: { label: string; rows: Record<s
 }
 
 export default function ReportsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState("");
   const [funnel, setFunnel] = useState<PipelineFunnel | null>(null);
@@ -55,7 +56,7 @@ export default function ReportsPage() {
     apiFetch<PipelineFunnel>(`/reports/${workspaceId}/funnel${query}`).then(setFunnel).catch(() => setFunnel(null));
   }, [workspaceId, selectedPipelineId]);
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   const maxFunnelCount = Math.max(1, ...(funnel?.stages.map((s) => s.count) ?? [0]));
 

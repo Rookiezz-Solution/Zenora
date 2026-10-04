@@ -6,6 +6,7 @@ import { TemplateBuilderForm, type TemplateFormValues } from "@/components/broad
 import { apiFetch } from "@/lib/api";
 import type { WaTemplate } from "@/lib/broadcast-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const INITIAL: TemplateFormValues = {
   name: "",
@@ -19,7 +20,7 @@ const INITIAL: TemplateFormValues = {
 };
 
 export default function NewWaTemplatePage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const router = useRouter();
 
   async function handleSubmit(values: TemplateFormValues) {
@@ -31,7 +32,7 @@ export default function NewWaTemplatePage() {
     router.push(`/broadcasts/templates/${template.id}`);
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-xl">

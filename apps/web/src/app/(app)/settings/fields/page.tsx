@@ -5,11 +5,12 @@ import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { apiFetch } from "@/lib/api";
 import type { CustomField } from "@/lib/pipeline-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const FIELD_TYPES: CustomField["type"][] = ["text", "number", "date", "select", "multiselect", "boolean"];
 
 export default function CustomFieldsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [fields, setFields] = useState<CustomField[]>([]);
   const [form, setForm] = useState({ key: "", label: "", type: "text" as CustomField["type"], options: "", required: false });
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +49,7 @@ export default function CustomFieldsPage() {
     load();
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-xl">

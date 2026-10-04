@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { apiFetch, type ApiError } from "@/lib/api";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 interface Form {
   slug: string;
@@ -16,7 +17,7 @@ interface Form {
 const EMPTY: Form = { slug: "", title: "", bio: "", whatsappPhone: "", brochureUrl: "", published: false };
 
 export default function LinkInBioSettingsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [form, setForm] = useState<Form>(EMPTY);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -61,7 +62,7 @@ export default function LinkInBioSettingsPage() {
     }
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   const input = "rounded-md border border-gray-300 px-3 py-2 text-sm";
   const publicUrl = typeof window !== "undefined" && form.slug ? `${window.location.origin}/l/${form.slug}` : null;

@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Task } from "@/lib/task-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 export default function TasksPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [loaded, setLoaded] = useState(false); // so an empty list is not announced before the tasks have arrived
   const [showCompleted, setShowCompleted] = useState(false);
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
@@ -16,7 +18,7 @@ export default function TasksPage() {
   function load() {
     if (!workspaceId) return;
     const query = showCompleted ? "" : "?completed=false";
-    apiFetch<Task[]>(`/tasks/${workspaceId}${query}`).then(setTasks).catch(() => setTasks([]));
+    apiFetch<Task[]>(`/tasks/${workspaceId}${query}`).then(setTasks).catch(() => setTasks([])).finally(() => setLoaded(true));
   }
   useEffect(load, [workspaceId, showCompleted]);
 
@@ -47,7 +49,7 @@ export default function TasksPage() {
     load();
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-2xl">
@@ -97,7 +99,7 @@ export default function TasksPage() {
             </div>
           </li>
         ))}
-        {tasks.length === 0 && <li className="px-4 py-6 text-center text-sm text-gray-400">No tasks yet.</li>}
+        {loaded && tasks.length === 0 && <li className="px-4 py-6 text-center text-sm text-gray-400">No tasks yet.</li>}
       </ul>
     </div>
   );

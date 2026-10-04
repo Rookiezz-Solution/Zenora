@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Notification } from "@/lib/notification-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 export default function NotificationsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   function load() {
@@ -21,7 +22,7 @@ export default function NotificationsPage() {
     load();
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-2xl">

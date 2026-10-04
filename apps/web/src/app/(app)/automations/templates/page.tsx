@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { apiFetch, type ApiError } from "@/lib/api";
 import type { Automation, FlowTemplate } from "@/lib/automation-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 type Scope = "all" | "mine" | "agency" | "public";
 
@@ -12,7 +13,7 @@ const SCOPE_LABELS: Record<Scope, string> = { all: "All", mine: "My templates", 
 const ORIGIN_LABELS: Record<FlowTemplate["origin"], string> = { mine: "Mine", agency: "From your agency", community: "Community", zenora: "By Zenora" };
 
 export default function FlowTemplatesGalleryPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [templates, setTemplates] = useState<FlowTemplate[]>([]);
   const [scope, setScope] = useState<Scope>("all");
   const [industry, setIndustry] = useState("");
@@ -61,7 +62,7 @@ export default function FlowTemplatesGalleryPage() {
     window.location.href = `/automations/templates/${template.id}`;
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-3xl">

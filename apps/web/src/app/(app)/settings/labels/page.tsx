@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { apiFetch } from "@/lib/api";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const DEFAULT_LABELS = {
   lead: "Lead",
@@ -21,7 +22,7 @@ interface Workspace {
 }
 
 export default function LabelsSettingsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [labels, setLabels] = useState(DEFAULT_LABELS);
   const [currency, setCurrency] = useState("INR");
   const [timezone, setTimezone] = useState("Asia/Kolkata");
@@ -47,7 +48,7 @@ export default function LabelsSettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-xl">

@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Lead } from "@/lib/lead-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 export default function LeadsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -40,7 +41,7 @@ export default function LeadsPage() {
   }
 
   if (!workspaceId) {
-    return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+    return <NoWorkspace loading={workspaceLoading} />;
   }
 
   return (

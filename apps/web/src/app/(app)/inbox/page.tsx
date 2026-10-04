@@ -8,9 +8,10 @@ import type { Conversation, ConversationFilter, Message, QuickReply, WaTemplate 
 import { getSocket } from "@/lib/socket";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 export default function InboxPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const { userId: currentUserId } = useCurrentUser();
   const [filter, setFilter] = useState<ConversationFilter>("all");
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -106,7 +107,7 @@ export default function InboxPage() {
   }
 
   if (!workspaceId) {
-    return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+    return <NoWorkspace loading={workspaceLoading} />;
   }
 
   return (

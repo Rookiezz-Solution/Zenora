@@ -5,6 +5,7 @@ import { MoveStageForm } from "@/components/pipeline/move-stage-form";
 import { apiFetch, type ApiError } from "@/lib/api";
 import type { CustomField, Pipeline } from "@/lib/pipeline-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 interface PendingMove {
   leadId: string;
@@ -20,7 +21,7 @@ interface PendingLostMove {
 }
 
 export default function PipelinePage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [pipeline, setPipeline] = useState<Pipeline | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [pendingLostMove, setPendingLostMove] = useState<PendingLostMove | null>(null);
@@ -139,7 +140,7 @@ export default function PipelinePage() {
     load();
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
   if (!pipeline) return <p className="text-sm text-gray-500">Loading…</p>;
 
   return (

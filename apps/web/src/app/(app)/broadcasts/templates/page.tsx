@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { WaTemplate } from "@/lib/broadcast-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const STATUS_STYLES: Record<WaTemplate["metaStatus"], string> = {
   pending: "bg-amber-100 text-amber-700",
@@ -13,7 +14,7 @@ const STATUS_STYLES: Record<WaTemplate["metaStatus"], string> = {
 };
 
 export default function WaTemplatesPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [templates, setTemplates] = useState<WaTemplate[]>([]);
 
   function load() {
@@ -22,7 +23,7 @@ export default function WaTemplatesPage() {
   }
   useEffect(load, [workspaceId]);
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-3xl">

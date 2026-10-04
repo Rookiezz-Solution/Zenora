@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Automation } from "@/lib/automation-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -14,7 +15,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function AutomationsListPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [newName, setNewName] = useState("");
 
@@ -34,7 +35,7 @@ export default function AutomationsListPage() {
     window.location.href = `/automations/${created.id}`;
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-3xl">

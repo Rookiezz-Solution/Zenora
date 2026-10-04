@@ -5,6 +5,7 @@ import { MESSAGE_RETENTION_OPTIONS_DAYS } from "@zenora/shared";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { apiFetch, type ApiError } from "@/lib/api";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 interface PersonRow {
   id: string;
@@ -26,7 +27,7 @@ interface EraseCounts {
 const input = "rounded-md border border-gray-300 px-2 py-1.5 text-sm";
 
 export default function PrivacyPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [retention, setRetention] = useState<number | null | undefined>(undefined);
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<PersonRow[] | null>(null);
@@ -135,7 +136,7 @@ export default function PrivacyPage() {
       window.location.assign("/login");
     });
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-3xl">

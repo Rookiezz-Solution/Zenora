@@ -6,11 +6,12 @@ import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Sequence, SequenceAction, SequenceStep } from "@/lib/sequence-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const EMPTY_STEP: SequenceStep = { waitHours: 1, action: { type: "send_text", body: "" } };
 
 export default function NewSequencePage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const router = useRouter();
   const [name, setName] = useState("");
   const [steps, setSteps] = useState<SequenceStep[]>([{ ...EMPTY_STEP }]);
@@ -47,7 +48,7 @@ export default function NewSequencePage() {
     }
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-xl">

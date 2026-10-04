@@ -4,6 +4,7 @@ import Papa from "papaparse";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 type FieldKey = "name" | "phone" | "email" | "tags";
 const FIELDS: { key: FieldKey; label: string }[] = [
@@ -14,7 +15,7 @@ const FIELDS: { key: FieldKey; label: string }[] = [
 ];
 
 export default function ImportLeadsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [mapping, setMapping] = useState<Partial<Record<FieldKey, string>>>({});
@@ -67,7 +68,7 @@ export default function ImportLeadsPage() {
   }
 
   if (!workspaceId) {
-    return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+    return <NoWorkspace loading={workspaceLoading} />;
   }
 
   return (

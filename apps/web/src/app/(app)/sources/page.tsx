@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { apiFetch, type ApiError } from "@/lib/api";
 import { formatMoney, sourceLabel, type AdAccountRow, type AdsReport, type AdsSyncResult } from "@/lib/ads-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -73,7 +74,7 @@ function CustomerListCard({ workspaceId }: { workspaceId: string }) {
 }
 
 function SourcesContent() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const params = useSearchParams();
   const [accounts, setAccounts] = useState<AdAccountRow[]>([]);
   const [report, setReport] = useState<AdsReport | null>(null);
@@ -132,7 +133,7 @@ function SourcesContent() {
       await load();
     });
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   const trackedCount = accounts.filter((a) => a.status !== "inactive").length;
   const totalLeads = report?.sources.reduce((n, s) => n + s.leads, 0) ?? 0;

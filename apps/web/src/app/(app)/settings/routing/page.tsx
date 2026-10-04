@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import type { CustomField } from "@/lib/pipeline-types";
 import type { AssignTo, AssignToType, Member, RoutingCondition, RoutingRule, ScoringRule } from "@/lib/routing-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const EMPTY_CONDITION: RoutingCondition = { field: "source", operator: "equals", value: "" };
 
@@ -62,7 +63,7 @@ function ConditionEditor({
 }
 
 export default function RoutingSettingsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [routingRules, setRoutingRules] = useState<RoutingRule[]>([]);
   const [scoringRules, setScoringRules] = useState<ScoringRule[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -177,7 +178,7 @@ export default function RoutingSettingsPage() {
     return "→ team";
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-2xl">

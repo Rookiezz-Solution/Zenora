@@ -5,6 +5,7 @@ import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { apiFetch, type ApiError } from "@/lib/api";
 import type { AiSettings, Faq, KnowledgeSource, KnowledgeSourceType, TestChatMessage, TestChatResult } from "@/lib/knowledge-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const SOURCE_TYPES: { value: KnowledgeSourceType; label: string }[] = [
   { value: "text", label: "Text" },
@@ -16,7 +17,7 @@ const SOURCE_TYPES: { value: KnowledgeSourceType; label: string }[] = [
 const STATUS_LABEL: Record<KnowledgeSource["status"], string> = { pending: "Processing…", ready: "Ready", failed: "Failed" };
 
 export default function KnowledgePage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [faqs, setFaqs] = useState<Faq[]>([]);
   const [settings, setSettings] = useState<AiSettings | null>(null);
@@ -126,7 +127,7 @@ export default function KnowledgePage() {
     }
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-2xl">

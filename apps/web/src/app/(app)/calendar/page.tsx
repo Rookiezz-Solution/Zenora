@@ -5,6 +5,7 @@ import { apiFetch, type ApiError } from "@/lib/api";
 import type { WaTemplate } from "@/lib/broadcast-types";
 import { SlotPicker } from "@/components/slot-picker";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -84,7 +85,7 @@ function ReminderFields({
 }
 
 export default function CalendarPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [status, setStatus] = useState<{ connected: boolean; email: string | null } | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [types, setTypes] = useState<AppointmentType[]>([]);
@@ -196,7 +197,7 @@ export default function CalendarPage() {
     load();
   }
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   const byDay = new Map<string, Appointment[]>();
   for (const a of appointments) {

@@ -14,6 +14,7 @@ import {
   type WebhookRow
 } from "@/lib/developer-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const input = "rounded-md border border-gray-300 px-2 py-1.5 text-sm";
@@ -78,7 +79,7 @@ function Deliveries({ workspaceId, webhookId }: { workspaceId: string; webhookId
 }
 
 export default function DevelopersPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [keys, setKeys] = useState<ApiKeyRow[]>([]);
   const [hooks, setHooks] = useState<WebhookRow[]>([]);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -154,7 +155,7 @@ export default function DevelopersPage() {
 
   const toggle = (list: string[], value: string, set: (v: string[]) => void) => set(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-3xl">

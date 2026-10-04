@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Broadcast } from "@/lib/broadcast-types";
 import { useCurrentWorkspace } from "@/lib/use-workspace";
+import { NoWorkspace } from "@/components/no-workspace";
 
 const STATUS_STYLES: Record<Broadcast["status"], string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -15,7 +16,7 @@ const STATUS_STYLES: Record<Broadcast["status"], string> = {
 };
 
 export default function BroadcastsPage() {
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, loading: workspaceLoading } = useCurrentWorkspace();
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
 
   function load() {
@@ -24,7 +25,7 @@ export default function BroadcastsPage() {
   }
   useEffect(load, [workspaceId]);
 
-  if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
+  if (!workspaceId) return <NoWorkspace loading={workspaceLoading} />;
 
   return (
     <div className="max-w-4xl">
