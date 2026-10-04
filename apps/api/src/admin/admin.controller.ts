@@ -1,10 +1,12 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
+import { PLAN_LABELS, getPlanConfig, type PlanConfigOverrides } from "@zenora/shared";
 import { z } from "zod";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ZodValidationPipe } from "../auth/dto/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReferralsService } from "../referrals/referrals.service";
+import { PlanConfigService } from "../billing/plan-config.service";
 import { FlowTemplatesService } from "../flow-templates/flow-templates.service";
 import { OwnerConsoleService } from "./owner-console.service";
 import { PlatformSettingsService } from "./platform-settings.service";
@@ -15,6 +17,12 @@ const putSettingSchema = z.object({ value: z.string().max(500) });
 const limitValue = z.number().int().min(0).max(10_000_000).nullable().optional();
 const setLimitsSchema = z.object({ contacts: limitValue, users: limitValue, instagramAccounts: limitValue, note: z.string().trim().max(200).nullable().optional() });
 const grantCreditsSchema = z.object({ amount: z.number().int().min(1).max(100_000), reason: z.string().trim().min(3).max(200) });
+const overridesSchema = z.object({
+  plans: z.record(z.record(z.number())).optional(),
+  addonPrices: z.record(z.number()).optional(),
+  topupPrices: z.record(z.number()).optional()
+});
+const updatePlansSchema = z.object({ overrides: overridesSchema, note: z.string().trim().max(200).optional(), confirmLargePriceChange: z.boolean().optional() });
 const rejectTemplateSchema = z.object({ reason: z.string().trim().min(3).max(200) });
 const payoutSchema = z.object({ referrerUserId: z.string().min(1), reference: z.string().trim().min(3).max(120), partnerInvoiceRef: z.string().trim().max(60).optional() });
 
@@ -25,7 +33,8 @@ export class AdminController {
     private readonly settings: PlatformSettingsService,
     private readonly owner: OwnerConsoleService,
     private readonly referrals: ReferralsService,
-    private readonly templates: FlowTemplatesService
+    private readonly templates: FlowTemplatesService,
+    private readonly planConfig: PlanConfigService
   ) {}
 
   @Get("overview")
@@ -43,6 +52,31 @@ export class AdminController {
   recordPayout(@CurrentUser() userId: string, @Body(new ZodValidationPipe(payoutSchema)) body: unknown) {
     const { referrerUserId, reference, partnerInvoiceRef } = body as z.infer<typeof payoutSchema>;
     return this.referrals.recordPayout(userId, referrerUserId, reference, partnerInvoiceRef);
+  }
+
+  // Plan prices and limits. Changes apply to future purchases only (the price is
+  // locked at checkout), limits can't be lowered under existing customers, and
+  // every change is audited.
+  @Get("plans")
+  plans() {
+    return this.planConfig.state();
+  }
+
+  @Post("plans/preview")
+  async previewPlans(@Body(new ZodValidationPipe(z.object({ overrides: overridesSchema }))) body: unknown) {
+    const { issues, changes, large, blocked } = await this.planConfig.evaluate((body as { overrides: PlanConfigOverrides }).overrides);
+    return { issues, changes, requiresConfirmation: large.length > 0, blocked };
+  }
+
+  @Put("plans")
+  updatePlans(@CurrentUser() userId: string, @Body(new ZodValidationPipe(updatePlansSchema)) body: unknown) {
+    const { overrides, note, confirmLargePriceChange } = body as { overrides: PlanConfigOverrides; note?: string; confirmLargePriceChange?: boolean };
+    return this.planConfig.update(userId, overrides, { note, confirmLargePriceChange });
+  }
+
+  @Delete("plans")
+  resetPlans(@CurrentUser() userId: string) {
+    return this.planConfig.reset(userId);
   }
 
   @Get("templates/pending")
@@ -123,5 +157,16 @@ export class PublicConfigController {
   @Get()
   get() {
     return this.settings.publicConfig();
+  }
+}
+
+// The pricing page and billing screen read prices and limits from here, so they
+// always show what a checkout will actually charge.
+@Controller("public/plans")
+export class PublicPlansController {
+  @Get()
+  get() {
+    const config = getPlanConfig();
+    return { plans: config.plans, addonPrices: config.addonPrices, topupPrices: config.topupPrices, labels: PLAN_LABELS };
   }
 }

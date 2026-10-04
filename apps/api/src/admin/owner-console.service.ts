@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { OVERRIDABLE_LIMITS, PLAN_LIMITS, describeLimitChange, estimateEconomics, monthlyRecurringRevenueInr, type LimitOverrides, type PlanId } from "@zenora/shared";
+import { OVERRIDABLE_LIMITS, getPlanConfig, describeLimitChange, estimateEconomics, monthlyRecurringRevenueInr, type LimitOverrides, type PlanId } from "@zenora/shared";
 import { UsageService } from "../billing/usage.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -118,7 +118,7 @@ export class OwnerConsoleService {
       ...workspace,
       planId,
       owners: owners.map((o) => o.user),
-      plan: PLAN_LIMITS[planId],
+      plan: getPlanConfig().plans[planId],
       effectiveLimits: usage.effectiveLimits,
       current: usage.usage,
       override: override ? { contacts: override.contacts, users: override.users, instagramAccounts: override.instagramAccounts, note: override.note, updatedAt: override.updatedAt } : null,

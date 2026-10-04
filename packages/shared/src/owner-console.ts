@@ -1,6 +1,7 @@
 // Owner console maths: what a workspace is worth to the platform. Pure, so it
 // can be tested without a database.
-import { PLAN_LIMITS, YEARLY_MONTHS_CHARGED, type PlanId } from "./plans";
+import { getPlanConfig } from "./plan-config";
+import { YEARLY_MONTHS_CHARGED, type PlanId } from "./plans";
 
 // docs: "1 credit ≈ ₹0.25 of provider cost" (see CREDIT_WEIGHTS in plans.ts).
 export const CREDIT_PROVIDER_COST_INR = 0.25;
@@ -10,7 +11,7 @@ export const CREDIT_PROVIDER_COST_INR = 0.25;
 // active paid subscription counts (a trial or lapsed one is worth nothing yet).
 export function monthlyRecurringRevenueInr(planId: PlanId, billingCycle: string, status: string): number {
   if (status !== "active") return 0;
-  const price = PLAN_LIMITS[planId].priceInr;
+  const price = getPlanConfig().plans[planId].priceInr;
   if (!price) return 0;
   return billingCycle === "yearly" ? Math.round((price * YEARLY_MONTHS_CHARGED) / 12) : price;
 }

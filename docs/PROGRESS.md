@@ -1,5 +1,27 @@
 # Zenora — build progress
 
+## 2026-10-18 — Plans and pricing editor (super admin)
+
+Built last because it changes what customers pay, so the safeguards are the point: **a mistake here must not touch money already taken or leave a customer stranded.**
+
+**Done** (Admin → Plans and pricing)
+- Edit, for **Starter / Growth / Pro**: monthly price, users, Instagram accounts, contacts, AI credits per month; plus add-on prices and AI top-up prices. **Free and Partner can't be edited**, and neither can what a top-up pack contains. Ranges are enforced (price ₹99–₹1,00,000, whole numbers…), and the finished set must still make sense: a bigger plan must cost more and allow at least as much as the one below.
+- **Review changes** shows exactly what would change, any problems, anything blocked, and whether a confirmation is needed, before **Save**.
+- **Prices apply to purchases started after the change.** The price shown to a customer is **locked into the Razorpay order** (`baseInr` / `gstInr` in its notes) and the invoice is written from that, so a price edit between "Pay" and payment can never produce an invoice that differs from the charge. Existing invoices are untouched. (Orders created before locking existed fall back to the current price.)
+- **Limits can be raised freely and apply at once** to every workspace on the plan; **lowering one is refused** while any workspace on that plan is already above the new figure (it names how many).
+- **A price move of more than 25%** needs a separate confirmation (UI checkbox / `confirmLargePriceChange`).
+- Every save and reset is **audited** with the exact before → after and a note; **Reset to defaults** removes the overrides.
+- How it works: defaults + one stored override row (only values that differ from the defaults), applied in memory by `getPlanConfig()` that every price/limit check now reads (usage, checkout, owner-console MRR, the billing page via the new public `GET /public/plans`). Each API instance re-reads it every 30 s and immediately after its own change; it survives restarts.
+- Schema: `PlanConfigOverride` (migration `20261017090000_plan_config`).
+
+**Verified**: typecheck, lint, build, tests green (shared +11, api +21). Live (real Neon + API + web): public prices match the defaults; non-admin 403 / logged-out 401; a price of ₹5, Pro cheaper than Growth, and editing the Free plan all → 400; Growth ₹3,999 → ₹6,000 without confirmation → 409, with it → saved and `/public/plans` showed ₹6,000 while the shipped defaults stayed ₹3,999; lowering Starter users 2 → 1 with a Starter workspace holding 2 members → 409 "1 workspace is above starter users 1"; raising Starter users to 4 showed up in that customer's own billing usage immediately; after restarting the API the saved price was still in force; reset restored defaults; the audit log held all three entries; the page renders and the Review button surfaced the >25% confirmation with Save disabled until ticked. Test data deleted and overrides cleared.
+
+**Not verified / open**
+- **No real Razorpay charge was made** (no credentials): the price lock is verified by unit tests with mocked orders — price in the order, invoice from the locked amount, fallback for old orders — not against Razorpay.
+- Existing paid subscriptions are not re-priced at renewal because there is no recurring-billing engine yet (each purchase is a one-off checkout); when renewals exist they should lock in the price they were sold at.
+- Limit changes to *Free* are not offered. A workspace that deliberately sits on a per-workspace override (owner console) is unaffected by plan edits to that limit.
+- The public pricing page / marketing site (if any) should read `/public/plans`; the in-app billing page already does.
+
 ## 2026-10-17 — "Download everything" (workspace data export)
 
 Completes the privacy set: per-person export/erase, retention, workspace and account deletion — and now the **owner's own copy of everything** (data portability, and an exit path before deleting a workspace).

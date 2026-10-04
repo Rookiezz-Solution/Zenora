@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ADDON_PRICES_INR, PLAN_IDS, PLAN_LABELS, PLAN_LIMITS, TOPUP_PRICES_INR, type PlanId } from "@zenora/shared";
+import { ADDON_PRICES_INR, DEFAULT_PLAN_CONFIG, PLAN_IDS, PLAN_LABELS, TOPUP_PRICES_INR, type PlanConfig, type PlanId } from "@zenora/shared";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { apiFetch } from "@/lib/api";
 import type { BillingOverview, CheckoutOrderResult, UsageOverview } from "@/lib/billing-types";
@@ -32,6 +32,14 @@ function UsageBar({ label, current, limit }: { label: string; current: number; l
 }
 
 export default function BillingPage() {
+  // What a checkout will actually charge: the live prices from the server, not constants baked into the app.
+  const [config, setConfig] = useState<PlanConfig>(DEFAULT_PLAN_CONFIG);
+  useEffect(() => {
+    apiFetch<PlanConfig>("/public/plans").then(setConfig).catch(() => undefined);
+  }, []);
+  const PLAN_LIMITS = config.plans;
+  const ADDON_PRICES = config.addonPrices;
+  const TOPUP_PRICES = config.topupPrices;
   const { workspaceId } = useCurrentWorkspace();
   const [overview, setOverview] = useState<BillingOverview | null>(null);
   const [usage, setUsage] = useState<UsageOverview | null>(null);
@@ -210,7 +218,7 @@ export default function BillingPage() {
               onClick={() => buyAddon(key)}
               className="rounded-md border border-gray-300 px-3 py-1.5 text-xs disabled:opacity-50"
             >
-              {key} — ₹{ADDON_PRICES_INR[key]}/mo
+              {key} — ₹{ADDON_PRICES[key]}/mo
             </button>
           ))}
         </div>
@@ -227,7 +235,7 @@ export default function BillingPage() {
               onClick={() => buyTopup(key)}
               className="rounded-md border border-gray-300 px-3 py-1.5 text-xs disabled:opacity-50"
             >
-              {key.replace("credits", "")} credits — ₹{TOPUP_PRICES_INR[key]}
+              {key.replace("credits", "")} credits — ₹{TOPUP_PRICES[key]}
             </button>
           ))}
         </div>

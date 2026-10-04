@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@zenora/db";
-import { CREDIT_WEIGHTS, PLAN_LIMITS, USAGE_ALERT_THRESHOLDS, type PlanId } from "@zenora/shared";
+import { CREDIT_WEIGHTS, USAGE_ALERT_THRESHOLDS, getPlanConfig, type PlanId } from "@zenora/shared";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -39,7 +39,7 @@ export class UsageService {
   // why the grant only gets written on first actual spend.
   private async aiCreditBalance(workspaceId: string, planId: PlanId): Promise<number> {
     const last = await this.prisma.client.creditLedger.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" } });
-    return last?.balanceAfter ?? PLAN_LIMITS[planId].aiCreditsPerMonth;
+    return last?.balanceAfter ?? getPlanConfig().plans[planId].aiCreditsPerMonth;
   }
 
   // Everything this needs is independent once the workspace is known, so it is
@@ -57,7 +57,7 @@ export class UsageService {
       this.prisma.client.creditLedger.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" } })
     ]);
     const planId = (subscription?.planId as PlanId) ?? "free";
-    const limits = PLAN_LIMITS[planId];
+    const limits = getPlanConfig().plans[planId];
     const quantityOf = (key: string) => addons.filter((a) => a.addonKey === key).reduce((sum, a) => sum + a.quantity, 0);
     const aiCreditsRemaining = lastLedger?.balanceAfter ?? limits.aiCreditsPerMonth;
 
@@ -85,7 +85,7 @@ export class UsageService {
     const ops: Prisma.PrismaPromise<unknown>[] = [];
     let balance = last?.balanceAfter;
     if (balance === undefined) {
-      balance = PLAN_LIMITS[planId].aiCreditsPerMonth;
+      balance = getPlanConfig().plans[planId].aiCreditsPerMonth;
       if (balance > 0) ops.push(this.prisma.client.creditLedger.create({ data: { workspaceId, delta: balance, reason: "monthly_reset", balanceAfter: balance } }));
     }
     const balanceAfter = balance + amount;
@@ -96,7 +96,7 @@ export class UsageService {
 
   async checkAiCredits(workspaceId: string): Promise<AiCreditCheck> {
     const planId = await this.currentPlanId(workspaceId);
-    const limit = PLAN_LIMITS[planId].aiCreditsPerMonth;
+    const limit = getPlanConfig().plans[planId].aiCreditsPerMonth;
     const remaining = await this.aiCreditBalance(workspaceId, planId);
     return { allowed: remaining > 0, remaining, limit };
   }
@@ -113,7 +113,7 @@ export class UsageService {
     const ops: Prisma.PrismaPromise<unknown>[] = [];
     let balance = last?.balanceAfter;
     if (balance === undefined) {
-      balance = PLAN_LIMITS[planId].aiCreditsPerMonth;
+      balance = getPlanConfig().plans[planId].aiCreditsPerMonth;
       if (balance > 0) {
         ops.push(this.prisma.client.creditLedger.create({ data: { workspaceId, delta: balance, reason: "monthly_reset", balanceAfter: balance } }));
       }
@@ -135,7 +135,7 @@ export class UsageService {
       })
     );
     await this.prisma.client.$transaction(ops);
-    await this.alertOnThresholdCrossing(workspaceId, PLAN_LIMITS[planId].aiCreditsPerMonth, balance, balanceAfter);
+    await this.alertOnThresholdCrossing(workspaceId, getPlanConfig().plans[planId].aiCreditsPerMonth, balance, balanceAfter);
     return { remaining: balanceAfter, allowed: true };
   }
 

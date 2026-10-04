@@ -8,11 +8,12 @@ import { apiFetch } from "@/lib/api";
 const SECTIONS = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/workspaces", label: "Workspaces" },
+  { href: "/admin/plans", label: "Plans and pricing" },
   { href: "/admin/templates", label: "Template review" },
   { href: "/admin/referrals", label: "Referral payouts" },
   { href: "/admin/integrations", label: "Integrations" }
 ];
-const COMING_SOON = ["Plans and pricing"];
+const COMING_SOON: string[] = [];
 
 // Platform-level area for the Zenora team — separate from any workspace.
 // Access is enforced by the API; this only decides what to render.

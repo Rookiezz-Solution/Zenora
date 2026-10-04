@@ -1336,3 +1336,12 @@ model RetainedInvoice {
   @@index([formerWorkspaceId])
   @@index([retainUntil])
 }
+
+// The super admin's changes to plan prices and limits, applied over the shipped
+// defaults. One row (id "plans"). History lives in PlatformAuditLog.
+model PlanConfigOverride {
+  id          String   @id // always "plans"
+  data        Json
+  updatedById String
+  updatedAt   DateTime @updatedAt
+}

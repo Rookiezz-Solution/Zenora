@@ -1,4 +1,5 @@
 import { UnauthorizedException } from "@nestjs/common";
+import { DEFAULT_PLAN_CONFIG, setPlanConfig } from "@zenora/shared";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { ReferralsService } from "../referrals/referrals.service";
@@ -164,5 +165,44 @@ describe("BillingService.cancelSubscription", () => {
 
     expect(client.subscription.updateMany).toHaveBeenCalledWith({ where: { workspaceId: "ws1" }, data: { status: "canceled" } });
     expect(client.workspace.update).toHaveBeenCalledWith({ where: { id: "ws1" }, data: { planId: "free" } });
+  });
+});
+
+describe("BillingService price locking", () => {
+  it("puts the price shown to the customer into the Razorpay order", async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: "o1" });
+    const { service } = makeService(makeClient(), makeRazorpay({ createOrder }));
+    await service.createCheckoutOrder("ws1", { kind: "plan", planId: "growth", billingCycle: "monthly" } as never);
+
+    expect(createOrder.mock.calls[0]![2]).toMatchObject({ workspaceId: "ws1", kind: "plan", baseInr: "3999", gstInr: "720" });
+  });
+
+  it("invoices the locked amount even if the price was changed after the order was created", async () => {
+    const client = makeClient();
+    const razorpay = makeRazorpay({
+      getOrder: vi.fn().mockResolvedValue({
+        id: "o1",
+        notes: { workspaceId: "ws1", kind: "plan", payload: JSON.stringify({ kind: "plan", planId: "growth", billingCycle: "monthly" }), baseInr: "3999", gstInr: "720" }
+      })
+    });
+    const { service } = makeService(client, razorpay);
+    setPlanConfig({ ...DEFAULT_PLAN_CONFIG, plans: { ...DEFAULT_PLAN_CONFIG.plans, growth: { ...DEFAULT_PLAN_CONFIG.plans.growth, priceInr: 5499 } } });
+    try {
+      await service.confirmPayment("ws1", { razorpayOrderId: "o1", razorpayPaymentId: "p9", razorpaySignature: "sig" });
+    } finally {
+      setPlanConfig(DEFAULT_PLAN_CONFIG);
+    }
+
+    expect(client.invoice.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ amountInr: 3999, gstInr: 720 }) }));
+  });
+
+  it("falls back to the current price for an order created before locking existed", async () => {
+    const client = makeClient();
+    const razorpay = makeRazorpay({
+      getOrder: vi.fn().mockResolvedValue({ id: "o1", notes: { workspaceId: "ws1", kind: "plan", payload: JSON.stringify({ kind: "plan", planId: "growth", billingCycle: "monthly" }) } })
+    });
+    const { service } = makeService(client, razorpay);
+    await service.confirmPayment("ws1", { razorpayOrderId: "o1", razorpayPaymentId: "p10", razorpaySignature: "sig" });
+    expect(client.invoice.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ amountInr: 3999 }) }));
   });
 });

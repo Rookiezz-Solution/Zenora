@@ -22,3 +22,4 @@ export * from "./referrals";
 export * from "./privacy";
 export * from "./template-sharing";
 export * from "./consent";
+export * from "./plan-config";

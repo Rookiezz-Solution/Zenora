@@ -7,6 +7,12 @@ import type { ConfirmPaymentDto, CreateCheckoutOrderDto, UpdateBillingProfileDto
 
 const DAY_MS = 86_400_000;
 
+function lockedAmount(notes: Record<string, string> | undefined): { baseInr: number; gstInr: number } | null {
+  const baseInr = Number(notes?.baseInr);
+  const gstInr = Number(notes?.gstInr);
+  return Number.isInteger(baseInr) && Number.isInteger(gstInr) && baseInr >= 0 && gstInr >= 0 && notes?.baseInr !== undefined ? { baseInr, gstInr } : null;
+}
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -40,7 +46,12 @@ export class BillingService {
     const order = await this.razorpay.createOrder(amount.totalInr, receipt, {
       workspaceId,
       kind: dto.kind,
-      payload: JSON.stringify(dto)
+      payload: JSON.stringify(dto),
+      // The price the customer was shown is locked into the order, so the invoice
+      // matches what was charged even if a super admin changes prices before the
+      // payment completes.
+      baseInr: String(amount.baseInr),
+      gstInr: String(amount.gstInr)
     });
     return {
       razorpayOrderId: order.id,
@@ -63,7 +74,7 @@ export class BillingService {
       throw new UnauthorizedException("Order does not belong to this workspace");
     }
     const intent = JSON.parse(order.notes.payload ?? "{}") as CheckoutIntent;
-    await this.applyPayment(workspaceId, intent, dto.razorpayOrderId, dto.razorpayPaymentId);
+    await this.applyPayment(workspaceId, intent, dto.razorpayOrderId, dto.razorpayPaymentId, lockedAmount(order.notes));
     await this.referrals.accrueForPayment(dto.razorpayPaymentId);
     return { status: "paid" };
   }
@@ -84,15 +95,17 @@ export class BillingService {
       return;
     }
     const intent = JSON.parse(payment.notes.payload ?? "{}") as CheckoutIntent;
-    await this.applyPayment(workspaceId, intent, payment.order_id, payment.id);
+    await this.applyPayment(workspaceId, intent, payment.order_id, payment.id, lockedAmount(payment.notes));
     await this.referrals.accrueForPayment(payment.id);
   }
 
-  private async applyPayment(workspaceId: string, intent: CheckoutIntent, orderId: string, paymentId: string): Promise<void> {
+  private async applyPayment(workspaceId: string, intent: CheckoutIntent, orderId: string, paymentId: string, locked: { baseInr: number; gstInr: number } | null = null): Promise<void> {
     const existing = await this.prisma.client.invoice.findUnique({ where: { razorpayPaymentId: paymentId } });
     if (existing) return; // webhook + client-confirm can both fire for the same payment
 
-    const amount = computeCheckoutAmount(intent);
+    const computed = computeCheckoutAmount(intent);
+    // Orders made before price locking existed carry no amount; they fall back to the current price.
+    const amount = locked ? { ...computed, baseInr: locked.baseInr, gstInr: locked.gstInr, totalInr: locked.baseInr + locked.gstInr } : computed;
     const now = new Date();
 
     if (intent.kind === "plan") {
