@@ -45,6 +45,7 @@ model Workspace {
   billingAddress String?
   agencyId       String? // set when this workspace is managed by an agency
   messageRetentionDays Int? // null = keep messages until deleted; otherwise older messages are purged daily
+  deletionScheduledAt DateTime? // set when the owner asked to delete the workspace; the daily job deletes it after the grace period
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
@@ -1265,11 +1266,12 @@ model ReferralCode {
 model Referral {
   id                  String   @id @default(cuid())
   referrerUserId      String
-  referredWorkspaceId String   @unique
+  referredWorkspaceId String?  @unique // null once that workspace has been deleted; the earned commissions stay
+  referredName        String   @default("") // the business's name at referral time, for when the workspace is gone
   code                String
   createdAt           DateTime @default(now())
 
-  referredWorkspace Workspace         @relation(fields: [referredWorkspaceId], references: [id], onDelete: Cascade)
+  referredWorkspace Workspace?        @relation(fields: [referredWorkspaceId], references: [id], onDelete: SetNull)
   commissions       CommissionEntry[]
 
   @@index([referrerUserId])
@@ -1306,4 +1308,31 @@ model Payout {
   entries CommissionEntry[]
 
   @@index([referrerUserId])
+}
+
+// A copy of an invoice kept after its workspace is deleted. Tax law requires
+// invoices to be kept for years, so they are copied here (no link to the
+// workspace) before the workspace and everything else about the customer goes.
+// It holds the business's billing details, never contacts or messages.
+model RetainedInvoice {
+  id                String   @id @default(cuid())
+  originalInvoiceId String   @unique
+  formerWorkspaceId String // plain text: the workspace no longer exists
+  businessName      String?
+  gstin             String?
+  billingAddress    String?
+  description       String
+  amountInr         Int
+  gstInr            Int
+  status            String
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  periodStart       DateTime
+  periodEnd         DateTime
+  issuedAt          DateTime
+  deletedAt         DateTime @default(now())
+  retainUntil       DateTime
+
+  @@index([formerWorkspaceId])
+  @@index([retainUntil])
 }

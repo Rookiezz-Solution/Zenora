@@ -16,3 +16,20 @@ export function retentionCutoff(now: Date, days: number): Date {
 export function isValidMessageRetention(days: number | null): boolean {
   return days === null || (MESSAGE_RETENTION_OPTIONS_DAYS as readonly number[]).includes(days);
 }
+
+// Deleting a workspace removes everything about the business's customers. The
+// owner gets a window to change their mind first.
+export const DELETION_GRACE_DAYS = 7;
+// Invoices are kept for tax purposes after a workspace is gone (conservative:
+// longer than the statutory minimum).
+export const INVOICE_RETENTION_YEARS = 8;
+
+export function deletionDueAt(requestedAt: Date): Date {
+  return new Date(requestedAt.getTime() + DELETION_GRACE_DAYS * 86_400_000);
+}
+
+export function invoiceRetainUntil(issuedAt: Date): Date {
+  const d = new Date(issuedAt);
+  d.setUTCFullYear(d.getUTCFullYear() + INVOICE_RETENTION_YEARS);
+  return d;
+}

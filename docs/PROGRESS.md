@@ -1,5 +1,24 @@
 # Zenora — build progress
 
+## 2026-10-16 — Workspace deletion and "delete my account"
+
+Closes the gap I flagged in the privacy work. Decided on the merits, with GST in mind: **deleting a workspace must not destroy tax records**, and **a referrer must not lose commission they already earned** because a customer left.
+
+**Done** (Settings → Privacy → danger zone)
+- **Delete this workspace**: the owner types the exact workspace name; deletion is *scheduled* for **7 days later** and can be cancelled until then, with a red banner on every page meanwhile. Only an owner can do it (`workspace.manage`); a plan in force simply ends (no refund, said on the page).
+- **The purge** (hourly worker job, safe to re-run if it crashes part-way): copies every invoice to a separate **`RetainedInvoice`** table (billing name, GSTIN, address, amounts, Razorpay ids, dates; **no contacts or messages**) kept **8 years** from issue; removes the raw Meta payloads mentioning the business's own WhatsApp/Instagram ids; deletes messages, conversations, tasks, SLA timers and its platform-audit rows; then deletes the workspace, cascading everything else.
+- **Referrals survive**: a referral now remembers the business's name and keeps its earned commission when the workspace is gone (listed as "closed"); nothing further accrues.
+- **Delete my account** (`DELETE /account`): type your email; blocked while you are the **only owner** of any workspace (message names it); otherwise removes the login, memberships, agency seats and referral code, signs the session out, and the email can register again.
+- Schema: `Workspace.deletionScheduledAt`, `RetainedInvoice`, `Referral.referredName` with `referredWorkspaceId` now nullable (migrations `20261015090000`, `20261015100000`).
+
+**Verified**: typecheck, lint, build, tests (shared 165, worker 84, api 367 = 616) green. Live (real Neon, API + worker code): sole-owner account deletion → 409 naming the workspace; wrong confirmation name → 400, right one → scheduled and shown in the workspace list; cancel then re-schedule; a non-member gets 403 on both; the purge **left it alone during the grace period** and, once backdated, removed the workspace, leads, conversations, messages, WhatsApp number and its raw event while an unrelated raw event survived; the invoice was retained with business name, GSTIN, amount and a 2034 date, none left in the live table; the referral kept its name with a null workspace and the ₹300 commission stayed accrued ("closed" on the referrer's page); wrong email → 400 for account deletion, right email (any case) → deleted, old session 401, login 401; the referrer deleted their own account too. Test rows deleted.
+
+**Open**
+- Connected-service cleanup is not done: Google Calendar events already created, Meta/Google refresh tokens are deleted from Zenora but not revoked at the provider, and Meta keeps its own copy of any conversation.
+- Commission already owed to a referrer who then deletes their account stays in the ledger but won't show in the payout list (no user to pay): a person-level settle-up is a manual step.
+- No data export for the whole workspace before deletion (only per-person export); a "download everything" button would be a good addition.
+- Retained invoices have no purge job after 8 years and no UI; they're only in the database for the accountant.
+
 ## 2026-10-15 — Hardening: foreign ids in request bodies
 
 The roadmap is complete; this closes the first item on the open list in `docs/SECURITY.md`.

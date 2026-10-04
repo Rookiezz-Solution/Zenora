@@ -32,6 +32,10 @@ export default function PrivacyPage() {
   const [people, setPeople] = useState<PersonRow[] | null>(null);
   const [erasing, setErasing] = useState<PersonRow | null>(null);
   const [typed, setTyped] = useState("");
+  const [deletion, setDeletion] = useState<{ scheduledFor: string | null; graceDays: number } | null>(null);
+  const [wsName, setWsName] = useState("");
+  const [confirmWs, setConfirmWs] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState("");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -39,6 +43,12 @@ export default function PrivacyPage() {
     apiFetch<{ messageRetentionDays: number | null }>(`/privacy/${workspaceId}/retention`)
       .then((r) => setRetention(r.messageRetentionDays))
       .catch(() => setRetention(undefined));
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    apiFetch<{ scheduledFor: string | null; graceDays: number }>(`/privacy/${workspaceId}/deletion`).then(setDeletion).catch(() => setDeletion(null));
+    apiFetch<{ name: string }>(`/workspaces/${workspaceId}`).then((w) => setWsName(w.name)).catch(() => setWsName(""));
   }, [workspaceId]);
 
   async function run(action: () => Promise<void>) {
@@ -83,6 +93,26 @@ export default function PrivacyPage() {
       setPeople((list) => list?.filter((p) => p.id !== erasing.id) ?? null);
       setErasing(null);
       setTyped("");
+    });
+
+  const scheduleDeletion = () =>
+    run(async () => {
+      setDeletion(await apiFetch(`/privacy/${workspaceId}/deletion`, { method: "POST", body: JSON.stringify({ confirmName: confirmWs }) }));
+      setConfirmWs("");
+      setMessage({ tone: "ok", text: "Deletion scheduled. You can cancel until then." });
+    });
+
+  const cancelDeletion = () =>
+    run(async () => {
+      setDeletion(await apiFetch(`/privacy/${workspaceId}/deletion`, { method: "DELETE" }));
+      setMessage({ tone: "ok", text: "Deletion cancelled. Nothing was removed." });
+    });
+
+  const deleteAccount = () =>
+    run(async () => {
+      await apiFetch("/account", { method: "DELETE", body: JSON.stringify({ confirmEmail }) });
+      window.localStorage.removeItem("zenora.workspaceId");
+      window.location.assign("/login");
     });
 
   if (!workspaceId) return <p className="text-sm text-gray-500">Log in and create a workspace first.</p>;
@@ -159,6 +189,43 @@ export default function PrivacyPage() {
             </div>
           </div>
         )}
+      </section>
+
+      <section className="mt-8 rounded-md border border-red-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-red-800">Delete this workspace</h2>
+        {deletion?.scheduledFor ? (
+          <>
+            <p className="mt-1 text-sm text-gray-700">
+              Scheduled for deletion on <span className="font-semibold">{new Date(deletion.scheduledFor).toLocaleString()}</span>.
+            </p>
+            <button type="button" onClick={cancelDeletion} className="mt-3 rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white">
+              Cancel deletion
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-gray-600">
+              Permanently removes every contact, conversation, message, automation and setting, and disconnects your channels. It happens {deletion?.graceDays ?? 7} days after you confirm, and you can cancel until then. Your invoices are kept separately for tax purposes, and there is no refund for the current plan. Only an owner can do this.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input value={confirmWs} onChange={(e) => setConfirmWs(e.target.value)} placeholder={wsName ? `Type "${wsName}" to confirm` : "Type the workspace name"} className={`${input} w-64`} />
+              <button type="button" disabled={!wsName || confirmWs !== wsName} onClick={scheduleDeletion} className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+                Schedule deletion
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="mt-4 rounded-md border border-red-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-red-800">Delete my account</h2>
+        <p className="mt-1 text-xs text-gray-600">Removes your login and your place in every workspace. You can&apos;t do this while you are the only owner of a workspace: delete it, or make someone else an owner, first.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input value={confirmEmail} onChange={(e) => setConfirmEmail(e.target.value)} placeholder="Type your email to confirm" className={`${input} w-64`} />
+          <button type="button" disabled={confirmEmail.length < 3} onClick={deleteAccount} className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+            Delete my account
+          </button>
+        </div>
       </section>
     </div>
   );

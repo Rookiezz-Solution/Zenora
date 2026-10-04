@@ -12,6 +12,7 @@ function make(client: Record<string, unknown> = {}) {
   const full = {
     referralCode: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn().mockImplementation(({ data }) => Promise.resolve(data)) },
     referral: { findUnique: vi.fn(), create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    workspace: { findUnique: vi.fn().mockResolvedValue({ name: "Asha Clinic" }) },
     invoice: { findUnique: vi.fn() },
     membership: { findUnique: vi.fn().mockResolvedValue(null) },
     commissionEntry: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
@@ -38,7 +39,7 @@ describe("ReferralsService.attribute", () => {
   it("records a referral for a valid code of somebody else", async () => {
     const { service, client } = make({ referralCode: { findUnique: vi.fn().mockResolvedValue({ userId: "referrer" }) } });
     await service.attribute("ws1", "creator", "abcd2345");
-    expect(client.referral.create).toHaveBeenCalledWith({ data: { referrerUserId: "referrer", referredWorkspaceId: "ws1", code: "ABCD2345" } });
+    expect(client.referral.create).toHaveBeenCalledWith({ data: { referrerUserId: "referrer", referredWorkspaceId: "ws1", referredName: "Asha Clinic", code: "ABCD2345" } });
   });
 
   it("silently ignores missing, malformed, unknown and self-owned codes", async () => {
@@ -61,7 +62,7 @@ describe("ReferralsService.attribute", () => {
 
 describe("ReferralsService.accrueForPayment", () => {
   const invoice = { id: "inv1", workspaceId: "ws1", status: "paid", amountInr: 1499, issuedAt: new Date("2026-03-01T00:00:00Z") };
-  const referral = { id: "ref1", referrerUserId: "referrer", createdAt: new Date("2026-01-15T00:00:00Z") };
+  const referral = { id: "ref1", referrerUserId: "referrer", referredWorkspaceId: "ws1", createdAt: new Date("2026-01-15T00:00:00Z") };
   const base = { invoice: { findUnique: vi.fn().mockResolvedValue(invoice) }, referral: { findUnique: vi.fn().mockResolvedValue(referral) } };
 
   it("accrues 20% of the pre-GST amount on a paid invoice of a referred workspace", async () => {
@@ -88,6 +89,12 @@ describe("ReferralsService.accrueForPayment", () => {
     const twice = make({ ...base, commissionEntry: { findUnique: vi.fn().mockResolvedValue({ id: "c" }), create: vi.fn() } });
     await twice.service.accrueForPayment("pay1");
     expect(twice.client.commissionEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("earns nothing more once the referred workspace has been deleted", async () => {
+    const { service, client } = make({ ...base, referral: { findUnique: vi.fn().mockResolvedValue({ ...referral, referredWorkspaceId: null }) } });
+    await service.accrueForPayment("pay1");
+    expect(client.commissionEntry.create).not.toHaveBeenCalled();
   });
 
   it("never fails the payment it is attached to", async () => {
@@ -134,11 +141,14 @@ describe("ReferralsService.overview", () => {
   it("shows the code, terms, earnings and referred businesses by name and plan only", async () => {
     const { service } = make({
       referralCode: { findUnique: vi.fn().mockResolvedValue({ code: "ABCD2345" }) },
-      referral: { findMany: vi.fn().mockResolvedValue([{ id: "r1", createdAt: new Date("2026-02-01"), referredWorkspace: { name: "Asha Clinic", subscription: { planId: "starter", status: "active" } } }]) },
+      referral: { findMany: vi.fn().mockResolvedValue([{ id: "r1", createdAt: new Date("2026-02-01"), referredName: "Asha Clinic", referredWorkspace: { name: "Asha Clinic", subscription: { planId: "starter", status: "active" } } }, { id: "r2", createdAt: new Date("2026-03-01"), referredName: "Gone Salon", referredWorkspace: null }]) },
       commissionEntry: { findMany: vi.fn().mockResolvedValue([{ referralId: "r1", amountInr: 300, status: "paid" }, { referralId: "r1", amountInr: 300, status: "accrued" }]) }
     });
     const o = await service.overview("u1");
     expect(o).toMatchObject({ code: "ABCD2345", terms: { pct: 20, months: 12 }, accruedInr: 300, paidInr: 300 });
-    expect(o.referrals).toEqual([{ id: "r1", joinedAt: expect.any(Date), businessName: "Asha Clinic", planId: "starter", status: "active", earnedInr: 600 }]);
+    expect(o.referrals).toEqual([
+      { id: "r1", joinedAt: expect.any(Date), businessName: "Asha Clinic", planId: "starter", status: "active", earnedInr: 600 },
+      { id: "r2", joinedAt: expect.any(Date), businessName: "Gone Salon", planId: "closed", status: "closed", earnedInr: 0 } // deleted workspace: name kept, earnings stay
+    ]);
   });
 });

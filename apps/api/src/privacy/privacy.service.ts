@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@zenora/db";
-import { isValidMessageRetention } from "@zenora/shared";
+import { DELETION_GRACE_DAYS, deletionDueAt, isValidMessageRetention } from "@zenora/shared";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -111,6 +111,34 @@ export class PrivacyService {
     // No personal data here: the lead id no longer resolves to anyone.
     await this.audit.log({ workspaceId, userId, action: "privacy.lead_erased", entityType: "lead", entityId: leadId, metadata: counts });
     return counts;
+  }
+
+  // --- deleting the whole workspace ---------------------------------------
+
+  async deletionStatus(workspaceId: string) {
+    const ws = await this.prisma.client.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { deletionScheduledAt: true } });
+    return { scheduledFor: ws.deletionScheduledAt, graceDays: DELETION_GRACE_DAYS };
+  }
+
+  // Nothing is deleted now. The owner must type the workspace's exact name, and
+  // the workspace is removed by the daily job once the grace period has passed
+  // (cancellable until then). Invoices are copied aside at that point.
+  async scheduleDeletion(workspaceId: string, userId: string, confirmName: string) {
+    const ws = await this.prisma.client.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { name: true, deletionScheduledAt: true } });
+    if (ws.deletionScheduledAt) throw new BadRequestException("This workspace is already scheduled for deletion");
+    if (confirmName.trim() !== ws.name) throw new BadRequestException("Type the workspace name exactly to confirm");
+    const scheduledFor = deletionDueAt(new Date());
+    await this.prisma.client.workspace.update({ where: { id: workspaceId }, data: { deletionScheduledAt: scheduledFor } });
+    await this.audit.log({ workspaceId, userId, action: "privacy.workspace_deletion_scheduled", entityType: "workspace", entityId: workspaceId, metadata: { scheduledFor } });
+    return { scheduledFor, graceDays: DELETION_GRACE_DAYS };
+  }
+
+  async cancelDeletion(workspaceId: string, userId: string) {
+    const ws = await this.prisma.client.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { deletionScheduledAt: true } });
+    if (!ws.deletionScheduledAt) throw new BadRequestException("This workspace is not scheduled for deletion");
+    await this.prisma.client.workspace.update({ where: { id: workspaceId }, data: { deletionScheduledAt: null } });
+    await this.audit.log({ workspaceId, userId, action: "privacy.workspace_deletion_cancelled", entityType: "workspace", entityId: workspaceId });
+    return { scheduledFor: null, graceDays: DELETION_GRACE_DAYS };
   }
 
   async getRetention(workspaceId: string) {

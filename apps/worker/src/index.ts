@@ -5,6 +5,7 @@ import { processBroadcast } from "./processors/broadcast";
 import { processKnowledgeSource } from "./processors/knowledge";
 import { processReminderSweep } from "./processors/reminders";
 import { processRetentionSweep } from "./processors/retention";
+import { processWorkspaceDeletions } from "./processors/workspace-deletion";
 import { processSalespersonAlert, processSlaCheck } from "./processors/routing";
 import { processSequenceStep } from "./processors/sequence";
 import { processWebhookDelivery } from "./processors/webhook-delivery";
@@ -56,6 +57,7 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
   },
   privacy: async (job) => {
     if (job.name === "retention_sweep") await processRetentionSweep();
+    else if (job.name === "workspace_deletion_sweep") await processWorkspaceDeletions();
   },
   appointments: async (job) => {
     if (job.name === "reminder_sweep") await processReminderSweep();
@@ -82,6 +84,10 @@ const privacyQueue = new Queue("privacy", { connection: createRedisConnection() 
 privacyQueue
   .upsertJobScheduler("retention-sweep", { every: 24 * 3_600_000 }, { name: "retention_sweep" })
   .catch((err) => console.error("Could not schedule the retention sweep:", err));
+// Hourly, so a workspace is removed within an hour of its grace period ending.
+privacyQueue
+  .upsertJobScheduler("workspace-deletion-sweep", { every: 3_600_000 }, { name: "workspace_deletion_sweep" })
+  .catch((err) => console.error("Could not schedule the workspace deletion sweep:", err));
 
 console.log(`Zenora worker listening on queues: ${QUEUE_NAMES.join(", ")}`);
 

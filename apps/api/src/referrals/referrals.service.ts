@@ -42,7 +42,8 @@ export class ReferralsService {
       if (!code) return;
       const owner = await this.prisma.client.referralCode.findUnique({ where: { code } });
       if (!owner || owner.userId === creatorUserId) return; // unknown code, or referring yourself
-      await this.prisma.client.referral.create({ data: { referrerUserId: owner.userId, referredWorkspaceId: workspaceId, code } });
+      const workspace = await this.prisma.client.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } });
+      await this.prisma.client.referral.create({ data: { referrerUserId: owner.userId, referredWorkspaceId: workspaceId, referredName: workspace?.name ?? "", code } });
     } catch (err) {
       this.logger.warn(`Referral not recorded: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -56,6 +57,7 @@ export class ReferralsService {
       if (!invoice || invoice.status !== "paid") return;
       const referral = await this.prisma.client.referral.findUnique({ where: { referredWorkspaceId: invoice.workspaceId } });
       if (!referral) return;
+      if (!referral.referredWorkspaceId) return; // workspace deleted: nothing more to earn
       if (referral.referrerUserId && (await this.isMember(referral.referrerUserId, invoice.workspaceId))) return; // never earn on your own workspace
       if (!isWithinCommissionWindow(referral.createdAt, invoice.issuedAt, REFERRAL_COMMISSION_MONTHS)) return;
       const exists = await this.prisma.client.commissionEntry.findUnique({ where: { invoiceId: invoice.id } });
@@ -83,7 +85,7 @@ export class ReferralsService {
     const [referrals, entries, payouts] = await Promise.all([
       this.prisma.client.referral.findMany({
         where: { referrerUserId: userId },
-        select: { id: true, createdAt: true, referredWorkspace: { select: { name: true, subscription: { select: { planId: true, status: true } } } } },
+        select: { id: true, createdAt: true, referredName: true, referredWorkspace: { select: { name: true, subscription: { select: { planId: true, status: true } } } } },
         orderBy: { createdAt: "desc" }
       }),
       this.prisma.client.commissionEntry.findMany({ where: { referral: { referrerUserId: userId } }, select: { referralId: true, amountInr: true, status: true } }),
@@ -99,9 +101,10 @@ export class ReferralsService {
       referrals: referrals.map((r) => ({
         id: r.id,
         joinedAt: r.createdAt,
-        businessName: r.referredWorkspace.name,
-        planId: r.referredWorkspace.subscription?.planId ?? "free",
-        status: r.referredWorkspace.subscription?.status ?? "active",
+        // After the business deletes its workspace only the name remains.
+        businessName: r.referredWorkspace?.name ?? r.referredName,
+        planId: r.referredWorkspace ? (r.referredWorkspace.subscription?.planId ?? "free") : "closed",
+        status: r.referredWorkspace ? (r.referredWorkspace.subscription?.status ?? "active") : "closed",
         earnedInr: sum("accrued", r.id) + sum("paid", r.id)
       })),
       payouts

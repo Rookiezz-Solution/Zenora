@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AccountModule } from "./account/account.module";
 import { AdminModule } from "./admin/admin.module";
 import { AgenciesModule } from "./agencies/agencies.module";
 import { AdsModule } from "./ads/ads.module";
@@ -63,6 +64,7 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     AdminModule,
     AdsModule,
     AgenciesModule,
+    AccountModule,
     AudiencesModule,
     ReferralsModule,
     PrivacyModule,

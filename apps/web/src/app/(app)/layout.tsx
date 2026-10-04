@@ -1,10 +1,14 @@
+import { DeletionBanner } from "@/components/deletion-banner";
 import { Sidebar } from "@/components/sidebar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-gray-50 p-6">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+        <DeletionBanner />
+        {children}
+      </main>
     </div>
   );
 }

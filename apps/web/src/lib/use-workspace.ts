@@ -6,6 +6,7 @@ import { apiFetch } from "./api";
 export interface WorkspaceSummary {
   id: string;
   name: string;
+  deletionScheduledAt?: string | null;
 }
 
 const STORAGE_KEY = "zenora.workspaceId";
