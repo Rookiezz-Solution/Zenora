@@ -1,5 +1,6 @@
 import { Queue, Worker, type Job } from "bullmq";
 import { resumeRun, startRun } from "./automation-engine/engine";
+import { startHealthServer } from "./health-server";
 import { createRedisConnection } from "./redis";
 import { processAdsSync } from "./processors/ads-sync";
 import { processBroadcast } from "./processors/broadcast";
@@ -111,6 +112,8 @@ privacyQueue
 const heartbeat = () => void connection.set(WORKER_HEARTBEAT_KEY, String(Date.now()), "EX", WORKER_HEARTBEAT_TTL_S).catch(() => undefined);
 heartbeat();
 const heartbeatTimer = setInterval(heartbeat, WORKER_HEARTBEAT_EVERY_MS);
+
+if (process.env.PORT) startHealthServer(Number(process.env.PORT));
 
 console.log(`Zenora worker listening on queues: ${QUEUE_NAMES.join(", ")}`);
 

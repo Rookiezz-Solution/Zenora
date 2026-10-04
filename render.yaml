@@ -1,0 +1,91 @@
+# Render Blueprint: Zenora on Render's FREE tier, for TESTING.
+#
+# Free-tier facts that shape this file (see docs/RENDER.md before deploying):
+#  - Render's free tier has web services only (no background workers), so the
+#    worker runs as a web service and answers /health on PORT.
+#  - Free services sleep after ~15 minutes without traffic. A sleeping worker
+#    processes no jobs (reminders, sweeps, webhooks) until something wakes it.
+#  - The web app and API sit on different *.onrender.com sites, so the session
+#    cookie must be SameSite=None (SESSION_COOKIE_SAMESITE). On your own domain
+#    (app.example.com + api.example.com) remove that setting.
+#  - Database and Redis are NOT created here: use Neon and Upstash (free) and paste
+#    their connection strings when Render asks (the "sync: false" values).
+#
+# URLs below assume the service names are free. If Render adds a suffix, change
+# APP_URL / API_URL / NEXT_PUBLIC_API_URL to the real addresses and redeploy.
+
+envVarGroups:
+  - name: zenora-shared
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Neon connection string
+      - key: REDIS_URL
+        sync: false # Upstash "rediss://..." URL
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false # 64 hex characters: openssl rand -hex 32. Same value for API and worker.
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+
+services:
+  - type: web
+    name: zenora-api
+    runtime: node
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @zenora/db generate &&
+      pnpm exec turbo run build --filter=@zenora/api... &&
+      pnpm --filter @zenora/db migrate:deploy
+    startCommand: node apps/api/dist/main.js
+    envVars:
+      - fromGroup: zenora-shared
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: APP_URL
+        value: https://zenora-web.onrender.com
+      - key: API_URL
+        value: https://zenora-api.onrender.com
+      - key: SESSION_COOKIE_SAMESITE
+        value: none
+      - key: TRUST_PROXY
+        value: "1"
+      - key: SUPER_ADMIN_EMAILS
+        sync: false # your email, so you can open /admin
+
+  - type: web
+    name: zenora-worker
+    runtime: node
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @zenora/db generate &&
+      pnpm exec turbo run build --filter=@zenora/worker...
+    startCommand: node apps/worker/dist/index.js
+    envVars:
+      - fromGroup: zenora-shared
+
+  - type: web
+    name: zenora-web
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm exec turbo run build --filter=@zenora/web...
+    startCommand: pnpm --filter @zenora/web exec next start -p $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_API_URL
+        value: https://zenora-api.onrender.com
+      - key: NEXT_PUBLIC_SUPPORT_EMAIL
+        sync: false # optional

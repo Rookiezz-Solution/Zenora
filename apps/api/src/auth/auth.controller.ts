@@ -10,6 +10,7 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import type { Request, Response } from "express";
 import { loadEnv } from "../config/env";
+import { clearSessionCookie, setSessionCookie } from "../common/session-cookie";
 import { authLimits } from "./auth-limits";
 import { AuthService } from "./auth.service";
 import { CurrentUser } from "./decorators/current-user.decorator";
@@ -26,7 +27,7 @@ export class AuthController {
   async signUp(@Req() req: Request, @Body(new ZodValidationPipe(signUpSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
     await authLimits.signup(req.ip ?? "unknown");
     const result = await this.authService.signUp(body as never);
-    setSessionCookie(res, result.token);
+    setSessionCookie(res, result.token, SESSION_COOKIE_MAX_AGE_MS);
     return { user: result.user };
   }
 
@@ -34,14 +35,13 @@ export class AuthController {
   async login(@Req() req: Request, @Body(new ZodValidationPipe(loginSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
     await authLimits.login(req.ip ?? "unknown", (body as { email: string }).email);
     const result = await this.authService.login(body as never);
-    setSessionCookie(res, result.token);
+    setSessionCookie(res, result.token, SESSION_COOKIE_MAX_AGE_MS);
     return { user: result.user };
   }
 
   @Post("logout")
   logout(@Res({ passthrough: true }) res: Response) {
-    const { SESSION_COOKIE_NAME } = loadEnv();
-    res.clearCookie(SESSION_COOKIE_NAME);
+    clearSessionCookie(res);
     return { signedOut: true };
   }
 
@@ -51,7 +51,7 @@ export class AuthController {
   async resetPassword(@Req() req: Request, @Body(new ZodValidationPipe(passwordResetSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
     await authLimits.otpVerify(req.ip ?? "unknown", (body as { email: string }).email);
     const result = await this.authService.resetPassword(body as never);
-    setSessionCookie(res, result.token);
+    setSessionCookie(res, result.token, SESSION_COOKIE_MAX_AGE_MS);
     return { user: result.user };
   }
 
@@ -60,7 +60,7 @@ export class AuthController {
   async changePassword(@CurrentUser() userId: string, @Req() req: Request, @Body(new ZodValidationPipe(changePasswordSchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
     await authLimits.login(req.ip ?? "unknown", userId); // slows down guessing the current password
     const result = await this.authService.changePassword(userId, body as never);
-    setSessionCookie(res, result.token);
+    setSessionCookie(res, result.token, SESSION_COOKIE_MAX_AGE_MS);
     return { user: result.user };
   }
 
@@ -68,7 +68,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async logoutAll(@CurrentUser() userId: string, @Res({ passthrough: true }) res: Response) {
     await this.authService.signOutEverywhere(userId);
-    res.clearCookie(loadEnv().SESSION_COOKIE_NAME);
+    clearSessionCookie(res);
     return { signedOut: true };
   }
 
@@ -82,7 +82,7 @@ export class AuthController {
   async verifyOtp(@Req() req: Request, @Body(new ZodValidationPipe(otpVerifySchema)) body: unknown, @Res({ passthrough: true }) res: Response) {
     await authLimits.otpVerify(req.ip ?? "unknown", (body as { target: string }).target);
     const result = await this.authService.verifyOtp(body as never);
-    setSessionCookie(res, result.token);
+    setSessionCookie(res, result.token, SESSION_COOKIE_MAX_AGE_MS);
     return { user: result.user };
   }
 
@@ -96,7 +96,7 @@ export class AuthController {
   @UseGuards(AuthGuard("google"))
   async googleCallback(@Req() req: Request & { user: { googleId: string; email: string; name?: string; avatarUrl?: string } }, @Res() res: Response) {
     const result = await this.authService.validateOrCreateGoogleUser(req.user);
-    setSessionCookie(res, result.token);
+    setSessionCookie(res, result.token, SESSION_COOKIE_MAX_AGE_MS);
     const { APP_URL } = loadEnv();
     res.redirect(`${APP_URL}/`);
   }
@@ -108,12 +108,3 @@ export class AuthController {
   }
 }
 
-function setSessionCookie(res: Response, token: string) {
-  const { SESSION_COOKIE_NAME, NODE_ENV } = loadEnv();
-  res.cookie(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: SESSION_COOKIE_MAX_AGE_MS
-  });
-}

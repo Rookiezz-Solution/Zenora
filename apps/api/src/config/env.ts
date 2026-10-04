@@ -8,6 +8,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   AUTH_SECRET: z.string().min(16, "AUTH_SECRET must be at least 16 characters"),
   SESSION_COOKIE_NAME: z.string().default("zenora_session"),
+  // "none" only when the web app and API are on different sites (see common/session-cookie.ts).
+  SESSION_COOKIE_SAMESITE: z.enum(["lax", "none"]).default("lax"),
   // 32-byte hex key for AES-256-GCM (encrypts channel access tokens at rest).
   // Generate with: openssl rand -hex 32
   TOKEN_ENCRYPTION_KEY: z

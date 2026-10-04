@@ -28,8 +28,10 @@ async function bootstrap() {
   });
   app.use(cookieParser());
   app.enableCors({ origin: env.APP_URL, credentials: true });
-  await app.listen(env.API_PORT);
-  console.log(`Zenora API listening on :${env.API_PORT}`);
+  // Hosting platforms (Render, Railway...) tell the process which port to use through PORT.
+  const port = process.env.PORT ? Number(process.env.PORT) : env.API_PORT;
+  await app.listen(port, "0.0.0.0");
+  console.log(`Zenora API listening on :${port}`);
 }
 
 bootstrap();
