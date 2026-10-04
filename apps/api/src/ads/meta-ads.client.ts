@@ -1,24 +1,14 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { fetchMetaInsights, metaGraphGet, type MetaInsightRow } from "@zenora/shared";
 import { loadEnv } from "../config/env";
+
+export type { MetaInsightRow };
 
 export interface MetaAdAccount {
   externalAccountId: string; // without the "act_" prefix
   name: string | null;
   currency: string | null;
 }
-
-export interface MetaInsightRow {
-  date: string;
-  adId: string;
-  adName: string | null;
-  campaignId: string;
-  campaignName: string;
-  spend: string;
-  impressions: string;
-  clicks: string;
-}
-
-const MAX_PAGES = 20;
 
 // Thin wrapper over Meta's Marketing API (read-only: ads_read). Each user
 // connects their own ad account by logging in with Facebook; the Meta app's
@@ -45,21 +35,8 @@ export class MetaAdsClient {
     return url.toString();
   }
 
-  private base() {
-    return `https://graph.facebook.com/${loadEnv().META_GRAPH_API_VERSION}`;
-  }
-
-  private async get<T>(urlOrPath: string, params: Record<string, string> = {}): Promise<T> {
-    const url = new URL(urlOrPath.startsWith("http") ? urlOrPath : `${this.base()}${urlOrPath}`);
-    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-    const res = await fetch(url);
-    const body = (await res.json()) as T & { error?: { message?: string; code?: number } };
-    if (!res.ok) {
-      const code = body.error?.code;
-      // 190 = the access token expired or was revoked.
-      throw new Error(code === 190 ? "Meta access expired — reconnect your ad account" : `Meta Ads API error: ${body.error?.message ?? res.status}`);
-    }
-    return body;
+  private get<T>(urlOrPath: string, params: Record<string, string> = {}): Promise<T> {
+    return metaGraphGet<T>(loadEnv().META_GRAPH_API_VERSION, urlOrPath, params);
   }
 
   async listAdAccounts(accessToken: string): Promise<MetaAdAccount[]> {
@@ -71,38 +48,8 @@ export class MetaAdsClient {
     return (body.data ?? []).map((a) => ({ externalAccountId: a.account_id, name: a.name ?? null, currency: a.currency ?? null }));
   }
 
-  // Per-ad, per-day spend for a window. Following `paging.next` is capped so
-  // a huge account can't turn one click into an unbounded loop.
-  async fetchInsights(accessToken: string, accountId: string, since: string, until: string): Promise<MetaInsightRow[]> {
-    type Page = {
-      data?: { date_start: string; ad_id: string; ad_name?: string; campaign_id: string; campaign_name?: string; spend?: string; impressions?: string; clicks?: string }[];
-      paging?: { next?: string };
-    };
-    let page = await this.get<Page>(`/act_${accountId}/insights`, {
-      access_token: accessToken,
-      level: "ad",
-      time_increment: "1",
-      fields: "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks",
-      time_range: JSON.stringify({ since, until }),
-      limit: "500"
-    });
-    const rows: MetaInsightRow[] = [];
-    for (let i = 0; i < MAX_PAGES; i++) {
-      for (const r of page.data ?? []) {
-        rows.push({
-          date: r.date_start,
-          adId: r.ad_id,
-          adName: r.ad_name ?? null,
-          campaignId: r.campaign_id,
-          campaignName: r.campaign_name ?? r.campaign_id,
-          spend: r.spend ?? "0",
-          impressions: r.impressions ?? "0",
-          clicks: r.clicks ?? "0"
-        });
-      }
-      if (!page.paging?.next) break;
-      page = await this.get<Page>(page.paging.next);
-    }
-    return rows;
+  // Per-ad, per-day spend for a window (shared with the scheduled sync in the worker).
+  fetchInsights(accessToken: string, accountId: string, since: string, until: string): Promise<MetaInsightRow[]> {
+    return fetchMetaInsights(loadEnv().META_GRAPH_API_VERSION, accessToken, accountId, since, until);
   }
 }

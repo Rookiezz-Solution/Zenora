@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { buildAdsReport, parseSpendMinor, type AdLeadRow, type AdStatRow } from "@zenora/shared";
+import { buildAdsReport, toAdStatData, type AdLeadRow, type AdStatRow } from "@zenora/shared";
 import { MetaGraphClient } from "../channels/meta-graph.client";
 import { decryptToken, encryptToken } from "../common/encryption";
 import { PrismaService } from "../prisma/prisma.service";
@@ -85,14 +85,7 @@ export class AdsService {
       try {
         const insights = await this.metaAds.fetchInsights(decryptToken(account.accessTokenCipher!), account.externalAccountId, since, until);
         for (const r of insights) {
-          const data = {
-            adName: r.adName,
-            campaignId: r.campaignId,
-            campaignName: r.campaignName,
-            spendMinor: parseSpendMinor(r.spend),
-            impressions: Number.parseInt(r.impressions, 10) || 0,
-            clicks: Number.parseInt(r.clicks, 10) || 0
-          };
+          const data = toAdStatData(r);
           await this.prisma.client.adDailyStat.upsert({
             where: { adAccountId_date_adId: { adAccountId: account.id, date: r.date, adId: r.adId } },
             create: { workspaceId, adAccountId: account.id, date: r.date, adId: r.adId, ...data },

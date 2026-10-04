@@ -1,6 +1,7 @@
 import { Queue, Worker, type Job } from "bullmq";
 import { resumeRun, startRun } from "./automation-engine/engine";
 import { createRedisConnection } from "./redis";
+import { processAdsSync } from "./processors/ads-sync";
 import { processBroadcast } from "./processors/broadcast";
 import { processKnowledgeSource } from "./processors/knowledge";
 import { processReminderSweep } from "./processors/reminders";
@@ -62,6 +63,9 @@ const PROCESSORS: Partial<Record<QueueName, (job: Job) => Promise<void>>> = {
     else if (job.name === "workspace_deletion_sweep") await processWorkspaceDeletions();
     else if (job.name === "subscription_lifecycle_sweep") console.log("subscription lifecycle:", await processSubscriptionLifecycle());
   },
+  ads: async (job) => {
+    if (job.name === "ads_sync_sweep") console.log("ads sync:", await processAdsSync());
+  },
   appointments: async (job) => {
     if (job.name === "reminder_sweep") await processReminderSweep();
   },
@@ -92,6 +96,12 @@ privacyQueue
   .upsertJobScheduler("workspace-deletion-sweep", { every: 3_600_000 }, { name: "workspace_deletion_sweep" })
   .catch((err) => console.error("Could not schedule the workspace deletion sweep:", err));
 
+// Every 6 hours: refresh ad spend for tracked Meta ad accounts.
+const adsQueue = new Queue("ads", { connection: createRedisConnection() });
+adsQueue
+  .upsertJobScheduler("ads-sync-sweep", { every: 6 * 3_600_000 }, { name: "ads_sync_sweep" })
+  .catch((err) => console.error("Could not schedule the ads sync:", err));
+
 // Daily: trials, renewals, and the monthly AI-credit reset.
 privacyQueue
   .upsertJobScheduler("subscription-lifecycle-sweep", { every: 24 * 3_600_000 }, { name: "subscription_lifecycle_sweep" })
@@ -110,6 +120,7 @@ async function shutdown() {
   await Promise.all(workers.map((w) => w.close()));
   await appointmentsQueue.close();
   await privacyQueue.close();
+  await adsQueue.close();
   await connection.quit();
   process.exit(0);
 }

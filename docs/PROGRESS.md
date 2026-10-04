@@ -1,5 +1,21 @@
 # Zenora — build progress
 
+## 2026-10-04 — Scheduled ad sync
+
+Ad spend only refreshed when someone pressed "Sync now". It now refreshes itself.
+
+**Done**
+- A worker job on a new `ads` queue runs **every 6 hours** and pulls the **last 7 days** for every tracked, connected Meta ad account (the 30-day backfill stays a manual "Sync now"). Accounts synced in the last 5 hours are skipped, so restarting the worker does not re-pull what was just pulled; at most 500 accounts per run, least recently synced first.
+- Same code and same stored rows as the manual sync: the Marketing API reading moved into `@zenora/shared` (`fetchMetaInsights`, `toAdStatData`) and the API's client now delegates to it, so the two cannot drift.
+- An account that fails (e.g. expired access) is marked `error` with the message so the Ads page asks the owner to reconnect, and the other accounts still sync.
+
+**Verified**: typecheck, lint, build, tests green (shared 197, worker 96, api 464 = 757). Live against real Neon: with a stubbed Meta response the real database got 2 ad-day rows with spend in minor units (123.45 → 12345); an immediate second run skipped the account; after forcing it due and restating the spend, the same two rows were updated, not duplicated; with a **real call to graph.facebook.com using a fake token** Meta answered "expired/invalid" and the account was marked `error` with the reconnect message. Test data deleted.
+
+**Not verified / open**
+- **No real Meta ad account** has been synced (no credentials): the response shape is from Meta's documentation and the mocked tests.
+- The sweep reads `META_GRAPH_API_VERSION` from the environment (default v21.0), not from the admin dashboard like the API does.
+- Instagram/WhatsApp referral attribution and the "qualified" column are unchanged (still open).
+
 ## 2026-10-04 — Refunds: invoice status and referral commission
 
 Razorpay refunds were not handled: the invoice stayed "paid" and the referrer kept the commission.

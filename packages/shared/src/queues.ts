@@ -12,7 +12,8 @@ export const QUEUE_NAMES = [
   "sequences",
   "appointments",
   "webhooks",
-  "privacy"
+  "privacy",
+  "ads"
 ] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
