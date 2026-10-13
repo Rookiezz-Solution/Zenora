@@ -1,4 +1,5 @@
-# Render Blueprint: Zenora on Render's FREE tier, for TESTING.
+# Render Blueprint: Zenora API + worker on Render's FREE tier, for TESTING
+# (web app on Vercel; see docs/GO_LIVE_FREE.md).
 #
 # Free-tier facts that shape this file (see docs/RENDER.md before deploying):
 #  - Render's free tier has web services only (no background workers), so the
@@ -11,8 +12,9 @@
 #  - Database and Redis are NOT created here: use Neon and Upstash (free) and paste
 #    their connection strings when Render asks (the "sync: false" values).
 #
-# URLs below assume the service names are free. If Render adds a suffix, change
-# APP_URL / API_URL / NEXT_PUBLIC_API_URL to the real addresses and redeploy.
+# The WEB APP is not here: it is hosted on Vercel (apps/web/vercel.json). Only the
+# API and the worker run on Render. API_URL below assumes the name zenora-api is
+# free; if Render adds a suffix, change API_URL to the real address.
 
 envVarGroups:
   - name: zenora-shared
@@ -47,7 +49,7 @@ services:
       - key: AUTH_SECRET
         generateValue: true
       - key: APP_URL
-        value: https://zenora-web.onrender.com
+        sync: false # your Vercel address, e.g. https://zenora-xyz.vercel.app (no trailing slash)
       - key: API_URL
         value: https://zenora-api.onrender.com
       - key: SESSION_COOKIE_SAMESITE
@@ -71,21 +73,3 @@ services:
     startCommand: node apps/worker/dist/index.js
     envVars:
       - fromGroup: zenora-shared
-
-  - type: web
-    name: zenora-web
-    runtime: node
-    plan: free
-    region: singapore
-    buildCommand: >-
-      corepack enable &&
-      pnpm install --frozen-lockfile &&
-      pnpm exec turbo run build --filter=@zenora/web...
-    startCommand: pnpm --filter @zenora/web exec next start -p $PORT
-    envVars:
-      - key: NODE_VERSION
-        value: "22"
-      - key: NEXT_PUBLIC_API_URL
-        value: https://zenora-api.onrender.com
-      - key: NEXT_PUBLIC_SUPPORT_EMAIL
-        sync: false # optional

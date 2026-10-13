@@ -1,4 +1,5 @@
 # Deploying Zenora to Render (free tier, for testing)
+n> **Note:** the web app is now hosted on Vercel and only the API and worker run on Render. The current step-by-step is `docs/GO_LIVE_FREE.md`; this file has extra Render detail.
 
 This puts the whole app on the internet for **testing and demos**, at no cost. It is not for real customers: see "What free means" below. The blueprint is `render.yaml` at the repo root.
 
