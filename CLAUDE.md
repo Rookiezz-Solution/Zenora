@@ -29,3 +29,20 @@ It is industry-generic: every business can customise its own pipelines, stages, 
 - Write tests for business logic (automation engine, routing, credit metering, permissions). Aim for green CI before moving on.
 - Use feature flags for anything half-built. Use test/sandbox keys only; never commit secrets (`.env.example` lists every variable).
 - Match the UI in `design/screens` (layout, copy, fields, dropdown options). Brand colour #8B4FA8; fonts Bricolage Grotesque (headings) and Plus Jakarta Sans (body).
+
+## How work is done in this repo (carried over from earlier Claude sessions)
+Claude Code's chat history and memory live on each person's own laptop and are **not** shared through Git, so anything a new Claude session must know is written here and in `docs/`. Current state: `docs/PROGRESS.md` (newest entry first), deployment in `docs/DEPLOYMENT.md` / `docs/RENDER.md`, security in `docs/SECURITY.md`, team workflow in `CONTRIBUTING.md`.
+
+**Routine for a change:** plan briefly → build → unit tests for the logic → `pnpm typecheck && pnpm lint && pnpm test && pnpm build` → try it for real (run the servers, use the browser, real database) → delete any test data you created → add an entry to the top of `docs/PROGRESS.md` (what was done, what was verified, what is **not** verified/open, stated honestly) → commit and push. Report failures and skipped steps plainly.
+
+**Ask the user first for:** plan prices or limits changes, workspace/account deletion behaviour, automatically sending customer data to third parties, real money movement, widening third-party permissions (e.g. Meta `ads_management`), and anything telephony/transcription/meeting-bot (that area is **paused** until the user says so). Real credentials are entered by a super admin in the app (Admin → Integrations), never committed.
+
+**Running locally:** use `dotenv-cli` (`npx dotenv -e ../../.env -- <command>`) for each of: API (`apps/api`, `node dist/main.js` after `pnpm build`), worker (`apps/worker`, `node dist/index.js`) and web (`apps/web`, `pnpm dev`). Do not `source .env` in bash: the worker can silently connect to the wrong Redis. API on :4000, web on :3000.
+
+**Gotchas**
+- `packages/shared` and `packages/db` are consumed from their built `dist`: rebuild after changing them. Stop all running Zenora node processes before `pnpm build`/`pnpm test` (they lock the Prisma engine file and the db build fails).
+- Schema changes: `prisma migrate dev` fails in non-interactive shells. Use `npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel ./prisma/schema.prisma --script`, put the SQL in `packages/db/prisma/migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql`, then `pnpm db:migrate:deploy` and `pnpm db:generate`.
+- Neon (Postgres) occasionally is unreachable for seconds (`P1001`): retry, it is not a code bug.
+- On Windows, multi-line shell heredocs containing apostrophes/backticks can break: write patch scripts or files with the editor tools and run them, and re-check that a scripted edit really applied.
+- Every query is scoped by `workspaceId`; use the existing guards (`JwtAuthGuard`, `PermissionsGuard`, `@RequirePermission`) and `common/workspace-refs.ts` ownership checks, and Zod validation pipes on every body.
+- Test accounts use emails like `designrookiezz+itemNN@gmail.com`; delete them and their workspaces when done.
